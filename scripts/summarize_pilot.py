@@ -32,6 +32,21 @@ def main():
  if failures:
   result.update(status='incomplete',failures=failures)
   lines=['# Matched training pilot','', 'Incomplete; no accuracy promotion.',*['- '+r['run']+': '+r['error'] for r in failures]]
+  # Preserve useful completed evidence without treating missing seeds as successes.
+  result['available_seed_diagnostics']={}
+  for seed in sorted({key[0] for key in groups}):
+   if (seed,'flow') not in groups or (seed,'geometry') not in groups:continue
+   config=groups[seed,'flow']['training']['config']
+   cluster_path=Path(config['development_clusters'])
+   if hashlib.sha256(cluster_path.read_bytes()).hexdigest()!=config['development_clusters_sha256']:raise ValueError('development clusters changed')
+   clusters=json.loads(cluster_path.read_text())['clusters']
+   control=groups[seed,'flow'];geometry=groups[seed,'geometry']
+   signature=lambda g:[(r['step'],r['bucket'],r['batch'],r['flow_rng_sha256'],r['input_ids_sha256']) for r in g['training']['rows']]
+   if signature(control)!=signature(geometry):raise ValueError('paired inputs or stochastic draws differed')
+   paired={m:paired_comparison(means_by_target(control['records'],'steps25_cfg2',m),means_by_target(geometry['records'],'steps25_cfg2',m),clusters=clusters) for m in METRICS}
+   result['available_seed_diagnostics'][str(seed)]=paired
+   tm=paired['tm_fixed_reference'];lines+=['',f"Available seed {seed}: control TM {tm['ours']:.5f}, geometry TM {tm['theirs']:.5f}, paired difference {tm['theirs_minus_ours']:+.5f}, cluster CI {tm['ci95']}. This does not replace the missing replication."]
+  lines+=['','GPU hardware for completed evaluations:','```json',json.dumps(result['runs'],indent=2),'```']
  else:
   config=next(iter(groups.values()))['training']['config']
   if any(g['training']['config']!=config for g in groups.values()):raise ValueError('training protocols differ')

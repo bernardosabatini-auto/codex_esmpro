@@ -27,7 +27,7 @@ def main():
  config['target_ids']=ids
  manifest=dict(status='running',model='pair_online_final_esmc',config=config,source=str(a.source),completed_predictions=0,batches=[],controls=[],
     timing_scope='batched sequences to three backbone predictions, including tokenization, ESMC, head, decoder and coordinate transfer; excludes model loading, validation, scoring and artifact writes',
-    precision='ESMC BF16 weights as inherited; head fp16_mlp; decoder strict FP32',samples=3)
+    precision=dict(embedding=config.get('embedding_precision','bf16'),head=config.get('flow_precision','fp16_mlp'),decoder='fp32'),samples=3)
  atomic_json(a.output/'manifest.json',manifest);telemetry=None;scorers=None
  try:
   path=a.source/'data/phase1_dataset/dataset_exp_val_esmc.h5';records=[read_record(path,'val',n,embedding_dim=2560) for n in ids]
@@ -35,11 +35,11 @@ def main():
   ckpt=a.source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt';manifest['checkpoint']=file_identity(ckpt,hash_contents=True)
   model,arch=load_legacy(ckpt,trusted_pickle=True);model.cuda().eval().requires_grad_(False)
   ae=a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt';manifest['decoder_checkpoint']=file_identity(ae,hash_contents=True)
-  decoder=load_proteinae(a.source/'ProteinAE_v1',ae).cuda();embedding=FinalESMC(a.source/'data/esmc6b')
+  decoder=load_proteinae(a.source/'ProteinAE_v1',ae).cuda();embedding=FinalESMC(a.source/'data/esmc6b',precision=config.get('embedding_precision','bf16'))
   manifest['embedding_artifacts']=[file_identity(p,hash_contents=True) for p in sorted((a.source/'data/esmc6b').glob('*')) if p.is_file() and p.suffix in ('.json','.safetensors')]
   manifest['resident_parameters']=sum(p.numel() for m in (model,decoder,embedding.model) for p in m.parameters())
   cfg=SampleConfig(steps=25,guidance=2);batches={int(k):v for k,v in config['batches'].items()};buckets=requests_by_bucket(records,batches,3)
-  options=dict(flow_precision='fp16_mlp',decoder_precision='fp32')
+  options=dict(flow_precision=config.get('flow_precision','fp16_mlp'),decoder_precision='fp32')
   def tensors(requests,length):
    unique={r['id']:r for r,_ in requests};ordered=list(unique);index={name:i for i,name in enumerate(ordered)}
    esm=embedding([unique[n]['sequence'] for n in ordered],length)

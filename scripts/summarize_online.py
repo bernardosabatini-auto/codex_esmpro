@@ -3,7 +3,7 @@ from pathlib import Path
 from latentfold.metrics import paired_comparison
 from summarize_comparison import validate_scores,means_by_target,hardware
 p=argparse.ArgumentParser();p.add_argument('--runs',nargs='+',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-run=a.runs[0];m=json.loads((run/'manifest.json').read_text());result=dict(status=m['status'])
+run=a.runs[0];m=json.loads((run/'manifest.json').read_text());result=dict(status=m['status'],precision=m['precision'])
 lines=['# Full sequence-to-backbone benchmark','',f"Status: {m['status']}; predictions: {m['completed_predictions']}/1878."]
 if m['status']=='complete':
  s=json.loads((run/'scores.json').read_text());validate_scores(m,s);root=Path(__file__).resolve().parents[1]

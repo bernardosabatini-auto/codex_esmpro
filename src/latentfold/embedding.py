@@ -1,14 +1,18 @@
 """Frozen final-layer ESMC extraction; explicit padding and no truncation."""
 import torch
+from .precision import inference_precision
 
 
 class FinalESMC:
-    def __init__(self, path, device='cuda'):
+    def __init__(self, path, device='cuda', precision='bf16'):
+        if precision not in ('bf16','fp32'):
+            raise ValueError('unsupported conditioner precision')
         from transformers import AutoModel, AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True, trust_remote_code=False)
-        self.model = AutoModel.from_pretrained(path, dtype=torch.bfloat16,
+        self.model = AutoModel.from_pretrained(path, dtype=torch.bfloat16 if precision=='bf16' else torch.float32,
             local_files_only=True, trust_remote_code=False).eval().to(device).requires_grad_(False)
         self.device = device
+        self.precision = precision
         if self.model.config.hidden_size != 2560:
             raise ValueError('unexpected ESMC conditioner dimensions')
 
@@ -20,7 +24,7 @@ class FinalESMC:
         if enc['input_ids'].shape != (len(sequences),length+2) or enc['attention_mask'].sum(1).tolist() != [len(s)+2 for s in sequences]:
             raise ValueError('tokenizer changed residue correspondence')
         inputs={k:enc[k].to(self.device) for k in ('input_ids','attention_mask')}
-        with torch.autocast('cuda',dtype=torch.bfloat16):
+        with inference_precision(self.precision):
             value=self.model(**inputs,output_hidden_states=False).last_hidden_state[:,1:length+1].float()
         mask=torch.arange(length,device=value.device)[None]<torch.tensor([len(s) for s in sequences],device=value.device)[:,None]
         value=value*mask[...,None]

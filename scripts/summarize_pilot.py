@@ -15,10 +15,12 @@ def geometry_by_target(records,field):
 
 def main():
  p=argparse.ArgumentParser(description=__doc__);p.add_argument('--runs',nargs='+',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
- groups={};failures=[];result=dict(status='running',seeds={},runs={})
+ groups={};failures=[];result=dict(status='running',seeds={},runs={},hardware_warnings=[])
  for run in a.runs:
   try:
-   training=json.loads((run/'training.json').read_text());manifest=json.loads((run/'evaluation/manifest.json').read_text());scores=json.loads((run/'evaluation/scores.json').read_text())
+   training=json.loads((run/'training.json').read_text());manifest=json.loads((run/'evaluation/manifest.json').read_text())
+   if manifest['status']!='complete':raise ValueError(manifest.get('error','incomplete evaluation'))
+   scores=json.loads((run/'evaluation/scores.json').read_text())
    validate_scores(manifest,scores)
    if training['status']!='complete' or training['steps']!=training['config']['updates']:raise ValueError('incomplete training')
    if any(r['aux_to_flow_ratio']>.100001 for r in training['rows']):raise ValueError('auxiliary gradient exceeded cap')
@@ -26,11 +28,15 @@ def main():
    if key in groups:raise ValueError('duplicate seed/arm')
    trace=Path(str(run)+'_nsight.sqlite')
    groups[key]=dict(training=training,records=scores['records'])
-   result['runs'][run.name]=dict(task=task,training_seconds=training['training_seconds'],peak_reserved_gib=training['peak_reserved_bytes']/2**30,
-       training_hardware=hardware(trace,training['batches'],prefix='train::'),evaluation_hardware=hardware(trace,manifest['batches']))
+   result['runs'][run.name]=dict(task=task,training_seconds=training['training_seconds'],peak_reserved_gib=training['peak_reserved_bytes']/2**30)
+   for label,batches,prefix in [('training_hardware',training['batches'],'train::'),('evaluation_hardware',manifest['batches'],'collect::')]:
+    try:result['runs'][run.name][label]=hardware(trace,batches,prefix=prefix)
+    except Exception as error:
+     result['hardware_warnings'].append(dict(run=str(run),stage=label,error=f'{type(error).__name__}: {error}'))
+     result['runs'][run.name][label]=dict(status='unavailable',reason=str(error))
   except Exception as error:failures.append(dict(run=str(run),error=f'{type(error).__name__}: {error}'))
  if failures:
-  result.update(status='incomplete',failures=failures)
+  result.update(status='incomplete',failures=failures,development_gate_passed=False)
   lines=['# Matched training pilot','', 'Incomplete; no accuracy promotion.',*['- '+r['run']+': '+r['error'] for r in failures]]
   # Preserve useful completed evidence without treating missing seeds as successes.
   result['available_seed_diagnostics']={}
@@ -46,6 +52,9 @@ def main():
    paired={m:paired_comparison(means_by_target(control['records'],'steps25_cfg2',m),means_by_target(geometry['records'],'steps25_cfg2',m),clusters=clusters) for m in METRICS}
    result['available_seed_diagnostics'][str(seed)]=paired
    tm=paired['tm_fixed_reference'];lines+=['',f"Available seed {seed}: control TM {tm['ours']:.5f}, geometry TM {tm['theirs']:.5f}, paired difference {tm['theirs_minus_ours']:+.5f}, cluster CI {tm['ci95']}. This does not replace the missing replication."]
+  if any(v['tm_fixed_reference']['theirs_minus_ours']<=0 for v in result['available_seed_diagnostics'].values()):
+   result['decision']='Stop this geometry recipe: available nonpositive seeds already violate the all-seeds-positive promotion rule. Preserve the failed stability control; no accuracy promotion or additional scale-up.'
+   lines+=['',result['decision']]
   lines+=['','GPU hardware for completed evaluations:','```json',json.dumps(result['runs'],indent=2),'```']
  else:
   config=next(iter(groups.values()))['training']['config']
@@ -84,6 +93,7 @@ def main():
       f"Development promotion gate: {result['development_gate_passed']}. Confirmation on the locked final test remains required for any accuracy claim.",'',
       'Geometry checks here use the inherited reference-short adjacency proxy because the development cache lacks original residue maps. Training and the new final test have explicit maps.','',
       'GPU hardware and memory:','```json',json.dumps(result['runs'],indent=2),'```']
+ if result['hardware_warnings']:lines+=['','Some profiler intervals have missing counters; those hardware measurements are unavailable. This does not remove valid structure scores.','```json',json.dumps(result['hardware_warnings'],indent=2),'```']
  a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 
 if __name__=='__main__':main()

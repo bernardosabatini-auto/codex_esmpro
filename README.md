@@ -1,5 +1,8 @@
 # ESM → ProteinAE restart
 
+See [the current results snapshot](reports/progress.html) for the active accuracy
+experiments and their decisions.
+
 Start with [the critical review and staged plan](reports/review.html), then the
 [H200 profiling summary](reports/h200_profile.md) and
 [batch precision diagnosis](reports/batch_precision.md), plus the
@@ -30,6 +33,13 @@ gradients over 500 updates and three paired seeds. A subsequent confidence
 ablation reuses the three controls and changes only source-pLDDT residue weights.
 Earlier-layer ESM work is deferred at the user's request. Neither continued
 training nor the new losses are established accuracy improvements yet.
+
+The [geometry pilot](reports/pilot_49461023.md) is now stopped: the two completed
+geometry evaluations have TM changes of −0.00005 and −0.00004 relative to their
+matched controls. The third geometry checkpoint failed the batch/padding
+stability control. Its failed evaluation is preserved. The small positive local
+lDDT changes do not satisfy the practical accuracy gate. Three confidence-weighted
+runs remain a separate ablation; they are not combined with the geometry loss.
 
 This is a minimal research core, extracted from the original project with
 [symbol-level provenance](PROVENANCE.json). It retains both flow architectures

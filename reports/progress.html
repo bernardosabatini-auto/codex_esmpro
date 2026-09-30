@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ESM–ProteinAE experiment results</title><style>body{max-width:1050px;margin:40px auto;padding:0 24px;font:16px/1.5 system-ui;color:#17212b}table{border-collapse:collapse;width:100%}td,th{text-align:left;border-bottom:1px solid #ccc;padding:8px}small{color:#52616e}a{color:#2059a1}</style>
 <h1>ESM → ProteinAE: current evidence</h1>
-<small>Generated from recorded artifacts at 2026-09-30T19:34:10+00:00. This is a saved snapshot.</small>
+<small>Generated from recorded artifacts at 2026-09-30T19:57:14+00:00. This is a saved snapshot.</small>
 <p>Earlier-layer ESM work is deferred, with no GPU allocation. Current tests change the training objective or source-confidence weights while retaining the same folding head.</p>
 <h2>Structure accuracy</h2><p>All 626 development proteins and three samples per protein; every sample retained. Fixed residue correspondence, optimized TM-score and CA lDDT. These are reused development data.</p>
 <table><tr><th>Model</th><th>Mean TM</th><th>CA lDDT</th><th>Coverage</th></tr>
@@ -9,17 +9,17 @@
 <tr><td>Untouched pair_free</td><td>0.55934</td><td>0.66709</td><td>1878/1878</td></tr>
 <tr><td>ESMFold2-Fast</td><td>0.59977</td><td>0.72389</td><td>1878/1878</td></tr>
 <tr><td>flow, seed 7919</td><td>0.56636</td><td>0.67183</td><td>1878/1878</td></tr>
-<tr><td>geometry, seed 7919</td><td colspan="3">Training running, 421/500 updates; evaluation pending</td></tr>
+<tr><td>geometry, seed 7919</td><td>0.56631</td><td>0.67214</td><td>1878/1878</td></tr>
 <tr><td>flow, seed 7920</td><td>0.56588</td><td>0.67167</td><td>1878/1878</td></tr>
-<tr><td>geometry, seed 7920</td><td colspan="3">Training running, 441/500 updates; evaluation pending</td></tr>
+<tr><td>geometry, seed 7920</td><td colspan="3">Training complete, 500/500 updates; evaluation failed</td></tr>
 <tr><td>flow, seed 7921</td><td>0.56505</td><td>0.67021</td><td>1878/1878</td></tr>
-<tr><td>geometry, seed 7921</td><td colspan="3">Training running, 421/500 updates; evaluation pending</td></tr>
-<tr><td>confidence, seed 7919</td><td colspan="3">Training running, 21/500 updates; evaluation pending</td></tr>
-<tr><td>confidence, seed 7920</td><td colspan="3">Training running, 1/500 updates; evaluation pending</td></tr>
-<tr><td>confidence, seed 7921</td><td colspan="3">Training running, 1/500 updates; evaluation pending</td></tr>
+<tr><td>geometry, seed 7921</td><td>0.56501</td><td>0.67062</td><td>1878/1878</td></tr>
+<tr><td>confidence, seed 7919</td><td colspan="3">Training running, 481/500 updates; evaluation pending</td></tr>
+<tr><td>confidence, seed 7920</td><td colspan="3">Training running, 461/500 updates; evaluation pending</td></tr>
+<tr><td>confidence, seed 7921</td><td colspan="3">Training running, 441/500 updates; evaluation pending</td></tr>
 </table><h2>Paired decisions</h2>
 <p>Promotion requires a mean TM gain of at least 0.01, a positive sequence-cluster confidence bound, positive gains in all three training seeds, and no material lDDT or geometry regression. Independent final-test confirmation is required. A better training loss alone does not qualify.</p>
-<p>Geometry objective: full paired analysis pending.</p>
+<p><strong>Geometry objective:</strong> Stop this geometry recipe: available nonpositive seeds already violate the all-seeds-positive promotion rule. Preserve the failed stability control; no accuracy promotion or additional scale-up. Complete accuracy coverage was not achieved for all seeds.</p>
 <p>Confidence weighting: full paired analysis pending.</p>
 <h2>Independent test</h2>
 <p>Expanded score-blind curation: running. Eligible targets recovered so far: 0; minimum 32. Original September and January–September screens yielded three and 11 targets respectively. Releases since January 2024 are screened with the same sequence exclusion, residue correspondence and 90% observed-CA coverage requirements.</p>
@@ -34,4 +34,6 @@
 <li><a href="training_data_v1.md">training_data_v1.md</a></li>
 <li><a href="canonical_frames_v1.md">canonical_frames_v1.md</a></li>
 <li><a href="training_profile_49459162.md">training_profile_49459162.md</a></li>
+<li><a href="pilot_49461023.md">pilot_49461023.md</a></li>
+<li><a href="online_49468214.md">online_49468214.md</a></li>
 </ul><p>Code and aggregate reports are synchronized to GitHub. Datasets, weights, target manifests, predictions and profiler traces remain local and ignored by Git.</p></html>

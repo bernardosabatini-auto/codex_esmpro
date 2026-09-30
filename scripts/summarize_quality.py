@@ -40,7 +40,9 @@ def main():
             paired['geometry']={field:paired_comparison(geometry_by_target(rows['flow'],field),geometry_by_target(rows['confidence'],field),clusters=clusters) for field in ('predicted_ca_gaps_on_reference_short','peptide_length_outliers_on_reference_short')}
             if str(seed) in result['seeds']:raise ValueError('duplicate training seed')
             result['seeds'][str(seed)]=paired
-            result['hardware'][run.name]=dict(training_seconds=train['training_seconds'],peak_reserved_gib=train['peak_reserved_bytes']/2**30,training=hardware(Path(str(run)+'_nsight.sqlite'),train['batches'],prefix='train::'))
+            result['hardware'][run.name]=dict(training_seconds=train['training_seconds'],peak_reserved_gib=train['peak_reserved_bytes']/2**30)
+            try:result['hardware'][run.name]['training']=hardware(Path(str(run)+'_nsight.sqlite'),train['batches'],prefix='train::')
+            except Exception as error:result['hardware'][run.name]['training']=dict(status='unavailable',reason=str(error))
         except Exception as error:result['failures'].append(dict(run=str(run),error=f'{type(error).__name__}: {error}'))
     lines=['# Confidence-weighted training pilot','', 'One change to the three matched control runs: fixed source-pLDDT residue weights. Same 1,024 proteins, input order, random draws, 500 updates, learning rate and inference settings. No examples dropped.']
     if not result['failures'] and len(result['seeds'])==3:

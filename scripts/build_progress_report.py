@@ -30,6 +30,10 @@ def main():
     if external and external['status']=='complete':
         s=read('runs/external_49461971/scores.json')['summaries']['esmfold2_steps50_loops3']
         lines.append(f'<tr><td>ESMFold2-Fast</td><td>{s["mean_tm_fixed_reference"]:.5f}</td><td>{s["mean_ca_lddt"]:.5f}</td><td>{s["predictions"]}/1878</td></tr>')
+    online=read('runs/online_49470256/manifest.json')
+    if online and online['status']=='complete':
+        s=read('runs/online_49470256/scores.json')['summaries']['steps25_cfg2']
+        lines.append(f'<tr><td>Pair, fresh final-layer ESMC, strict FP32</td><td>{s["mean_tm_fixed_reference"]:.5f}</td><td>{s["mean_ca_lddt"]:.5f}</td><td>{s["predictions"]}/1878</td></tr>')
     for pattern in ('pilot_49461023_*','quality_49466461_*'):
         for run in sorted((ROOT/'runs').glob(pattern)):
             if not run.is_dir(): continue
@@ -45,6 +49,8 @@ def main():
         '<p>Promotion requires a mean TM gain of at least 0.01, a positive sequence-cluster confidence bound, positive gains in all three training seeds, and no material lDDT or geometry regression. Independent final-test confirmation is required. A better training loss alone does not qualify.</p>']
     for name,relative in [('Geometry objective','reports/pilot_49461023.json'),('Confidence weighting','reports/quality_49466461.json')]:
         d=read(relative)
+        if d and d.get('decision'):
+            lines.append(f'<p><strong>{name}:</strong> {esc(d["decision"])} Complete accuracy coverage was not achieved for all seeds.</p>');continue
         if not d or d['status']!='complete':
             lines.append(f'<p>{name}: full paired analysis pending.</p>');continue
         s=d['mean_across_training_seeds']['tm_fixed_reference'];ci=s['ci95']
@@ -58,7 +64,7 @@ def main():
         '<h2>Hardware and scope</h2><p>The validated training batches are 128/64/32/16 proteins at padded lengths 128/256/384/512. Training uses an FP16 head with checked parameter gradients and a strict FP32 decoder. The final backward profile measured 90.1% SM activity during computation and 63.5% across the capture. Actual experiment counters are reported in the linked analyses. SM activity is not percent of peak FLOPs.</p>',
         '<p>External-model inference measured 81.1% SM activity during collection and 74.6% over the capture. Its timing includes sequence conditioning; the cached pair-head timing excludes ESMC. No end-to-end speed ratio is claimed.</p>',
         '<h2>Evidence and reproducibility</h2><ul>']
-    for filename in ('comparison_49414524.md','external_49461971.md','external_strata_49461971.md','geometry_49453471.md','training_data_v1.md','canonical_frames_v1.md','training_profile_49459162.md','pilot_49461023.md','quality_49466461.md','holdout_expanded_20260930.md'):
+    for filename in ('comparison_49414524.md','external_49461971.md','external_strata_49461971.md','geometry_49453471.md','training_data_v1.md','canonical_frames_v1.md','training_profile_49459162.md','pilot_49461023.md','quality_49466461.md','online_49468214.md','online_49470256.md','holdout_expanded_20260930.md'):
         if (ROOT/'reports'/filename).exists():lines.append(f'<li><a href="{filename}">{filename}</a></li>')
     lines += ['</ul><p>Code and aggregate reports are synchronized to GitHub. Datasets, weights, target manifests, predictions and profiler traces remain local and ignored by Git.</p></html>']
     (ROOT/'reports/progress.html').write_text('\n'.join(lines)+'\n')

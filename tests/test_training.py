@@ -34,3 +34,17 @@ class TrainingTests(unittest.TestCase):
         for (name,p),(othername,q) in zip(other.named_parameters(),uncheckpointed.named_parameters()):
             self.assertEqual(name,othername)
             if p.grad is not None:torch.testing.assert_close(p.grad,q.grad,atol=1e-6,rtol=1e-5)
+
+class GradientCapTests(unittest.TestCase):
+    def test_cap_and_zero_auxiliary_equivalence(self):
+        from latentfold.training import controlled_backward
+        model=torch.nn.Linear(3,2,bias=False)
+        flow=model.weight.square().sum()
+        geometry=(model.weight*torch.tensor([[1.,-3.,2.],[5.,1.,-4.]])).sum()*100
+        flow_grad=2*model.weight.detach()
+        stats=controlled_backward(model,flow,geometry,weight=1,max_ratio=.1,loss_scale=1)
+        self.assertAlmostEqual(stats['aux_to_flow_ratio'],.1,places=6)
+        self.assertLessEqual(float((model.weight.grad-flow_grad).norm()/flow_grad.norm()),.100001)
+        model.zero_grad(set_to_none=True)
+        controlled_backward(model,model.weight.square().sum(),None,weight=0,loss_scale=128)
+        torch.testing.assert_close(model.weight.grad,flow_grad)

@@ -11,7 +11,7 @@ from latentfold.checkpoints import load_legacy
 from latentfold.data import read_record,collate
 from latentfold.decoder import load_proteinae
 from latentfold.flow import FlowConfig
-from latentfold.training import objective
+from latentfold.training import objective,controlled_backward
 from latentfold.precision import inference_precision
 from profile_gpu import Telemetry,atomic_json
 
@@ -35,6 +35,7 @@ def main():
     p.add_argument('--padded-buckets',action='store_true')
     p.add_argument('--candidate-precision',choices=['bf16','fp16'],default='bf16')
     p.add_argument('--profile-precision',choices=['fp32','fp16'],default='fp32')
+    p.add_argument('--controlled-gradient',action='store_true')
     p.add_argument('--batches',nargs='+',type=int,default=[1,2,4,8,16,32])
     a=p.parse_args();a.output.mkdir(parents=True,exist_ok=False)
     torch.set_num_threads(4);torch.manual_seed(0);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
@@ -108,6 +109,7 @@ def main():
                     if time.monotonic()>deadline:raise TimeoutError('internal profile time cap')
                     row=dict(length=padded_length or meta['length'],actual_length=meta['length'],target_id=meta['id'],batch=count,arm=arm,precision=mode)
                     try:
+                        model.zero_grad(set_to_none=True);gc.collect();torch.cuda.empty_cache()
                         batch=make_batch(record,meta,count,padded_length);torch.cuda.reset_peak_memory_stats()
                         seconds=[]
                         for repetition in range(3):
@@ -116,12 +118,20 @@ def main():
                             name=f'collect::train::{index}::{arm}::{count}::{repetition}'
                             torch.cuda.synchronize();tick=time.monotonic()
                             with inference_precision(mode):
-                                loss,stats=objective(model,decoder,batch,config,generator=generator,
-                                    geometry_weight=weight if arm=='geometry' else 0,geometry_seed=19,max_geometry=4)
+                                parts=objective(model,decoder,batch,config,generator=generator,
+                                    geometry_weight=weight if arm=='geometry' else 0,geometry_seed=19,max_geometry=4,
+                                    return_parts=a.controlled_gradient)
                             scale=128. if mode=='fp16' else 1.
-                            (loss*scale).backward()
-                            for parameter in model.parameters():
-                                if parameter.grad is not None:parameter.grad.div_(scale)
+                            if a.controlled_gradient:
+                                loss,geometry,stats=parts
+                                stats.update(controlled_backward(model,loss,geometry,weight=weight,loss_scale=scale))
+                                del geometry
+                            else:
+                                loss,stats=parts
+                                (loss*scale).backward()
+                                for parameter in model.parameters():
+                                    if parameter.grad is not None:parameter.grad.div_(scale)
+                            del parts
                             norm=torch.nn.utils.clip_grad_norm_(model.parameters(),1.,error_if_nonfinite=True)
                             # Optimizer allocations and arithmetic included; lr=0
                             # keeps the same reference weights throughout sizing.
@@ -141,6 +151,8 @@ def main():
                         model.zero_grad(set_to_none=True)
                         if 'loss' in locals(): del loss
                         if 'batch' in locals(): del batch
+                        if 'parts' in locals(): del parts
+                        if 'geometry' in locals(): del geometry
                         gc.collect();torch.cuda.empty_cache();break
                     atomic_json(a.output/'profile.json',report)
         report.update(status='complete',candidate_gradient_controls_passed=all(r['passed'] for r in report['precision_controls']))

@@ -1,0 +1,16 @@
+import argparse,json
+from pathlib import Path
+from latentfold.metrics import paired_comparison
+from summarize_comparison import validate_scores,means_by_target,hardware
+p=argparse.ArgumentParser();p.add_argument('--runs',nargs='+',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+run=a.runs[0];m=json.loads((run/'manifest.json').read_text());result=dict(status=m['status'])
+lines=['# Full sequence-to-backbone benchmark','',f"Status: {m['status']}; predictions: {m['completed_predictions']}/1878."]
+if m['status']=='complete':
+ s=json.loads((run/'scores.json').read_text());validate_scores(m,s);root=Path(__file__).resolve().parents[1]
+ ref=json.loads((root/'runs/comparison_49414524_0/scores.json').read_text());clusters=json.loads((root/'runs/development_clusters/clusters.json').read_text())['clusters']
+ if ref['usalign']!=s['usalign']:raise ValueError('scoring protocol differs')
+ result['online_minus_cached']={metric:paired_comparison(means_by_target(ref['records'],'steps25_cfg2',metric),means_by_target(s['records'],'steps25_cfg2',metric),clusters=clusters) for metric in ('tm_fixed_reference','ca_lddt')}
+ seconds=sum(r['seconds'] for r in m['batches']);result.update(seconds=seconds,proteins_per_second=626/seconds,predictions_per_second=1878/seconds,resident_parameters=m['resident_parameters'],peak_reserved_gib=max(r['peak_reserved_bytes'] for r in m['batches'])/2**30,hardware=hardware(Path(str(run)+'_nsight.sqlite'),m['batches']))
+ lines+=['',m['timing_scope'],'','Final ESMC layer only, with three samples averaged per target. Embeddings are recomputed from input sequences. The external ESMFold2 run used one protein at a time, whereas this pipeline batches different proteins: these numbers are not a matched-batch latency or optimized-throughput speed ratio.','', '```json',json.dumps(result,indent=2),'```']
+else:lines+=['',m.get('error','Incomplete; no performance claim.')]
+a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')

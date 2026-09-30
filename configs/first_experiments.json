@@ -117,7 +117,7 @@
   "accuracy_experiment_stages": {
     "data_contract": {
       "development": "Existing 626 proteins remain reused development data. Freeze evaluation at 25 steps, guidance 2 and three paired inference samples per target.",
-      "final_test": "Select and lock a separate experimental test manifest with sequence-family separation, residue maps and source provenance before new folding-head training; do not tune on its scores.",
+      "final_test": "The original pre-training manifest lock could not be satisfied: blind September screening produced only three eligible targets. On 2026-09-30 freeze the broader Jan\u2013Sep selection protocol and exclusion corpus before training; allow score-blind CPU curation during the development pilot. Final manifest and independent confirmation remain required before accuracy promotion.",
       "missing_maps": "Do not guess adjacency through missing residues. Use verified continuous training records or explicit residue maps for geometry supervision; retain and separately report all development strata.",
       "uncertainty": "Sequence-cluster bootstrap where cluster labels have been constructed; prediction samples are repeated measurements, not independent proteins. Training seeds are independent replications."
     },
@@ -135,8 +135,10 @@
       "gpus": 6,
       "layout": "Two objectives times three paired training seeds; six independent single-GPU jobs, no distributed training.",
       "walltime_cap_minutes_per_job": 120,
-      "update_budget": "Set from measured training throughput before submission. Match proteins, stochastic flow draws and optimizer updates; also report total GPU cost, since geometry supervision costs extra.",
-      "reference": "Retain the untouched checkpoint to distinguish continued-training gain from the contribution of the new loss."
+      "update_budget": 500,
+      "reference": "Retain the untouched checkpoint to distinguish continued-training gain from the contribution of the new loss.",
+      "training_proteins": 1024,
+      "note": "Small, fully residue-mapped training pilot; no general scaling inference. Two objectives times three paired training seeds. Auxiliary parameter gradient is capped at 10% of the flow gradient."
     },
     "resource_rules": {
       "max_total_project_gpus_running_or_pending": 8,

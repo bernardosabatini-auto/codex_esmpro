@@ -86,12 +86,12 @@ def notify(root, state, key, message, config):
 
 def followup(root, job, config):
     action = job.get('completion_action')
-    if action not in ('summarize_comparison', 'summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout'):
+    if action not in ('summarize_comparison', 'summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout', 'summarize_pilot'):
         raise ValueError('unrecognized completion action')
     ids = job_ids(job)
     if action == 'summarize_comparison' and len(ids) != 2:
         raise ValueError('comparison follow-up requires two registered tasks')
-    prefix = {'summarize_hybrid': 'hybrid', 'summarize_comparison': 'comparison', 'summarize_geometry': 'geometry', 'summarize_training_profile': 'training_profile', 'summarize_holdout': 'holdout'}[action]
+    prefix = {'summarize_hybrid': 'hybrid', 'summarize_comparison': 'comparison', 'summarize_geometry': 'geometry', 'summarize_training_profile': 'training_profile', 'summarize_holdout': 'holdout', 'summarize_pilot': 'pilot'}[action]
     report = root/'reports'/f"{prefix}_{job['id']}"
     command = [config['python'], str(root/'scripts'/f'{action}.py'), '--runs',
                *[str(root/'runs'/f'{prefix}_{i}') for i in ids], '--output', str(report)]
@@ -122,7 +122,10 @@ def tick_local(root, state, config):
         if root/'runs' not in status_path.parents:raise ValueError('local status outside runs')
         result=subprocess.run(['systemctl','--user','show',unit,'-p','ActiveState','-p','Result'],capture_output=True,text=True,check=True,timeout=10)
         fields=dict(line.split('=',1) for line in result.stdout.splitlines() if '=' in line)
-        data=json.loads(status_path.read_text()) if status_path.exists() else {'status':'running'}
+        try:
+            data=json.loads(status_path.read_text()) if status_path.exists() else {'status':'running'}
+        except json.JSONDecodeError:
+            outstanding.append(unit);continue
         if data['status']=='running' and fields.get('ActiveState') in ('active','activating'):
             outstanding.append(unit);continue
         if data['status']=='running':
@@ -178,7 +181,7 @@ def tick(root, config, query=scheduler_states, analyze=followup):
         if not all(rows[i]['state'] in TERMINAL for i in ids):
             continue
         success = all(rows[i]['state'] == 'COMPLETED' and rows[i]['exit_code'] == '0:0' for i in ids)
-        if not success and job.get('completion_action') not in ('summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout'):
+        if not success and job.get('completion_action') not in ('summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout', 'summarize_pilot'):
             entry.update(handled=True, outcome='job_failed', handled_at=stamp())
         elif not job.get('completion_action'):
             entry.update(handled=True, outcome='completed', handled_at=stamp())

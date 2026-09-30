@@ -12,7 +12,11 @@ from latentfold.precision import inference_precision
 from profile_gpu import atomic_json,Telemetry
 
 
-def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+def sha(path):
+    value=hashlib.sha256()
+    with Path(path).open('rb') as f:
+        for block in iter(lambda:f.read(1024*1024),b''):value.update(block)
+    return value.hexdigest()
 
 
 def train(config,task,out):
@@ -23,7 +27,8 @@ def train(config,task,out):
     data=json.loads(manifest_path.read_text())
     if data['status']!='complete':raise ValueError('training data incomplete')
     locked=json.loads(holdout.read_text())
-    if len(locked['targets'])<32:raise ValueError('independent test was not locked')
+    if locked.get('status')!='selection_protocol_locked' and len(locked.get('targets',[]))<32:
+        raise ValueError('neither test-selection protocol nor final manifest was locked')
     report=dict(status='running',task=task,config=config,rows=[],steps=0,batches=[],job_id=os.environ.get('SLURM_JOB_ID'))
     atomic_json(out/'training.json',report)
     torch.manual_seed(task['seed']);torch.set_num_threads(4);torch.cuda.set_device(0)
@@ -37,7 +42,11 @@ def train(config,task,out):
             record=dict(id=name,sequence=str(g.attrs['sequence']),**{k:torch.from_numpy(g[src][:]) for k,src in [('esm','esm2_emb'),('z','z'),('ca','ca_coords'),('adjacent','adjacent')]})
             if hashlib.sha256(record['sequence'].encode()).hexdigest()!=meta['sequence_sha256']:raise ValueError('training sequence mismatch')
             records[name]=record;buckets[meta['bucket']].append(name)
-    model,arch=load_legacy(source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt',trusted_pickle=True)
+    initial=source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt'
+    decoder_path=source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt'
+    if sha(initial)!=config['initial_checkpoint_sha256'] or sha(decoder_path)!=config['decoder_checkpoint_sha256']:
+        raise ValueError('source checkpoint changed since the strict FP32 baseline')
+    model,arch=load_legacy(initial,trusted_pickle=True)
     model.cuda().train();model.checkpoint_blocks=True;model.pair.checkpoint_blocks=True
     decoder=load_proteinae(source/'ProteinAE_v1',source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt').cuda()
     optimizer=torch.optim.AdamW(model.parameters(),lr=config['learning_rate'],weight_decay=.01,foreach=False)

@@ -1,0 +1,74 @@
+"""Validate paired training draws and compare full-sampling development accuracy."""
+import argparse,json,hashlib
+from pathlib import Path
+import numpy as np
+from latentfold.metrics import paired_comparison
+from summarize_comparison import validate_scores,means_by_target,hardware
+
+METRICS=('tm_fixed_reference','ca_lddt')
+
+def geometry_by_target(records,field):
+ groups={}
+ for row in records:groups.setdefault(row['target_id'],[]).append(row[field]/max(1,row['reference_adjacent_short_count']))
+ return {k:float(np.mean(v)) for k,v in groups.items()}
+
+
+def main():
+ p=argparse.ArgumentParser(description=__doc__);p.add_argument('--runs',nargs='+',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+ groups={};failures=[];result=dict(status='running',seeds={},runs={})
+ for run in a.runs:
+  try:
+   training=json.loads((run/'training.json').read_text());manifest=json.loads((run/'evaluation/manifest.json').read_text());scores=json.loads((run/'evaluation/scores.json').read_text())
+   validate_scores(manifest,scores)
+   if training['status']!='complete' or training['steps']!=training['config']['updates']:raise ValueError('incomplete training')
+   if any(r['aux_to_flow_ratio']>.100001 for r in training['rows']):raise ValueError('auxiliary gradient exceeded cap')
+   task=training['task'];key=(task['seed'],task['arm'])
+   if key in groups:raise ValueError('duplicate seed/arm')
+   trace=Path(str(run)+'_nsight.sqlite')
+   groups[key]=dict(training=training,records=scores['records'])
+   result['runs'][run.name]=dict(task=task,training_seconds=training['training_seconds'],peak_reserved_gib=training['peak_reserved_bytes']/2**30,
+       training_hardware=hardware(trace,training['batches'],prefix='train::'),evaluation_hardware=hardware(trace,manifest['batches']))
+  except Exception as error:failures.append(dict(run=str(run),error=f'{type(error).__name__}: {error}'))
+ if failures:
+  result.update(status='incomplete',failures=failures)
+  lines=['# Matched training pilot','', 'Incomplete; no accuracy promotion.',*['- '+r['run']+': '+r['error'] for r in failures]]
+ else:
+  config=next(iter(groups.values()))['training']['config']
+  if any(g['training']['config']!=config for g in groups.values()):raise ValueError('training protocols differ')
+  if set(groups)!={(t['seed'],t['arm']) for t in config['tasks']}:raise ValueError('task coverage differs')
+  cluster_path=Path(config['development_clusters'])
+  if hashlib.sha256(cluster_path.read_bytes()).hexdigest()!=config['development_clusters_sha256']:raise ValueError('development clusters changed')
+  cluster_data=json.loads(cluster_path.read_text());clusters=cluster_data['clusters']
+  baseline=Path(config['reference_run']);bm=json.loads((baseline/'manifest.json').read_text());bs=json.loads((baseline/'scores.json').read_text());validate_scores(bm,bs)
+  setting='steps25_cfg2';baseline_scores={m:means_by_target(bs['records'],setting,m) for m in METRICS}
+  lines=['# Matched training pilot','',f"{config['updates']} updates; {len(config['tasks'])} jobs; fixed 1,024-protein training subset. Full 25-step/guidance-2 sampling, three fixed samples averaged per development protein. No oracle selection.",'',
+     'This is a small continued-training pilot. The 626 proteins are reused development data; scores from the locked final test are not used here.','',
+     f"Uncertainty: paired sequence-cluster bootstrap across {cluster_data['n_clusters']} operational clusters. Inference samples are repeated measurements, not independent proteins.",'',
+     '| Training seed | Control mean TM | Geometry mean TM | Difference [95% cluster CI] | Control vs untouched |','|---:|---:|---:|---|---:|']
+  aggregate={arm:{m:{} for m in METRICS} for arm in ('flow','geometry')}
+  for seed in sorted({key[0] for key in groups}):
+   control=groups[seed,'flow'];geometry=groups[seed,'geometry']
+   signature=lambda g:[(r['step'],r['bucket'],r['batch'],r['flow_rng_sha256'],r['input_ids_sha256']) for r in g['training']['rows']]
+   if signature(control)!=signature(geometry):raise ValueError('paired training inputs or stochastic draws differed')
+   paired={}
+   for metric in METRICS:
+    means={arm:means_by_target(groups[seed,arm]['records'],setting,metric) for arm in ('flow','geometry')}
+    paired[metric]=paired_comparison(means['flow'],means['geometry'],clusters=clusters)
+    paired['flow_vs_untouched_'+metric]=paired_comparison(baseline_scores[metric],means['flow'],clusters=clusters)
+    for arm in means:
+     for name,value in means[arm].items():aggregate[arm][metric].setdefault(name,[]).append(value)
+   paired['geometry']={field:paired_comparison(geometry_by_target(control['records'],field),geometry_by_target(geometry['records'],field),clusters=clusters) for field in ('predicted_ca_gaps_on_reference_short','peptide_length_outliers_on_reference_short')}
+   result['seeds'][str(seed)]=paired;tm=paired['tm_fixed_reference'];ci=tm['ci95']
+   lines.append(f"| {seed} | {tm['ours']:.5f} | {tm['theirs']:.5f} | {tm['theirs_minus_ours']:+.5f} [{ci[0]:+.5f}, {ci[1]:+.5f}] | {paired['flow_vs_untouched_tm_fixed_reference']['theirs_minus_ours']:+.5f} |")
+  result['mean_across_training_seeds']={metric:paired_comparison({k:float(np.mean(v)) for k,v in aggregate['flow'][metric].items()}, {k:float(np.mean(v)) for k,v in aggregate['geometry'][metric].items()},clusters=clusters) for metric in METRICS}
+  tm=result['mean_across_training_seeds']['tm_fixed_reference'];lddt=result['mean_across_training_seeds']['ca_lddt']
+  accuracy=tm['theirs_minus_ours']>=.01 and tm['ci95'][0]>0 and len(result['seeds'])>=3 and all(v['tm_fixed_reference']['theirs_minus_ours']>0 for v in result['seeds'].values())
+  geometry_ok=all(m['ci95'][1]<=.001 for v in result['seeds'].values() for m in v['geometry'].values())
+  result.update(status='complete',development_gate_passed=accuracy and lddt['ci95'][0]>=-.005 and geometry_ok)
+  lines+=['',f"Mean across training seeds: TM difference {tm['theirs_minus_ours']:+.5f}, cluster CI {tm['ci95']}. This CI averages the observed training seeds; it is not a well-powered estimate of training-seed uncertainty.",
+      f"Development promotion gate: {result['development_gate_passed']}. Confirmation on the locked final test remains required for any accuracy claim.",'',
+      'Geometry checks here use the inherited reference-short adjacency proxy because the development cache lacks original residue maps. Training and the new final test have explicit maps.','',
+      'GPU hardware and memory:','```json',json.dumps(result['runs'],indent=2),'```']
+ a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
+
+if __name__=='__main__':main()

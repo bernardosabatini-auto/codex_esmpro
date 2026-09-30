@@ -39,7 +39,7 @@ def main():
                   *[f'- {k}: {v:+.6f}' for k,v in result['local_descent_lddt_delta'].items()], '',
                   f"Peak allocated / reserved: {data['peak_allocated_bytes']/2**30:.2f} / {data['peak_reserved_bytes']/2**30:.2f} GiB.",
                   f"Hardware counters: {json.dumps(result['hardware'])}",'',
-                  'Long records without source residue maps receive distance terms only; chirality is evaluated only on mapped continuous quadruples. No head weights were updated.']
+                  f"Source residue maps verified for {sum(t['residue_map'] is not None for t in data['targets'])}/{len(data['targets'])} targets; chirality uses only mapped continuous quadruples. No head weights were updated."]
     a.output.parent.mkdir(parents=True,exist_ok=True)
     a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n')
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')

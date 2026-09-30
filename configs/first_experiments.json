@@ -55,7 +55,9 @@
       "priority": 2,
       "hypothesis": "Cached intermediate ESMC representations expose geometry more usefully than the last layer.",
       "comparison": "Audit the negative earlier-layer replacement result first. Validate matched sequence/coordinate identities and train/validation cluster separation in the existing final-layer and layer-80 caches. Use matched small distance/contact probes to ask whether layer 80 contributes complementary information. Only if it does, test an initially zero residual contribution from intermediate features while preserving final-layer conditioning, with the same folding head and unchanged loss.",
-      "gate": "No repeat of an unqualified layer-80 replacement. Complementary probe information must transfer to actual sampled-structure accuracy before generating a large cache or combining with a geometry-loss winner."
+      "gate": "Reopen only if other diagnostics provide a specific new reason. Do not rerun earlier-layer sweeps or build new intermediate-layer caches.",
+      "status": "deferred by user on 2026-09-30; earlier-layer probes already negative",
+      "gpu_budget_hours": 0
     },
     {
       "priority": 3,

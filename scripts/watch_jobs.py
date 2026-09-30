@@ -86,12 +86,12 @@ def notify(root, state, key, message, config):
 
 def followup(root, job, config):
     action = job.get('completion_action')
-    if action not in ('summarize_comparison', 'summarize_hybrid'):
+    if action not in ('summarize_comparison', 'summarize_hybrid', 'summarize_geometry'):
         raise ValueError('unrecognized completion action')
     ids = job_ids(job)
     if action == 'summarize_comparison' and len(ids) != 2:
         raise ValueError('comparison follow-up requires two registered tasks')
-    prefix = 'hybrid' if action == 'summarize_hybrid' else 'comparison'
+    prefix = {'summarize_hybrid': 'hybrid', 'summarize_comparison': 'comparison', 'summarize_geometry': 'geometry'}[action]
     report = root/'reports'/f"{prefix}_{job['id']}"
     command = [config['python'], str(root/'scripts'/f'{action}.py'), '--runs',
                *[str(root/'runs'/f'{prefix}_{i}') for i in ids], '--output', str(report)]
@@ -146,7 +146,7 @@ def tick(root, config, query=scheduler_states, analyze=followup):
         if not all(rows[i]['state'] in TERMINAL for i in ids):
             continue
         success = all(rows[i]['state'] == 'COMPLETED' and rows[i]['exit_code'] == '0:0' for i in ids)
-        if not success and job.get('completion_action') != 'summarize_hybrid':
+        if not success and job.get('completion_action') not in ('summarize_hybrid', 'summarize_geometry'):
             entry.update(handled=True, outcome='job_failed', handled_at=stamp())
         elif not job.get('completion_action'):
             entry.update(handled=True, outcome='completed', handled_at=stamp())

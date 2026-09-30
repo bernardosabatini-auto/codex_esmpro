@@ -70,7 +70,7 @@ def target_noise(ids, lengths, width, *, seed, sample_index=0, stream="flow", de
     return out.to(device)
 
 
-def flow_loss(net, z, esm, mask, config, *, generator):
+def flow_loss(net, z, esm, mask, config, *, generator, return_state=False):
     """One loss, with the effective sample count returned for logging.
 
     Protein weighting is the new default, matching the evaluation's unit of analysis.
@@ -105,7 +105,10 @@ def flow_loss(net, z, esm, mask, config, *, generator):
         loss = errors.sum() / mask.sum()
     if not torch.isfinite(loss):
         raise FloatingPointError("nonfinite flow loss")
-    return loss, {"proteins": b // config.repeats, "noisy_copies": b, "repeats": config.repeats}
+    info = {"proteins": b // config.repeats, "noisy_copies": b, "repeats": config.repeats}
+    if return_state:
+        info["state"] = dict(velocity=pred, x=x, t=t, dropped=drop, mask=mask)
+    return loss, info
 
 
 @torch.no_grad()

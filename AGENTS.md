@@ -14,3 +14,4 @@ This project is a clean restart of the ESM-to-ProteinAE study.
 - Match sampling settings between accuracy and speed measurements.
 - CPU tests use CUDA_VISIBLE_DEVICES='' and at most two numerical-library threads.
 - Do not launch distributed training or install packages into the inherited environment.
+- On 2026-09-30 the user requested execution of the accuracy plan but reported prior negative searches for signal in earlier ESM layers. Defer that branch; spend no GPU budget on earlier-layer sweeps or new intermediate-layer caches without a specific new finding that warrants revisiting it. Prioritize the structural-objective diagnostic and matched training.

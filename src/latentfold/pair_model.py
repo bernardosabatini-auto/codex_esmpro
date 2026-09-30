@@ -159,6 +159,7 @@ class PairFlowNet(nn.Module):
                  d_cond=D_ESM, d_pair=64, n_pair_blocks=6, pair_contact=False, pair_dist_bins=0, pair_fused=False, max_len=512, checkpoint_blocks=False):
         super().__init__()
         self.self_cond = self_cond
+        self.checkpoint_blocks = checkpoint_blocks
         self.in_proj = nn.Linear(D_LAT * (2 if self_cond else 1), d_model)
         self.cond_norm = nn.LayerNorm(d_cond); self.cond_proj = nn.Linear(d_cond, d_model)
         self.null_cond = nn.Parameter(torch.zeros(1, 1, d_model))
@@ -208,6 +209,9 @@ class PairFlowNet(nn.Module):
         h = self.in_proj(x_in) + c_tok + self.pos.weight[:L][None]
         c = self.t_mlp(timestep_embedding(t, self.d_model)) + c_pool
         for blk, pb in zip(self.blocks, pbs):
-            h = blk(h, c, mask, pb)
+            if self.checkpoint_blocks and torch.is_grad_enabled():
+                h = checkpoint(blk, h, c, mask, pb, use_reentrant=False)
+            else:
+                h = blk(h, c, mask, pb)
         s, b = self.out_ada(c).unsqueeze(1).chunk(2, dim=-1)
         return self.out_proj(self.out_norm(h) * (1 + s) + b)

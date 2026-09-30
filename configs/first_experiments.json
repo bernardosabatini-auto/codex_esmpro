@@ -11,7 +11,7 @@
     "peak GPU memory"
   ],
   "development_set": "existing exp-val; explicitly reused development data",
-  "final_test": "new experimental holdout, selected and locked before new training",
+  "final_test": "Locked 34-structure test, selected without model scores; 32 chains at <=256 residues and two at 257-512. Selection protocol was frozen before pilot-score inspection; CPU curation completed after training. Unscored because neither recipe passed promotion.",
   "first_gpu_stage": {
     "proposed_gpu_hour_cap": 2,
     "initial_targets": 64,
@@ -75,7 +75,7 @@
   "predeclared_promotion_rule": {
     "accuracy_track": "Paired mean fixed-correspondence TM gain at least 0.01 over the relevant matched control, sequence-cluster bootstrap lower bound above zero, reproducible across three training seeds, CA-lDDT delta lower confidence bound at least -0.005, geometry-outlier fraction delta upper confidence bound at most 0.001, and complete coverage. Confirm on the locked final test after choosing the recipe.",
     "speed_track": "at least 2x measured end-to-end speed, paired TM noninferiority lower bound above -0.005, predeclared CI procedure",
-    "note": "Practical target, not an achieved accuracy gain. Backward profiling, the training loop and development cluster labels are complete. Independent final-test curation remains pending."
+    "note": "Practical target, not an achieved accuracy gain. Both bounded training recipes failed promotion. A 34-structure final test is locked and remains unscored; its two long targets cannot support a strong long-chain claim."
   },
   "authorization": {
     "user_message": "When we are ready to launch, you can use upto 8 H200s at once",
@@ -110,7 +110,7 @@
     },
     "metrics_report": "reports/comparison_49414524.md",
     "precision_report": "reports/hybrid_49427699.md",
-    "status": "Frozen-checkpoint inference and external ESMFold2 comparison complete; matched new-weight pilots underway.",
+    "status": "Frozen and full-pipeline benchmarks complete. Nine models trained; structural and confidence-weighted recipes fail promotion. Retain untouched pair checkpoint.",
     "inference_policy_config": "configs/validated_inference.json",
     "note": "Validated inference precision does not establish safe or efficient backward precision."
   },
@@ -138,7 +138,10 @@
       "update_budget": 500,
       "reference": "Retain the untouched checkpoint to distinguish continued-training gain from the contribution of the new loss.",
       "training_proteins": 1024,
-      "note": "Small, fully residue-mapped training pilot; no general scaling inference. Two objectives times three paired training seeds. Auxiliary parameter gradient is capped at 10% of the flow gradient."
+      "note": "Small, fully residue-mapped training pilot; no general scaling inference. Two objectives times three paired training seeds. Auxiliary parameter gradient is capped at 10% of the flow gradient.",
+      "status": "stopped; not promoted",
+      "job": "49461023",
+      "outcome": "All six models trained; two valid geometry evaluations have nonpositive paired TM deltas, third failed shape controls. No scale-up."
     },
     "resource_rules": {
       "max_total_project_gpus_running_or_pending": 8,
@@ -148,7 +151,7 @@
       "precision": "Profile and validate training precision independently of inference precision.",
       "followup": "Register explicit IDs and an automatic analysis action before handing off; follow runs through completion and analysis."
     },
-    "budget_note": "These are proposed maximum allocations, not measured runtime estimates or scheduled jobs.",
+    "budget_note": "Historical maximum allocations are recorded above. Actual execution used 7.305 H200 GPU-hours across 17 tasks, including failures and setup; peak simultaneous allocation was seven GPUs.",
     "confidence_pilot": {
       "gpus": 3,
       "updates": 500,
@@ -156,7 +159,15 @@
       "comparison": "Reuse the completed latent-only controls for seeds 7919, 7920 and 7921. Change only training-reference confidence weights; no geometry auxiliary term.",
       "weight": "clip((pLDDT-50)/40, 0.05, 1), normalized by fixed protein-averaged mean within each training length bucket.",
       "controls": "Same 1024 proteins, batch order, stochastic flow draws, optimizer, EMA and full 626-target scoring. Four FP16-vs-FP32 actual parameter-gradient controls before training; fail on nonfinite gradients or failed precision.",
-      "gate": "Same predeclared accuracy/geometry thresholds. If the bounded pilot fails, do not scale this weighting recipe."
+      "gate": "Same predeclared accuracy/geometry thresholds. If the bounded pilot fails, do not scale this weighting recipe.",
+      "status": "complete; not promoted",
+      "job": "49466461",
+      "mean_tm_gain": 0.00030812921547745844,
+      "ci95": [
+        -0.0001133533652907072,
+        0.0007386217522699154
+      ],
+      "outcome": "Small local lDDT gain, no useful TM improvement or long-chain rescue; no scale-up."
     }
   },
   "prior_negative_evidence": {
@@ -166,5 +177,25 @@
     "structural_loss_details": "Gate 19 chooses a random subset across all sampled times and condition-drop states; compares separately decoded endpoint and true latent with separate decoder-noise draws; applies a sigmoid local-distance score and a fixed auxiliary weight. Its source does not gate the structural loss to conditioned late-time examples.",
     "interpretation": "These are concrete differences to test, not established explanations for the negative result. Do not rerun the unchanged loss or blindly replace the final ESM layer.",
     "existing_sensitivity_test": "gate6_decoder_tolerance.py already tests isotropic perturbations and interpolation for an older ESM-2 point head. Extend the evidence to current flow checkpoints, fixed decoder noise, exact coverage and fixed-correspondence metrics rather than presenting sensitivity analysis as new."
+  },
+  "execution_outcome": {
+    "date": "2026-09-30",
+    "trained_models": 9,
+    "updates_per_model": 500,
+    "training_proteins": 1024,
+    "promoted_recipes": 0,
+    "retained_checkpoint": "untouched pair reference",
+    "gpu_hours": 7.305,
+    "peak_allocated_gpus": 7,
+    "earlier_layer_gpu_hours": 0,
+    "next_accuracy_question": "Latent-only controls regressed from mean TM 0.56824 to 0.56576. They use EMA initialization, fresh optimizer state, per-protein reduction and a small length-balanced subset. Audit and isolate resume-policy and training-distribution effects before another loss experiment; do not infer an accuracy ceiling from this pilot.",
+    "final_test": {
+      "targets": 34,
+      "manifest_sha256": "f711a064d277b412c865566d7a3a8f43f3c8339d1927745f22343e711b3c1ec2",
+      "short_targets": 32,
+      "long_targets": 2,
+      "evaluated": false,
+      "report": "reports/holdout_expanded_20260930.md"
+    }
   }
 }

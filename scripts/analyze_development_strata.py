@@ -73,8 +73,9 @@ def main():
         strata['reference_CA_breaks' if discontinuous else 'reference_CA_continuous'] = sorted(
             n for n, (length, adjacent) in metadata.items() if (adjacent < length-1) == discontinuous)
     comparisons = [('untouched_pair', n) for n in candidates if n != 'untouched_pair']
-    if 'geometry' in candidates and 'flow' in candidates:
-        comparisons.append(('flow', 'geometry'))
+    for candidate in ('geometry','confidence'):
+        if candidate in candidates and 'flow' in candidates:
+            comparisons.append(('flow', candidate))
     result = dict(status='complete',diagnostic_only=True, comparisons={})
     lines = ['# Development accuracy diagnostics', '',
              'Exploratory strata; no multiplicity correction and no change to the primary promotion gate. All inference samples are averaged per target; pilot results also average the three training seeds. These confidence intervals are conditional on those seeds.', '',

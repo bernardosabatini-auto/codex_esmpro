@@ -39,7 +39,29 @@ geometry evaluations have TM changes of −0.00005 and −0.00004 relative to th
 matched controls. The third geometry checkpoint failed the batch/padding
 stability control. Its failed evaluation is preserved. The small positive local
 lDDT changes do not satisfy the practical accuracy gate. Three confidence-weighted
-runs remain a separate ablation; they are not combined with the geometry loss.
+runs were a separate ablation; they were not combined with the geometry loss.
+
+The [confidence-weighting pilot](reports/quality_49466461.md) also completed:
+mean paired TM change +0.00031, cluster interval [−0.00011, +0.00074]. It fails
+the +0.01 improvement gate, including within the planned length strata. Neither
+recipe is promoted or scaled. Keep the untouched checkpoint as the accuracy reference.
+
+The latent-only control itself regressed from 0.56824 to 0.56576 mean TM.
+It is continued training from EMA weights with a fresh optimizer, per-protein
+loss reduction and a small, length-balanced subset, not an exact resumption of
+the inherited training run. The loss comparisons are matched within this pilot;
+they do not isolate why continued training regressed. The next accuracy experiment
+should first separate the resume-policy and training-distribution effects before
+adding another objective. These null pilots do not establish an accuracy ceiling.
+
+The [complete sequence-to-backbone pipeline](reports/online_49470256.md) now
+includes fresh final-layer ESMC extraction, with all components in strict FP32.
+It scores 0.56767 TM and processes 1.19 proteins/s, returning three structures
+per protein; peak reserved memory is 78.4 GiB. Computation measured 95.1% SM
+activity and 75.1% instruction issue. Accuracy and coarse geometry pass the
+development noninferiority checks against cached inference. These are inherited
+development sequences, which can omit unresolved residues. The ESMFold2 timing
+used a different batch regime, so no matched-throughput speed ratio is claimed.
 
 This is a minimal research core, extracted from the original project with
 [symbol-level provenance](PROVENANCE.json). It retains both flow architectures
@@ -89,24 +111,28 @@ because old training checkpoints contain Python optimizer/RNG state. This is a
 serialization option, not GPU authorization. Decoder loading also assumes a
 trusted local ProteinAE checkpoint.
 
-The prediction command uses cached embeddings. Its timing is labeled accordingly
-and must not be presented as end-to-end sequence folding. Frozen ESMC extraction
-and a matched end-to-end benchmark are future work in the plan.
+The prediction command uses cached embeddings. Its timing is labeled accordingly.
+`scripts/benchmark_online.py` measures the complete pipeline including frozen
+final-layer ESMC; the validated configuration is in `configs/validated_inference.json`.
 
 ## Scope and limits
 
-- Tested: 31 CPU contract tests; exact forward parity of small pair and pair-free
+- Tested: 33 CPU contract tests; exact forward parity of small pair and pair-free
   models against isolated original definitions; a real pretrained ProteinAE
   decoder on one validation target; the full 626-target artifact/data audit.
 - H200 job 49346371 completed 50 throughput/memory configurations of the actual
   legacy heads and decoder. All eight real-weight cache equivalence checks gave
   exactly identical coordinates. Nsight counters are analyzed separately from
   nvidia-smi GPU busy time in `reports/h200_profile.json`.
-- New weights are being trained and evaluated on reused development proteins.
-  Do not promote them before the declared paired accuracy and geometry checks.
-  Independent final-test curation remains incomplete: the January–September 2026
-  screen yielded only 11 eligible structures, below the fixed minimum of 32.
-  A score-blind date expansion to January 2024 preserves all other selection rules.
+- Nine sets of new weights were trained on 1,024 proteins and evaluated on
+  reused development data. One geometry evaluation failed its shape control;
+  neither accuracy recipe meets the declared promotion gate.
+  The [independent test selection](reports/holdout_expanded_20260930.md) is now
+  locked at 34 structures after a score-blind expansion to January 2024 releases.
+  It contains 32 chains of at most 256 residues and only two longer chains;
+  it cannot support a strong long-chain accuracy claim. All inputs preserve full
+  polymer sequences and explicit observed-residue maps. No models have been
+  scored on it, because neither development recipe passed promotion.
 - `flow_loss` supports training, but this restart does not carry over the old
   distributed trainer, RAM caches, monkey patches, or scheduling machinery.
 - `usalign_fixed_tm` requires an external US-align executable. A pinned local

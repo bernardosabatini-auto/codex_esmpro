@@ -55,15 +55,30 @@ def main():
             lines.append(f'<p>{name}: full paired analysis pending.</p>');continue
         s=d['mean_across_training_seeds']['tm_fixed_reference'];ci=s['ci95']
         lines.append(f'<p><strong>{name}:</strong> matched mean TM change {s["theirs_minus_ours"]:+.5f}, 95% sequence-cluster interval [{ci[0]:+.5f}, {ci[1]:+.5f}]. Development gate passed: {d["development_gate_passed"]}.</p>')
+    geometry=read('reports/pilot_49461023.json');quality=read('reports/quality_49466461.json')
+    if geometry and geometry.get('decision') and quality and quality['status']=='complete' and not quality['development_gate_passed']:
+        lines.append('<p><strong>Decision:</strong> neither recipe meets the accuracy promotion rule. Retain the untouched checkpoint. Do not scale these recipes or distil an unimproved latent teacher.</p>')
+        lines.append('<p><strong>Next accuracy question:</strong> why does latent-only continued training regress from 0.56824 to 0.56576 mean TM? First audit the resume policy and training distribution, then isolate those changes in a bounded control experiment before adding another objective. The 1,024-protein pilot does not establish a general accuracy ceiling.</p>')
     lines += ['<h2>Independent test</h2>']
     holdout=read('runs/holdout_expanded_20260930/holdout.json')
     if holdout:
-        lines.append(f'<p>Expanded score-blind curation: {esc(holdout["status"])}. Eligible targets recovered so far: {holdout.get("selected_count",0)}; minimum 32. Original September and January–September screens yielded three and 11 targets respectively. Releases since January 2024 are screened with the same sequence exclusion, residue correspondence and 90% observed-CA coverage requirements.</p>')
+        lines.append(f'<p>Expanded score-blind curation: {esc(holdout["status"])}. Eligible targets recovered: {holdout.get("selected_count",0)}; minimum 32. Original September and January–September screens yielded three and 11 targets respectively. Releases since January 2024 are screened with the same sequence exclusion, residue correspondence and 90% observed-CA coverage requirements.</p>')
+        if holdout['status']=='complete':
+            lines.append(f'<p>Final manifest SHA256: <code>{esc(holdout["locked_sha256"])}</code>. No model scores have been computed on this set. It remains unused because neither development recipe passed promotion.</p>')
+            counts=holdout['stratum_counts']
+            lines.append(f'<p>Length coverage: {counts["True"]} chains at ≤256 residues and {counts["False"]} at 257–512. The long-chain stratum is too small for a strong accuracy claim.</p>')
         if holdout.get('error'):lines.append(f'<p>{esc(holdout["error"])}</p>')
     lines += ['<p>Independence from the frozen ESMC, ProteinAE and comparator pretraining sets is unknown.</p>',
-        '<h2>Hardware and scope</h2><p>The validated training batches are 128/64/32/16 proteins at padded lengths 128/256/384/512. Training uses an FP16 head with checked parameter gradients and a strict FP32 decoder. The final backward profile measured 90.1% SM activity during computation and 63.5% across the capture. Actual experiment counters are reported in the linked analyses. SM activity is not percent of peak FLOPs.</p>',
+        '<h2>Hardware and scope</h2><p>The validated training batches are 128/64/32/16 proteins at padded lengths 128/256/384/512. Training uses an FP16 head with checked parameter gradients and a strict FP32 decoder. Actual training measured approximately 96–97% SM activity but only 41% instruction issue where full counters were available; peak reserved memory was approximately 84–99 GiB. SM activity and instruction issue are not percent of peak FLOPs.</p>',
         '<p>External-model inference measured 81.1% SM activity during collection and 74.6% over the capture. Its timing includes sequence conditioning; the cached pair-head timing excludes ESMC. No end-to-end speed ratio is claimed.</p>',
         '<h2>Evidence and reproducibility</h2><ul>']
+    cost=read('runs/accuracy_execution_cost.json')
+    if cost:
+        lines.insert(-1,f'<p>This execution used {cost["gpu_hours"]:.3f} H200 GPU-hours across {cost["tasks"]} registered tasks, including failed jobs and setup time. Peak simultaneous allocation: {cost["peak_allocated_gpus"]} GPUs, below the authorized limit of eight.</p>')
+    perf=read('reports/online_49470256.json')
+    if perf and perf['status']=='complete':
+        h=perf['hardware']['collection_mean_percent']
+        lines.insert(-1,f'<p>Measured complete-pipeline throughput: {perf["proteins_per_second"]:.2f} proteins/s, three structures each, with {perf["peak_reserved_gib"]:.1f} GiB reserved. Computation: {h["SMs Active [Throughput %]"]:.1f}% SM activity and {h["SM Issue [Throughput %]"]:.1f}% instruction issue. Development accuracy/geometry noninferiority passed: {perf.get("development_noninferiority_passed", "pending")}.</p>')
     for filename in ('comparison_49414524.md','external_49461971.md','external_strata_49461971.md','geometry_49453471.md','training_data_v1.md','canonical_frames_v1.md','training_profile_49459162.md','pilot_49461023.md','quality_49466461.md','online_49468214.md','online_49470256.md','holdout_expanded_20260930.md'):
         if (ROOT/'reports'/filename).exists():lines.append(f'<li><a href="{filename}">{filename}</a></li>')
     lines += ['</ul><p>Code and aggregate reports are synchronized to GitHub. Datasets, weights, target manifests, predictions and profiler traces remain local and ignored by Git.</p></html>']

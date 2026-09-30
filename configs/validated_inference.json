@@ -2,12 +2,51 @@
   "status": "validated on reused development data; final test pending",
   "reference_job": "49414524",
   "validation_job": "49427699",
-  "sampling": {"steps": 25, "guidance": 2, "decoder_steps": 3},
-  "models": {
-    "pair": {"flow_precision": "fp16_mlp", "decoder_precision": "fp32"},
-    "pair_free": {"flow_precision": "fp16_linear", "decoder_precision": "fp32"}
+  "sampling": {
+    "steps": 25,
+    "guidance": 2,
+    "decoder_steps": 3
   },
-  "reference_precision": {"flow_precision": "fp32", "decoder_precision": "fp32"},
+  "models": {
+    "pair": {
+      "flow_precision": "fp16_mlp",
+      "decoder_precision": "fp32"
+    },
+    "pair_free": {
+      "flow_precision": "fp16_linear",
+      "decoder_precision": "fp32"
+    }
+  },
+  "reference_precision": {
+    "flow_precision": "fp32",
+    "decoder_precision": "fp32"
+  },
   "scope": "Frozen validated checkpoints and batch shapes; cached embeddings to coordinates. Recheck controls for changed weights, batches, software or sampling settings.",
-  "rejected": {"pair": ["fp16_linear"]}
+  "rejected": {
+    "pair": [
+      "fp16_linear"
+    ]
+  },
+  "online_pair": {
+    "validation_job": "49470256",
+    "embedding_precision": "fp32",
+    "flow_precision": "fp32",
+    "decoder_precision": "fp32",
+    "sampling": {
+      "steps": 25,
+      "guidance": 2,
+      "decoder_steps": 3,
+      "samples": 3
+    },
+    "batches": {
+      "128": 126,
+      "256": 63,
+      "384": 30,
+      "512": 30
+    },
+    "scope": "Untouched pair checkpoint; final-layer ESMC; complete pipeline on the same 626 inherited development inputs. Includes sequence extraction, excludes model load, validation, scoring and artifact serialization.",
+    "status": "Eight shape controls and development accuracy/geometry noninferiority passed; independent test pending.",
+    "rejected_job": "49468214",
+    "rejected_precision": "BF16 ESMC plus FP16-MLP head failed a long-protein online shape control."
+  }
 }

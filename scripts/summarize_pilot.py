@@ -7,6 +7,20 @@ from summarize_comparison import validate_scores,means_by_target,hardware
 
 METRICS=('tm_fixed_reference','ca_lddt')
 
+def validate_training_evaluation(training,manifest,scores):
+ validate_scores(manifest,scores)
+ cfg=manifest['config']
+ if any(cfg[k]!=v for k,v in dict(flow_steps=[25],guidance=[2],samples=3,decoder_steps=3).items()):
+  raise ValueError('training evaluation sampling differs from declared protocol')
+ if manifest['checkpoint']['sha256']!=training['checkpoint_sha256']:
+  raise ValueError('evaluation did not use the recorded trained weights')
+ if manifest['decoder_checkpoint']['sha256']!=training['config']['decoder_checkpoint_sha256']:
+  raise ValueError('evaluation decoder changed')
+ if manifest['precision']!={'flow_precision':'fp32','decoder_precision':'fp32'}:
+  raise ValueError('training evaluation must use strict FP32')
+ if scores['usalign']['arguments']!=['-TMscore','1']:
+  raise ValueError('evaluation correspondence protocol changed')
+
 def geometry_by_target(records,field):
  groups={}
  for row in records:groups.setdefault(row['target_id'],[]).append(row[field]/max(1,row['reference_adjacent_short_count']))
@@ -21,13 +35,13 @@ def main():
    training=json.loads((run/'training.json').read_text());manifest=json.loads((run/'evaluation/manifest.json').read_text())
    if manifest['status']!='complete':raise ValueError(manifest.get('error','incomplete evaluation'))
    scores=json.loads((run/'evaluation/scores.json').read_text())
-   validate_scores(manifest,scores)
+   validate_training_evaluation(training,manifest,scores)
    if training['status']!='complete' or training['steps']!=training['config']['updates']:raise ValueError('incomplete training')
    if any(r['aux_to_flow_ratio']>.100001 for r in training['rows']):raise ValueError('auxiliary gradient exceeded cap')
    task=training['task'];key=(task['seed'],task['arm'])
    if key in groups:raise ValueError('duplicate seed/arm')
    trace=Path(str(run)+'_nsight.sqlite')
-   groups[key]=dict(training=training,records=scores['records'])
+   groups[key]=dict(training=training,records=scores['records'],evaluation_signature=(manifest['dataset'],manifest['decoder_checkpoint'],manifest['precision'],scores['usalign']))
    result['runs'][run.name]=dict(task=task,training_seconds=training['training_seconds'],peak_reserved_gib=training['peak_reserved_bytes']/2**30)
    for label,batches,prefix in [('training_hardware',training['batches'],'train::'),('evaluation_hardware',manifest['batches'],'collect::')]:
     try:result['runs'][run.name][label]=hardware(trace,batches,prefix=prefix)
@@ -47,6 +61,7 @@ def main():
    if hashlib.sha256(cluster_path.read_bytes()).hexdigest()!=config['development_clusters_sha256']:raise ValueError('development clusters changed')
    clusters=json.loads(cluster_path.read_text())['clusters']
    control=groups[seed,'flow'];geometry=groups[seed,'geometry']
+   if control['evaluation_signature']!=geometry['evaluation_signature']:raise ValueError('paired evaluation data or scoring implementation differs')
    signature=lambda g:[(r['step'],r['bucket'],r['batch'],r['flow_rng_sha256'],r['input_ids_sha256']) for r in g['training']['rows']]
    if signature(control)!=signature(geometry):raise ValueError('paired inputs or stochastic draws differed')
    paired={m:paired_comparison(means_by_target(control['records'],'steps25_cfg2',m),means_by_target(geometry['records'],'steps25_cfg2',m),clusters=clusters) for m in METRICS}
@@ -64,6 +79,8 @@ def main():
   if hashlib.sha256(cluster_path.read_bytes()).hexdigest()!=config['development_clusters_sha256']:raise ValueError('development clusters changed')
   cluster_data=json.loads(cluster_path.read_text());clusters=cluster_data['clusters']
   baseline=Path(config['reference_run']);bm=json.loads((baseline/'manifest.json').read_text());bs=json.loads((baseline/'scores.json').read_text());validate_scores(bm,bs)
+  baseline_signature=(bm['dataset'],bm['decoder_checkpoint'],bm['precision'],bs['usalign'])
+  if any(g['evaluation_signature']!=baseline_signature for g in groups.values()):raise ValueError('evaluation data or scoring implementation differs from untouched reference')
   setting='steps25_cfg2';baseline_scores={m:means_by_target(bs['records'],setting,m) for m in METRICS}
   lines=['# Matched training pilot','',f"{config['updates']} updates; {len(config['tasks'])} jobs; fixed 1,024-protein training subset. Full 25-step/guidance-2 sampling, three fixed samples averaged per development protein. No oracle selection.",'',
      'This is a small continued-training pilot. The 626 proteins are reused development data; scores from the locked final test are not used here.','',

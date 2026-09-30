@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 from latentfold.metrics import paired_comparison
 from summarize_comparison import validate_scores, means_by_target, hardware
-from summarize_pilot import geometry_by_target, METRICS
+from summarize_pilot import geometry_by_target, METRICS, validate_training_evaluation
 
 
 def main():
@@ -30,7 +30,9 @@ def main():
             if hashlib.sha256(cp.read_bytes()).hexdigest()!=config['development_clusters_sha256']:raise ValueError('clusters changed')
             clusters=json.loads(cp.read_text())['clusters'];rows={}
             for arm,path in [('flow',control_path),('confidence',run)]:
-                m=json.loads((path/'evaluation/manifest.json').read_text());s=json.loads((path/'evaluation/scores.json').read_text());validate_scores(m,s);rows[arm]=s['records']
+                m=json.loads((path/'evaluation/manifest.json').read_text());s=json.loads((path/'evaluation/scores.json').read_text());validate_training_evaluation(ct if arm=='flow' else train,m,s);rows[arm]=s['records']
+                if arm=='flow':evaluation_signature=(m['dataset'],m['decoder_checkpoint'],s['usalign'])
+                elif evaluation_signature!=(m['dataset'],m['decoder_checkpoint'],s['usalign']):raise ValueError('reference data or scoring implementation differs')
             paired={}
             for metric in METRICS:
                 means={arm:means_by_target(r,'steps25_cfg2',metric) for arm,r in rows.items()}

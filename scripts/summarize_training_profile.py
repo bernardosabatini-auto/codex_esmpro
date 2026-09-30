@@ -19,7 +19,7 @@ def main():
   lines+=['| Length | Arm | Batch | Proteins/s | Reserved GiB |','|---:|---|---:|---:|---:|']
   for rows in result['selected'].values():
    for r in rows:lines.append(f"| {r['length']} | {r['arm']} | {r['batch']} | {r['proteins_per_second']:.2f} | {r['peak_reserved_bytes']/2**30:.2f} |")
-  lines+=['',f"BF16 full-parameter gradient controls: {json.dumps(d['precision_controls'])}",'',f"Hardware: {json.dumps(result['hardware'])}"]
+  lines+=['',f"Candidate full-parameter gradient controls: {json.dumps(d['precision_controls'])}",'',f"Hardware: {json.dumps(result['hardware'])}"]
  else: lines.append(f"Failure: {d.get('error','unknown')}")
  a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 

@@ -3,6 +3,7 @@ import torch
 from torch.nn import functional as F
 from .flow import flow_loss, target_noise
 from .geometry import revised_geometry
+from .precision import inference_precision
 
 
 def objective(model, decoder, batch, config, *, generator, geometry_weight=0.,
@@ -27,7 +28,7 @@ def objective(model, decoder, batch, config, *, generator, geometry_weight=0.,
                        sample_index=step,stream='training_decoder',device=z.device)
     noise=F.pad(noise,(0,0,0,4*z.shape[1]-noise.shape[1]))
     # Disable outer mixed precision for the decoder and distance arithmetic.
-    with torch.autocast(z.device.type,enabled=False):
+    with inference_precision('fp32'):
         ca=decoder(z,mask,noise=noise)
         geometry,nlocal=revised_geometry(ca,batch['ca'][index],mask,batch['adjacent'][index])
     if not torch.isfinite(geometry): raise FloatingPointError('nonfinite geometry objective')

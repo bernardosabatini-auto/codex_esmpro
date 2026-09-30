@@ -133,7 +133,7 @@ def main():
         query=a.output/'candidates.fasta'
         query.write_text(''.join(f">{r['id']}\n{r['sequence']}\n" for r in pool))
         mm='/n/holylabs/bsabatini_lab/Users/bsabatini/mmseqs/bin/mmseqs';hits=a.output/'hits.tsv'
-        cmd=[mm,'easy-search',str(query),str(corpus),str(hits),str(a.output/'mmseq_tmp'),'-s','7.5','-e','1e-3','--max-seqs','10000','--threads',str(a.threads),'--format-output','query,target,fident,qcov,tcov','-v','1']
+        cmd=[mm,'easy-search',str(query),str(corpus),str(hits),str(a.output/'mmseq_tmp'),'-s','7.5','-e','1e-3','--max-seqs','10000','--threads',str(a.threads),'--split-memory-limit','4G','--format-output','query,target,fident,qcov,tcov','-v','1']
         report['search_command']=cmd;save();subprocess.run(cmd,check=True)
         bad=set()
         for line in hits.read_text().splitlines():

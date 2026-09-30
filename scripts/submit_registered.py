@@ -26,7 +26,8 @@ def main():
   if count+a.gpus_per_task*a.tasks>8:raise RuntimeError('project GPU cap would be exceeded')
   command=['sbatch','--parsable',f'--gres=gpu:{a.gpus_per_task}',f'--time={a.minutes}'] if a.gpus_per_task else ['sbatch','--parsable',f'--time={a.minutes}']
   if a.tasks>1:command += [f'--array=0-{a.tasks-1}%{a.tasks}']
-  result=subprocess.run(command+[str(script)],cwd=root,text=True,capture_output=True,check=True)
+  result=subprocess.run(command+[str(script)],cwd=root,text=True,capture_output=True)
+  if result.returncode:raise RuntimeError(result.stderr.strip())
   jid=result.stdout.strip().split(';')[0]
   if not jid.isdigit():raise RuntimeError(f'unexpected submission result {result.stdout!r}')
   job=dict(id=jid,purpose=a.purpose,gpus=a.gpus_per_task*a.tasks,gpus_per_task=a.gpus_per_task,

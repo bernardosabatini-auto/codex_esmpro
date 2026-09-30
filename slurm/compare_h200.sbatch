@@ -6,13 +6,13 @@
 #SBATCH --array=0-1%2
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G
-#SBATCH --time=00:45:00
+#SBATCH --time=01:30:00
 #SBATCH --output=/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/runs/compare_%A_%a.out
 set -euo pipefail
 cd /n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot
 export PYTHONPATH="$PWD/src"
 export PYTHONDONTWRITEBYTECODE=1
-export OMP_NUM_THREADS=8 MKL_NUM_THREADS=8 OPENBLAS_NUM_THREADS=8
+export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 PYTHON=/n/home08/bsabatini/.conda/envs/proteinae/bin/python
 SOURCE=/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae
@@ -25,4 +25,5 @@ exec "$NSYS" profile --trace=nvtx --sample=none --cpuctxsw=none \
   --export=sqlite --output="${RUN}_nsight" \
   "$PYTHON" -u scripts/collect_comparison.py --source "$SOURCE" \
   --config configs/comparison626.json --model "$MODEL" \
-  --output "$RUN" --nsys-metrics --allow-gpu
+  --output "$RUN" --nsys-metrics --allow-gpu \
+  --score-workers 1 --usalign runs/tools/USalign/USalign

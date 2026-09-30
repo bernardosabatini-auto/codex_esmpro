@@ -17,7 +17,7 @@ Selected batches are the smallest within 95% of best measured throughput, with a
 | pair | 384 | 32 | 5.64 | 95.4% | 9.9% | 23.5 | 24.6 |
 | pair | 512 | 32 | 3.55 | 96.9% | 9.3% | 40.2 | 42.2 |
 
-The next comparison uses two H200s, one per frozen checkpoint: 626 development targets × 3 samples × 3 flow step counts (10, 25, 50) × 2 guidance settings (1, 2), for 22,536 structures. Estimated inference sweep: 15–18 minutes per GPU plus startup, controls, transfers, and output. Budget 20–30 minutes each; hard limit 45 minutes. Each run checks real-weight batching equivalence before the full sweep. CPU scoring follows GPU release.
+The initial BF16 sizing proposed two H200s, one per frozen checkpoint: 626 development targets × 3 samples × 3 flow step counts (10, 25, 50) × 2 guidance settings (1, 2), for 22,536 structures. Estimated inference sweep: 15–18 minutes per GPU plus startup, controls, transfers, and output. Budget 20–30 minutes each; hard limit 45 minutes. Each run checks real-weight batching equivalence before the full sweep. That proposal was superseded after numerical controls failed; see [the precision diagnosis](batch_precision.md) for the current FP32 configuration, timing budget, and overlapped CPU scoring.
 
 This is a development-set accuracy/cost comparison, not a new trained model, untouched test result, or end-to-end sequence-folding speed claim. The low tensor activity leaves substantial optimization work; kernel/stage profiling and controlled compilation are subsequent steps.
 

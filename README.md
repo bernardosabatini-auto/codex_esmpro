@@ -85,7 +85,7 @@ and a matched end-to-end benchmark are future work in the plan.
 profile-derived batch sizes in `configs/comparison626.json`. It checks real-weight
 batch/padding equivalence before collecting 10/25/50-step, guidance 1/2 predictions
 with three reproducible samples each. GPU inference and asynchronous disk writes
-overlap; CPU accuracy scoring happens after GPU release. All latents and backbone
+overlap; optional CPU scoring runs concurrently on allocated host cores. All latents and backbone
 coordinates are retained in HDF5. No best-of-three selection is performed.
 
 `scripts/score_comparison.py --run RUN_DIRECTORY --workers 4` scores a completed
@@ -99,10 +99,19 @@ The first comparison attempt (49349478) stopped at the real-weight batching
 controls before collecting the sweep. One control differed by 0.43–0.64 Å RMSD
 between padded batch and unpadded single inference. The source of this numerical
 difference was traced primarily to BF16 flow computation. The selected flow
-policy uses FP32 tensors with high float32 matrix-multiplication precision,
-followed by an IEEE FP32 decoder. Focused checks pass with nearly unchanged
-flow runtime; the comparison also validates actual production batch shapes
+policy now uses strict IEEE FP32 for both flow and decoder. BF16, FP16, and
+high-precision float32 matmul each failed at least one numerical shape control.
+Strict FP32 passed the focused short/long diagnoses, at roughly three times
+the flow cost. The comparison also validates actual production batch shapes
 before the full sweep. See the numerical diagnosis above for scope and results.
+
+The current account has no usable CPU-only submission route: the lab account has
+a zero submission limit, and the Kempner account is not allowed on the CPU
+partitions tested. The comparison therefore overlaps one CPU scoring process
+with GPU inference, using CPU cores already included in its allocation. It
+records the final scoring wait separately. The standard wrapper requests two
+H200s via two independent tasks, each limited to 90 minutes; GPU count remains
+bounded by the project-wide limit of eight.
 
 ## Repository synchronization
 

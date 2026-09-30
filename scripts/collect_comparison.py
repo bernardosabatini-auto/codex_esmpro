@@ -1,14 +1,15 @@
-"""Collect a predeclared accuracy/cost sweep; score later on CPUs.
+"""Collect a predeclared accuracy/cost sweep, optionally overlapping CPU scoring.
 
 One checkpoint per GPU process. All embeddings are read once on the host.
 Output contains every target/sample, with no oracle selection. Throughput
 excludes ESMC and does not support an end-to-end sequence-folding speed claim.
 """
 import argparse
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import hashlib
 import json
 import os
+import multiprocessing
 from pathlib import Path
 import time
 
@@ -25,6 +26,7 @@ from latentfold.metrics import ca_metrics
 from latentfold.precision import inference_precision, MODES
 from predict import file_identity
 from profile_gpu import Telemetry, atomic_json
+from score_comparison import score_batch, write_scores
 
 
 @torch.no_grad()
@@ -98,10 +100,17 @@ def main():
     parser.add_argument('--model', required=True)
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--nsys-metrics', action='store_true')
+    parser.add_argument('--score-workers', type=int, default=0, help='overlap CPU scoring with GPU inference')
+    parser.add_argument('--usalign', type=Path)
     parser.add_argument('--allow-gpu', action='store_true')
     a = parser.parse_args()
     if not a.allow_gpu:
         parser.error('--allow-gpu is required')
+    if not 0 <= a.score_workers <= 4:
+        parser.error('--score-workers must be in [0,4]')
+    binary = str(a.usalign.resolve()) if a.usalign else None
+    if binary and not os.access(binary, os.X_OK):
+        parser.error('USalign must be an executable file')
     config = json.loads(a.config.read_text())
     precision_options = {key: config.get(key, 'bf16') for key in ('flow_precision', 'decoder_precision')}
     if any(value not in MODES for value in precision_options.values()):
@@ -117,7 +126,7 @@ def main():
     if not batches or min(batches.values()) < 1:
         raise ValueError('invalid batch sizes')
     a.output.mkdir(parents=True, exist_ok=False)
-    torch.set_num_threads(8)
+    torch.set_num_threads(4 if a.score_workers else 8)
     torch.set_float32_matmul_precision('high')
     torch.cuda.set_device(0)
     torch.manual_seed(config['seed'])
@@ -129,7 +138,8 @@ def main():
                     torch=torch.__version__, gpu=torch.cuda.get_device_name(0),
                     timing_scope='cached embeddings to backbone; ESMC excluded',
                     precision=precision_options, controls=[], batches=[], completed_predictions=0)
-    telemetry = None
+    telemetry, scorers = None, None
+    score_futures = []
     save = lambda: atomic_json(a.output/'manifest.json', manifest)
     save()
     try:
@@ -153,6 +163,10 @@ def main():
         manifest['ready_unix'] = time.time()
         save()
         print('Controls passed. Starting full comparison.', flush=True)
+        if a.score_workers:
+            scorers = ProcessPoolExecutor(max_workers=a.score_workers, mp_context=multiprocessing.get_context('spawn'))
+            manifest['cpu_score_workers'] = a.score_workers
+            manifest['cpu_scoring'] = 'overlapped with GPU inference; final wait recorded'
         with h5py.File(a.output/'predictions.h5', 'x') as output, ThreadPoolExecutor(max_workers=1) as writer:
             pending = None
             for steps in config['flow_steps']:
@@ -184,6 +198,11 @@ def main():
                             gpu_seconds = time.perf_counter()-tick
                             z_cpu, ca_cpu = z.float().cpu().numpy(), ca.float().cpu().numpy()
                             bb_cpu = backbone.float().cpu().numpy()
+                            if scorers:
+                                scoring_inputs = [(key, r['id'], k, ca_cpu[i, :len(r['sequence'])],
+                                                   r['ca'].numpy(), bb_cpu[i, :len(r['sequence'])], binary)
+                                                  for i, (r, k) in enumerate(chunk)]
+                                score_futures.append(scorers.submit(score_batch, scoring_inputs))
                             del z, ca, backbone, tensors
                             if pending is not None:
                                 pending[0].result()
@@ -203,11 +222,19 @@ def main():
         expected = len(ids)*config['samples']*len(config['flow_steps'])*len(config['guidance'])
         if manifest['completed_predictions'] != expected:
             raise ValueError('incomplete target/sample coverage')
+        if scorers:
+            wait_start = time.perf_counter()
+            scored_rows = [row for future in score_futures for row in future.result()]
+            manifest['cpu_score_final_wait_seconds'] = time.perf_counter()-wait_start
+            write_scores(a.output, manifest, scored_rows, time.time()-manifest['ready_unix'], binary,
+                         timing_scope='GPU collection with overlapped CPU scoring; not CPU execution time')
         manifest['status'] = 'complete'
     except BaseException as error:
         manifest['status'], manifest['error'] = 'failed', f'{type(error).__name__}: {error}'
         raise
     finally:
+        if scorers:
+            scorers.shutdown(wait=True, cancel_futures=True)
         if telemetry:
             telemetry.close()
         manifest['ended_unix'] = time.time()

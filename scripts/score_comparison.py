@@ -32,6 +32,10 @@ def score_one(payload):
                 peptide_length_outliers_on_reference_short=int((((peptide < 1.1) | (peptide > 1.6)) & reference_short).sum()))
 
 
+def score_batch(payload_list):
+    return [score_one(payload) for payload in payload_list]
+
+
 def payloads(run, manifest, binary=None):
     config = manifest['config']
     expected_ids = set(config['target_ids'])
@@ -56,6 +60,32 @@ def payloads(run, manifest, binary=None):
                 raise ValueError('missing targets')
 
 
+def write_scores(run, manifest, rows, seconds, binary, timing_scope='CPU scoring stage wall time'):
+    if len(rows) != manifest['completed_predictions']:
+        raise ValueError('score coverage differs from GPU run')
+    binary_sha256 = hashlib.sha256(Path(binary).read_bytes()).hexdigest() if binary else None
+    summaries = {}
+    for setting in sorted({r['setting'] for r in rows}):
+        selected = [r for r in rows if r['setting'] == setting]
+        summaries[setting] = dict(predictions=len(selected), targets=len({r['target_id'] for r in selected}),
+            mean_ca_lddt=float(np.mean([r['ca_lddt'] for r in selected])),
+            mean_ca_rmsd=float(np.mean([r['ca_rmsd'] for r in selected])),
+            diagnostic_mean_tm_after_kabsch=float(np.mean([r['tm_after_kabsch'] for r in selected])))
+        if binary:
+            summaries[setting]['mean_tm_fixed_reference'] = float(np.mean([r['tm_fixed_reference'] for r in selected]))
+    result = dict(status='complete', model=manifest['model'], coverage=1.0,
+                  metric_note='CA lDDT; tm_after_kabsch is NOT optimized TM-score; all samples retained',
+                  usalign=dict(path=binary, sha256=binary_sha256, arguments=['-TMscore', '1']) if binary else None,
+                  seconds=seconds, timing_scope=timing_scope, summaries=summaries, records=rows)
+    dest = run/'scores.json'
+    if dest.exists():
+        raise FileExistsError(dest)
+    temp = dest.with_suffix('.tmp')
+    temp.write_text(json.dumps(result, indent=2, allow_nan=False)+'\n')
+    temp.replace(dest)
+    print(json.dumps(summaries, indent=2))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run', type=Path, required=True)
@@ -69,31 +99,9 @@ def main():
         raise ValueError('refusing to summarize incomplete GPU run')
     started = time.time()
     binary = str(a.usalign.resolve()) if a.usalign else None
-    binary_sha256 = hashlib.sha256(a.usalign.read_bytes()).hexdigest() if a.usalign else None
     with ProcessPoolExecutor(max_workers=a.workers, mp_context=multiprocessing.get_context('spawn')) as workers:
         rows = list(workers.map(score_one, payloads(a.run, manifest, binary), chunksize=8))
-    if len(rows) != manifest['completed_predictions']:
-        raise ValueError('score coverage differs from GPU run')
-    summaries = {}
-    for setting in sorted({r['setting'] for r in rows}):
-        selected = [r for r in rows if r['setting'] == setting]
-        summaries[setting] = dict(predictions=len(selected), targets=len({r['target_id'] for r in selected}),
-            mean_ca_lddt=float(np.mean([r['ca_lddt'] for r in selected])),
-            mean_ca_rmsd=float(np.mean([r['ca_rmsd'] for r in selected])),
-            diagnostic_mean_tm_after_kabsch=float(np.mean([r['tm_after_kabsch'] for r in selected])))
-        if binary:
-            summaries[setting]['mean_tm_fixed_reference'] = float(np.mean([r['tm_fixed_reference'] for r in selected]))
-    result = dict(status='complete', model=manifest['model'], coverage=1.0,
-                  metric_note='CA lDDT; tm_after_kabsch is NOT optimized TM-score; all samples retained',
-                  usalign=dict(path=binary, sha256=binary_sha256, arguments=['-TMscore', '1']) if binary else None,
-                  seconds=time.time()-started, summaries=summaries, records=rows)
-    dest = a.run/'scores.json'
-    if dest.exists():
-        raise FileExistsError(dest)
-    temp = dest.with_suffix('.tmp')
-    temp.write_text(json.dumps(result, indent=2, allow_nan=False)+'\n')
-    temp.replace(dest)
-    print(json.dumps(summaries, indent=2))
+    write_scores(a.run, manifest, rows, time.time()-started, binary)
 
 
 if __name__ == '__main__':

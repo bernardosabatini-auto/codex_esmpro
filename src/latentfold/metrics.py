@@ -106,6 +106,7 @@ def usalign_coordinates(binary, pred, ref):
     Missing original residue maps cannot be reconstructed from cached coordinates.
     """
     pred, ref = _coordinates(pred, ref)
+    pred, ref = pred-pred.mean(0), ref-ref.mean(0)
     if len(pred) > 9999 or max(np.abs(pred).max(), np.abs(ref).max()) >= 999:
         raise ValueError('coordinates exceed conservative PDB formatting limits')
     with tempfile.TemporaryDirectory(prefix='latentfold_tm_') as tmp:

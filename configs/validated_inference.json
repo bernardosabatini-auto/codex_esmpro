@@ -1,0 +1,13 @@
+{
+  "status": "validated on reused development data; final test pending",
+  "reference_job": "49414524",
+  "validation_job": "49427699",
+  "sampling": {"steps": 25, "guidance": 2, "decoder_steps": 3},
+  "models": {
+    "pair": {"flow_precision": "fp16_mlp", "decoder_precision": "fp32"},
+    "pair_free": {"flow_precision": "fp16_linear", "decoder_precision": "fp32"}
+  },
+  "reference_precision": {"flow_precision": "fp32", "decoder_precision": "fp32"},
+  "scope": "Frozen validated checkpoints and batch shapes; cached embeddings to coordinates. Recheck controls for changed weights, batches, software or sampling settings.",
+  "rejected": {"pair": ["fp16_linear"]}
+}

@@ -77,8 +77,17 @@ def analyze(runs, references, output):
         estimate = f"{d['theirs_minus_ours']:.5f} [{d['ci95'][0]:.5f}, {d['ci95'][1]:.5f}]" if d else 'not collected'
         speed = f"{r['speedup_cached_pipeline']:.2f}x" if 'speedup_cached_pipeline' in r else '—'
         lines.append(f"| {r.get('model', 'unknown')} | {r.get('policy', 'unknown')} | {r['status']} | {r['eligible']} | {speed} | {estimate} |")
+    for r in rows:
         if r.get('error'):
             lines += ['', f"Failure for {r.get('model')} / {r.get('policy')}: {r['error']}", '']
+    lines += ['', '## Hardware activity and memory', '',
+              'SM activity includes waiting warps and is not peak FLOP utilization. Whole-capture counters include model loading and controls, but exclude subsequent profiler export. Memory is the maximum measured across collection batches.', '',
+              '| Model / policy | SM active % | SM issue % | Tensor active % | Allocated / reserved GiB |',
+              '|---|---:|---:|---:|---:|']
+    for r in rows:
+        if r['status'] == 'complete':
+            h = r['hardware']['whole_capture_mean_percent']
+            lines.append(f"| {r['model']} / {r['policy']} | {h['SMs Active [Throughput %]']:.1f} | {h['SM Issue [Throughput %]']:.1f} | {h['Tensor Active [Throughput %]']:.1f} | {r['peak_allocated_gib']:.1f} / {r['peak_reserved_gib']:.1f} |")
     lines += ['', 'A policy is eligible only when every declared gate passes. Eligibility is a development-set finding, not a validated final-test or training improvement.', '']
     atomic_text(output.with_suffix('.json'), json.dumps(result, indent=2, allow_nan=False)+'\n')
     atomic_text(output.with_suffix('.md'), '\n'.join(lines))

@@ -7,6 +7,13 @@ Start with [the critical review and staged plan](reports/review.html), then the
 
 The completed 626-target run is summarized in
 [the frozen-head comparison](reports/comparison_49414524.md).
+The subsequent [hybrid precision experiment](reports/hybrid_49427699.md) validates
+FP16 feed-forward layers for the pair model (1.59x cached-pipeline speedup) and
+FP16 feed-forward layers plus attention projections for pair-free (2.62x).
+Attention calculations, latent updates and the decoder remain FP32. The broader
+policy failed the pair model's shape controls and is rejected. See
+[the validated inference settings](configs/validated_inference.json); these are
+development-set results and exclude ESMC extraction time.
 
 This is a minimal research core, extracted from the original project with
 [symbol-level provenance](PROVENANCE.json). It retains both flow architectures

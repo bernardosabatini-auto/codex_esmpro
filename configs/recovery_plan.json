@@ -1,0 +1,63 @@
+{
+  "status": "planned; no new GPU jobs submitted; expanded training manifest must be prepared and frozen before execution",
+  "purpose": "Identify a cause of the latent-only pilot regression before changing architecture or adding another loss.",
+  "evidence": {
+    "untouched_mean_tm": 0.5682384930777423,
+    "continued_training_mean_tm": 0.5657611377351792,
+    "checkpoint_optimizer_betas": [0.9, 0.95],
+    "pilot_optimizer_betas": [0.9, 0.999],
+    "checkpoint_has_raw_weights_optimizer_and_scheduler": true,
+    "interpretation": "The earlier pilots warm-started from EMA weights with a fresh optimizer; they did not resume the original training state. Comparisons between their matched arms remain valid. The beta difference alone has not been shown to cause regression."
+  },
+  "screen": {
+    "seed": 7919,
+    "matched_control": "pilot_49461023_0",
+    "reuse_control_condition": "Same initial EMA checkpoint, 500 updates, learning-rate schedule, EMA decay, precision, batch shapes, flow RNG, sampling and evaluator. Source and evaluation fingerprints must match; preserve previous default settings in the trainer.",
+    "arms": [
+      {
+        "name": "optimizer_beta",
+        "only_change": "AdamW beta2: 0.999 to 0.95",
+        "optimizer_betas": [0.9, 0.95],
+        "flow_config": {"reduction": "protein"},
+        "training_proteins": 1024
+      },
+      {
+        "name": "residue_reduction",
+        "only_change": "Per-protein to per-residue loss reduction",
+        "optimizer_betas": [0.9, 0.999],
+        "flow_config": {"reduction": "residue"},
+        "training_proteins": 1024
+      },
+      {
+        "name": "broader_training_pool",
+        "only_change": "Expand the training pool to 16384 proteins from the same cache sources, keeping bucket frequencies and update budget fixed",
+        "optimizer_betas": [0.9, 0.999],
+        "flow_config": {"reduction": "protein"},
+        "training_proteins": 16384,
+        "per_bucket": 4096,
+        "data_preflight": "Deterministic nested selection that contains the original 1024 records; train splits only; verify sequence, finite latent/embedding arrays and shapes; verify original records are unchanged. All sources must be covered by the frozen holdout exclusion audit. Freeze manifest before scoring. No new ESM embeddings or source-structure downloads."
+      }
+    ],
+    "evaluation": "All 626 reused development proteins, three fixed samples, 25 flow steps, CFG 2, strict FP32, fixed residue correspondence. No final-test evaluation.",
+    "resource_plan": {
+      "gpus_concurrent": 3,
+      "gpu_type": "H200",
+      "estimated_minutes_per_job": [40, 50],
+      "walltime_cap_minutes_per_job": 60,
+      "maximum_screen_gpu_hours": 3,
+      "maximum_screen_plus_two_replications_gpu_hours": 5,
+      "basis": "Prior 500-update latent-only runs including full scoring took approximately 37-38 minutes; broader-pool preparation is CPU work and must finish before GPU allocation.",
+      "monitoring": "Register exact job IDs and a supported analysis action; check only this project's jobs. Follow all jobs through analysis."
+    }
+  },
+  "followup": {
+    "screen_is_exploratory": true,
+    "replicate_only_if": "An arm improves mean TM over its matched control by at least 0.002 and reaches the untouched checkpoint's mean TM, with full coverage and passing numerical controls. This is a recovery screen, not an accuracy promotion rule.",
+    "replication": "Run only that arm for seeds 7920 and 7921 against the existing paired controls. If multiple arms qualify, select the largest TM gain; ties within 0.0005 prefer no additional data, then optimizer-beta correction.",
+    "recovery_claim": "Require positive paired gains in all three seeds and a sequence-cluster interval above zero versus continued-training controls; report comparison with the untouched checkpoint separately.",
+    "accuracy_promotion": "Unchanged: practical TM gain at least 0.01 plus the existing uncertainty, replication, lDDT and geometry gates, followed by independent confirmation.",
+    "stop": "Do not expand failed arms into a hyperparameter sweep or combine individually unhelpful changes. Audit the saved raw-model/optimizer resume path separately if recovery fails. Do not claim these three arms exhaust possible causes.",
+    "earlier_layer_gpu_budget": 0,
+    "final_test": "Keep the locked 34 targets unscored. Only two are longer than 256 residues; long-chain confirmation needs better coverage."
+  }
+}

@@ -72,9 +72,11 @@ def train(config,task,out):
         except BaseException as error:
             report.update(status='failed',error=f'{type(error).__name__}: {error}')
             atomic_json(out/'training.json',report);raise
-    optimizer=torch.optim.AdamW(model.parameters(),lr=config['learning_rate'],weight_decay=.01,foreach=False)
+    # Keep previous pilots reproducible while making recovery ablations explicit.
+    optimizer=torch.optim.AdamW(model.parameters(),lr=config['learning_rate'],weight_decay=.01,
+                               betas=tuple(config.get('optimizer_betas',(.9,.999))),foreach=False)
     ema={k:v.detach().clone() for k,v in model.state_dict().items()}
-    flow_config=FlowConfig();flow_rng=torch.Generator(device='cuda').manual_seed(task['seed'])
+    flow_config=FlowConfig(**config.get('flow_config',{}));flow_rng=torch.Generator(device='cuda').manual_seed(task['seed'])
     order_rng=np.random.default_rng(task['seed']);queues={k:[] for k in buckets}
     weight=config['geometry_weight'] if task['arm']=='geometry' else 0.
     telemetry=Telemetry(out,True);range_active=False

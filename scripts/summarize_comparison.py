@@ -39,7 +39,7 @@ def validate_scores(manifest, scores):
     return sorted(settings)
 
 
-def hardware(trace, batches):
+def hardware(trace, batches, *, prefix='collect::'):
     # Only call after Slurm termination / Nsight export, never on a live database.
     con = sqlite3.connect(trace.resolve().as_uri() + '?mode=ro&immutable=1', uri=True)
     try:
@@ -48,7 +48,7 @@ def hardware(trace, batches):
         types = {kind for kind, _, name in catalog if name in COUNTERS}
         if set(chosen.values()) != set(COUNTERS) or len(types) != 1:
             raise ValueError('missing or ambiguous hardware counters')
-        ranges = con.execute("select start,end,text from NVTX_EVENTS where text like 'collect::%' order by start").fetchall()
+        ranges = con.execute("select start,end,text from NVTX_EVENTS where text like ? order by start", (prefix+'%',)).fetchall()
         if len({r[2] for r in ranges}) != len(ranges) or {r[2] for r in ranges} != {r['nvtx_range'] for r in batches}:
             raise ValueError('hardware intervals differ from collected batches')
         if not ranges or any(e is None or e <= s for s, e, _ in ranges):

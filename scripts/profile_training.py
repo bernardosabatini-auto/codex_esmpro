@@ -36,6 +36,7 @@ def main():
     p.add_argument('--candidate-precision',choices=['bf16','fp16'],default='bf16')
     p.add_argument('--profile-precision',choices=['fp32','fp16'],default='fp32')
     p.add_argument('--controlled-gradient',action='store_true')
+    p.add_argument('--fixed-batches',type=json.loads)
     p.add_argument('--batches',nargs='+',type=int,default=[1,2,4,8,16,32])
     a=p.parse_args();a.output.mkdir(parents=True,exist_ok=False)
     torch.set_num_threads(4);torch.manual_seed(0);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
@@ -105,7 +106,8 @@ def main():
             # Promotion requires passing controls at every requested bucket.
             mode=a.profile_precision
             for arm in ('flow','geometry'):
-                for count in a.batches:
+                counts=[a.fixed_batches[str(padded_length)]] if a.fixed_batches else a.batches
+                for count in counts:
                     if time.monotonic()>deadline:raise TimeoutError('internal profile time cap')
                     row=dict(length=padded_length or meta['length'],actual_length=meta['length'],target_id=meta['id'],batch=count,arm=arm,precision=mode)
                     try:

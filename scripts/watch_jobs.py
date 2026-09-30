@@ -107,6 +107,38 @@ def followup(root, job, config):
     return str(report.with_suffix('.md'))
 
 
+
+def tick_local(root, state, config):
+    """Monitor only explicitly registered project CPU units, including timeout."""
+    path=root/'runs/local_jobs.json'
+    if not path.exists():return []
+    outstanding=[]
+    for job in json.loads(path.read_text())['jobs']:
+        unit=job['unit']
+        if not re.fullmatch(r'esm-proae-[a-z0-9-]+\.service',unit):raise ValueError('invalid local project unit')
+        entry=state.setdefault('local_jobs',{}).setdefault(unit,{})
+        if entry.get('handled'):continue
+        status_path=(root/job['status_path']).resolve()
+        if root/'runs' not in status_path.parents:raise ValueError('local status outside runs')
+        result=subprocess.run(['systemctl','--user','show',unit,'-p','ActiveState','-p','Result'],capture_output=True,text=True,check=True,timeout=10)
+        fields=dict(line.split('=',1) for line in result.stdout.splitlines() if '=' in line)
+        data=json.loads(status_path.read_text()) if status_path.exists() else {'status':'running'}
+        if data['status']=='running' and fields.get('ActiveState') in ('active','activating'):
+            outstanding.append(unit);continue
+        if data['status']=='running':
+            data.update(status='failed',error=f"CPU unit stopped before completion: {fields}")
+            write_json(status_path,data)
+        action=job['action']
+        if action not in ('summarize_holdout','summarize_training_data'):raise ValueError('unrecognized local action')
+        report=root/'reports'/job['report']
+        command=[config['python'],str(root/'scripts'/f'{action}.py'),'--runs',str(status_path.parent),'--output',str(report)]
+        env=dict(os.environ,CUDA_VISIBLE_DEVICES='',OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1')
+        with (root/'runs/watch'/f'analysis_{unit}.log').open('a') as log:
+            subprocess.run(command,env=env,cwd=root,stdout=log,stderr=subprocess.STDOUT,check=True,timeout=60)
+        entry.update(handled=True,outcome=data['status'],report=str(report.with_suffix('.md')))
+        notify(root,state,f'{unit}:analyzed',f"CPU preparation {unit}: {data['status']}; report {report.with_suffix('.md')}",config)
+    return outstanding
+
 def tick(root, config, query=scheduler_states, analyze=followup):
     state_path = root/'runs/watch/state.json'
     state = json.loads(state_path.read_text()) if state_path.exists() else {'jobs': {}, 'events': []}
@@ -161,6 +193,7 @@ def tick(root, config, query=scheduler_states, analyze=followup):
                 attempts = entry.get('attempts', 0)+1
                 entry.update(attempts=attempts, analysis_error=str(error), retry_after=time.time()+min(900, 60*2**min(attempts, 4)))
                 notify(root, state, f'{jid}:analysis_failed', f'ESM project {jid}: analysis failed; see runs/watch/analysis_{jid}.log; automatic retries enabled.', config)
+    state['outstanding_local_units']=tick_local(root,state,config)
     state.update(last_successful_check=stamp(), host=socket.gethostname(),
                  outstanding_jobs=[j['id'] for j in pending if not state['jobs'].get(j['id'], {}).get('handled')])
     write_json(state_path, state)
@@ -183,7 +216,7 @@ def main():
         try:
             state = tick(root, config)
             write_json(directory/'heartbeat.json', dict(checked_at=stamp(), status='ok', host=socket.gethostname(),
-                       outstanding_jobs=state['outstanding_jobs']))
+                       outstanding_jobs=state['outstanding_jobs'],outstanding_local_units=state.get('outstanding_local_units',[])))
         except Exception as error:
             write_json(directory/'heartbeat.json', dict(checked_at=stamp(), status='error', error=str(error), host=socket.gethostname()))
             state_path = directory/'state.json'

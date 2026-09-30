@@ -22,24 +22,25 @@ from latentfold.data import read_ids, read_record
 from latentfold.decoder import load_proteinae
 from latentfold.flow import SampleConfig, sample
 from latentfold.metrics import ca_metrics
+from latentfold.precision import inference_precision, MODES
 from predict import file_identity
 from profile_gpu import Telemetry, atomic_json
 
 
 @torch.no_grad()
-def infer(model, decoder, tensors, cfg):
+def infer(model, decoder, tensors, cfg, *, flow_precision='bf16', decoder_precision='bf16'):
     esm, mask, noise, dn = (x.to('cuda', non_blocking=True) for x in tensors)
-    with torch.autocast('cuda', dtype=torch.bfloat16):
+    with inference_precision(flow_precision):
         z = sample(model, esm, mask, cfg, noise=noise)
+    with inference_precision(decoder_precision):
         ca, backbone = decoder(z.float(), mask, return_backbone=True, noise=dn)
     if not torch.isfinite(backbone).all():
         raise FloatingPointError('nonfinite coordinates')
     return z, ca, backbone
 
 
-def batching_controls(model, decoder, buckets, seed):
+def batching_controls(model, decoder, buckets, seed, batches, precision_options, rows):
     """Check real-weight padded/batched predictions against unpadded singles."""
-    rows = []
     cfg = SampleConfig(steps=25, guidance=2)
     for length, requests in buckets.items():
         unique = {r['id']: r for r, _ in requests}
@@ -47,21 +48,26 @@ def batching_controls(model, decoder, buckets, seed):
             continue
         ordered = list(unique.values())
         selected = [ordered[0]] if len(ordered) == 1 else [ordered[0], ordered[-1]]
+        selected = selected[:batches[length]]
         controls = [(r, 0) for r in selected]
         tensors = prediction_batch(controls, length, seed=seed, decoder_scale=decoder.fm.scale_ref)
-        _, ca, _ = infer(model, decoder, tensors, cfg)
+        # Exercise the actual production batch shape, with repeated fixed inputs.
+        count = batches[length]
+        repeats = (count+len(controls)-1)//len(controls)
+        tensors = tuple(x.repeat(repeats, *([1]*(x.ndim-1)))[:count] for x in tensors)
+        _, ca, _ = infer(model, decoder, tensors, cfg, **precision_options)
         whole = ca.float().cpu().numpy()
         del ca
         for i, request in enumerate(controls):
             r, _ = request
             n = len(r['sequence'])
             single = prediction_batch([request], n, seed=seed, decoder_scale=decoder.fm.scale_ref)
-            _, ca, _ = infer(model, decoder, single, cfg)
+            _, ca, _ = infer(model, decoder, single, cfg, **precision_options)
             alone = ca[0].float().cpu().numpy()
             metrics = ca_metrics(whole[i, :n], alone)
             delta = abs(ca_metrics(whole[i, :n], r['ca'].numpy())['ca_lddt'] -
                         ca_metrics(alone, r['ca'].numpy())['ca_lddt'])
-            row = dict(target_id=r['id'], padded_length=length,
+            row = dict(target_id=r['id'], padded_length=length, batch=count,
                        reference_ca_lddt_absolute_change=delta, **metrics)
             rows.append(row)
             print('batching_control', json.dumps(row), flush=True)
@@ -97,6 +103,9 @@ def main():
     if not a.allow_gpu:
         parser.error('--allow-gpu is required')
     config = json.loads(a.config.read_text())
+    precision_options = {key: config.get(key, 'bf16') for key in ('flow_precision', 'decoder_precision')}
+    if any(value not in MODES for value in precision_options.values()):
+        raise ValueError('invalid precision configuration')
     entry = config['models'][a.model]
     ids_file = a.config.parent / config['target_manifest']
     ids = read_ids(ids_file)
@@ -118,8 +127,8 @@ def main():
                     source=str(a.source.resolve()),
                     job_id=os.environ.get('SLURM_JOB_ID'), started_unix=started,
                     torch=torch.__version__, gpu=torch.cuda.get_device_name(0),
-                    timing_scope='cached embeddings to CA, bf16; ESMC excluded',
-                    batches=[], completed_predictions=0)
+                    timing_scope='cached embeddings to backbone; ESMC excluded',
+                    precision=precision_options, controls=[], batches=[], completed_predictions=0)
     telemetry = None
     save = lambda: atomic_json(a.output/'manifest.json', manifest)
     save()
@@ -140,7 +149,7 @@ def main():
         manifest['decoder_checkpoint'] = file_identity(ae_checkpoint, hash_contents=True)
         decoder = load_proteinae(a.source/'ProteinAE_v1', ae_checkpoint,
                                  steps=config['decoder_steps']).cuda()
-        manifest['controls'] = batching_controls(model, decoder, buckets, config['seed'])
+        batching_controls(model, decoder, buckets, config['seed'], batches, precision_options, manifest['controls'])
         manifest['ready_unix'] = time.time()
         save()
         print('Controls passed. Starting full comparison.', flush=True)
@@ -168,7 +177,7 @@ def main():
                             torch.cuda.nvtx.range_push(nvtx)
                             tick = time.perf_counter()
                             try:
-                                z, ca, backbone = infer(model, decoder, tensors, cfg)
+                                z, ca, backbone = infer(model, decoder, tensors, cfg, **precision_options)
                                 torch.cuda.synchronize()
                             finally:
                                 torch.cuda.nvtx.range_pop()

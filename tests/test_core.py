@@ -16,11 +16,26 @@ from latentfold.data import read_record
 from latentfold.checkpoints import load_legacy
 from latentfold.decoder import DifferentiableDecoder
 from latentfold.batching import prediction_batch, requests_by_bucket
+from latentfold.precision import inference_precision
 
 torch.set_num_threads(2)
 
 
 class CoreTests(unittest.TestCase):
+    def test_precision_settings_restored_after_exception(self):
+        original = torch.get_float32_matmul_precision()
+        cudnn = torch.backends.cudnn.allow_tf32
+        with self.assertRaisesRegex(RuntimeError, 'sentinel'):
+            with inference_precision('fp32'):
+                self.assertEqual(torch.get_float32_matmul_precision(), 'highest')
+                self.assertFalse(torch.backends.cudnn.allow_tf32)
+                raise RuntimeError('sentinel')
+        self.assertEqual(torch.get_float32_matmul_precision(), original)
+        self.assertEqual(torch.backends.cudnn.allow_tf32, cudnn)
+        with self.assertRaises(ValueError):
+            with inference_precision('unknown'):
+                pass
+
     def net(self, pair=False):
         torch.manual_seed(4)
         kwargs = dict(d_model=32, n_layers=2, n_heads=4, d_cond=12, max_len=16)

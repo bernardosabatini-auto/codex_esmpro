@@ -2,6 +2,8 @@
 import math
 import re
 import subprocess
+import tempfile
+from pathlib import Path
 import numpy as np
 
 
@@ -94,3 +96,23 @@ def usalign_fixed_tm(binary, predicted_pdb, reference_pdb):
     if len(values) != 1 or not 0 <= values[0] <= 1:
         raise ValueError("missing or ambiguous reference-normalized US-align TM-score")
     return values[0]
+
+
+def usalign_coordinates(binary, pred, ref):
+    """TM-optimal superposition with fixed observed-residue correspondence.
+
+    Temporary CA-only files use the same residue numbers in both structures.
+    ALA names are placeholders; -TMscore 1 uses indices, not sequence alignment.
+    Missing original residue maps cannot be reconstructed from cached coordinates.
+    """
+    pred, ref = _coordinates(pred, ref)
+    if len(pred) > 9999 or max(np.abs(pred).max(), np.abs(ref).max()) >= 999:
+        raise ValueError('coordinates exceed conservative PDB formatting limits')
+    with tempfile.TemporaryDirectory(prefix='latentfold_tm_') as tmp:
+        paths = [Path(tmp)/'pred.pdb', Path(tmp)/'ref.pdb']
+        for path, coords in zip(paths, (pred, ref)):
+            with path.open('w') as handle:
+                for i, (x, y, z) in enumerate(coords, 1):
+                    handle.write(f'ATOM  {i:5d}  CA  ALA A{i:4d}    {x:8.3f}{y:8.3f}{z:8.3f}  1.00  0.00           C\n')
+                handle.write('TER\nEND\n')
+        return usalign_fixed_tm(binary, *paths)

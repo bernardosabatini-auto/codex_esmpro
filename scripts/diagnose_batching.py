@@ -17,7 +17,8 @@ from profile_gpu import atomic_json
 
 def precision(mode):
     torch.set_float32_matmul_precision('highest' if mode == 'fp32' else 'high')
-    return torch.autocast('cuda', dtype=torch.bfloat16, enabled=mode == 'bf16')
+    return torch.autocast('cuda', dtype=torch.float16 if mode == 'fp16' else torch.bfloat16,
+                          enabled=mode in ('bf16', 'fp16'))
 
 
 def compare(pred, reference, truth):
@@ -35,6 +36,10 @@ def main():
     p.add_argument('--output', type=Path, required=True)
     p.add_argument('--minutes', type=float, default=8)
     p.add_argument('--large-batch', type=int, default=64)
+    p.add_argument('--targets', nargs=2, default=['3pnr_B', '5eft_B'])
+    p.add_argument('--padded-length', type=int, default=256)
+    p.add_argument('--flow-precisions', nargs='+', choices=['bf16', 'fp16', 'tf32', 'fp32'], default=['bf16', 'fp32'])
+    p.add_argument('--decoder-precisions', nargs='+', choices=['bf16', 'fp16', 'tf32', 'fp32'], default=['bf16', 'fp32'])
     p.add_argument('--allow-gpu', action='store_true')
     a = p.parse_args()
     if not a.allow_gpu or a.large_batch < 2 or a.large_batch % 2:
@@ -44,8 +49,9 @@ def main():
     torch.cuda.set_device(0)
     deadline = time.monotonic()+a.minutes*60
     report = dict(status='running', job_id=os.environ.get('SLURM_JOB_ID'), started_unix=time.time(),
-                  targets=['3pnr_B', '5eft_B'], rows=[], flow_rows=[], timings=[],
-                  note='Fixed per-target flow and decoder noise; FP32 disables TF32; thresholds unchanged')
+                  targets=a.targets, padded_length=a.padded_length, rows=[], flow_rows=[], timings=[],
+                  flow_precisions=a.flow_precisions, decoder_precisions=a.decoder_precisions,
+                  note='Fixed per-target flow and decoder noise; fp32 disables TF32; tf32 requests PyTorch high float32 matmul precision; thresholds unchanged')
     save = lambda: atomic_json(a.output/'diagnosis.json', report)
     def budget():
         if time.monotonic() > deadline:
@@ -59,10 +65,10 @@ def main():
         requests = [(r, 0) for r in records]
         layouts = {}
         for i, r in enumerate(records):
-            for label, length in [('exact', len(r['sequence'])), ('padded', 256)]:
+            for label, length in [('exact', len(r['sequence'])), ('padded', a.padded_length)]:
                 layouts[f'single_{label}_{i}'] = (prediction_batch([requests[i]], length, seed=0,
                                                     decoder_scale=decoder.fm.scale_ref), [i])
-        base = prediction_batch(requests, 256, seed=0, decoder_scale=decoder.fm.scale_ref)
+        base = prediction_batch(requests, a.padded_length, seed=0, decoder_scale=decoder.fm.scale_ref)
         layouts['batch2'] = (base, [0, 1])
         # Exact duplicate inputs test batch shape effects without changing RNG.
         layouts[f'batch{a.large_batch}'] = (tuple(x.repeat(a.large_batch//2, *([1]*(x.ndim-1))) for x in base),
@@ -72,7 +78,7 @@ def main():
             print('Loading', checkpoint, flush=True)
             model, _ = load_legacy(a.source/'data/phase1_dataset'/checkpoint, trusted_pickle=True)
             model = model.cuda().eval().requires_grad_(False)
-            for flow_precision in ['bf16', 'fp32']:
+            for flow_precision in a.flow_precisions:
                 latent = {}
                 for layout, (tensors, indices) in layouts.items():
                     budget()
@@ -93,7 +99,7 @@ def main():
                                 target_id=records[i]['id'], rms_delta=float(delta.square().mean().sqrt()), max_abs_delta=float(delta.abs().max())))
                     del esm, mask, noise, dn, z
                     save()
-                for decoder_precision in ['bf16', 'fp32']:
+                for decoder_precision in a.decoder_precisions:
                     decoded = {}
                     for layout, (tensors, indices) in layouts.items():
                         budget()

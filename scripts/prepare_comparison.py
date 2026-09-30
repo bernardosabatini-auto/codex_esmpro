@@ -11,6 +11,8 @@ def main():
     p.add_argument('--source', type=Path, required=True)
     p.add_argument('--profile', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--flow-precision', choices=['bf16', 'fp16', 'tf32', 'fp32'], default='tf32')
+    p.add_argument('--decoder-precision', choices=['bf16', 'fp16', 'tf32', 'fp32'], default='fp32')
     a = p.parse_args()
     profile = json.loads(a.profile.read_text())
     if profile['status'] != 'passed':
@@ -34,6 +36,7 @@ def main():
         expected_targets=626, target_manifest=ids_file.name,
         target_manifest_sha256=hashlib.sha256(ids_text.encode()).hexdigest(), target_ids=ids,
         seed=0, samples=3, flow_steps=[10, 25, 50], guidance=[1.0, 2.0], decoder_steps=3,
+        flow_precision=a.flow_precision, decoder_precision=a.decoder_precision,
         internal_minutes=40, models=models, profile_report=str(a.profile),
         profile_report_sha256=hashlib.sha256(a.profile.read_bytes()).hexdigest(),
         batching_control=dict(max_ca_rmsd_A=0.2, min_self_ca_lddt=0.99,

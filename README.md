@@ -2,6 +2,7 @@
 
 Start with [the critical review and staged plan](reports/review.html), then the
 [H200 profiling summary](reports/h200_profile.md) and
+[batch precision diagnosis](reports/batch_precision.md), plus the
 [proposed experiment settings](configs/first_experiments.json).
 
 This is a minimal research core, extracted from the original project with
@@ -58,7 +59,7 @@ and a matched end-to-end benchmark are future work in the plan.
 
 ## Scope and limits
 
-- Tested: twelve CPU contract tests; exact forward parity of small pair and pair-free
+- Tested: thirteen CPU contract tests; exact forward parity of small pair and pair-free
   models against isolated original definitions; a real pretrained ProteinAE
   decoder on one validation target; the full 626-target artifact/data audit.
 - H200 job 49346371 completed 50 throughput/memory configurations of the actual
@@ -69,9 +70,10 @@ and a matched end-to-end benchmark are future work in the plan.
   been trained. The scheduled comparison concerns existing frozen checkpoints.
 - `flow_loss` supports training, but this restart does not carry over the old
   distributed trainer, RAM caches, monkey patches, or scheduling machinery.
-- `usalign_fixed_tm` requires an external US-align executable. Its parsing and
-  strict failure behavior are unit tested with fixture output; the executable
-  was unavailable on PATH. No new optimized TM-score run is claimed.
+- `usalign_fixed_tm` requires an external US-align executable. A pinned local
+  build has passed rigid-transform, correspondence-permutation, and mirror
+  controls. The CPU comparison scorer can report optimized, fixed-correspondence
+  TM-score using `--usalign PATH`; the binary and its sources remain untracked.
 - The current HDF5 files lack original residue maps. New builds must preserve
   them. Reading old records strictly cannot reconstruct missing provenance.
 - No generator/design pipeline is copied. That branch needs separate controls,
@@ -89,13 +91,18 @@ coordinates are retained in HDF5. No best-of-three selection is performed.
 `scripts/score_comparison.py --run RUN_DIRECTORY --workers 4` scores a completed
 collection on CPUs. It checks exact target/sample coverage and reports CA lDDT,
 RMSD, and geometry diagnostics. `tm_after_kabsch` is explicitly a diagnostic and
-must not be reported as optimized TM-score. ESMC runtime and a verified external
-TM-score executable remain required for a full comparison with sequence folding.
+must not be reported as optimized TM-score. Add `--usalign PATH` to measure
+optimized fixed-correspondence TM-score separately. ESMC timing remains required
+for a full comparison with sequence folding.
 
 The first comparison attempt (49349478) stopped at the real-weight batching
 controls before collecting the sweep. One control differed by 0.43–0.64 Å RMSD
 between padded batch and unpadded single inference. The source of this numerical
-difference must be isolated before the comparison is relaunched.
+difference was traced primarily to BF16 flow computation. The selected flow
+policy uses FP32 tensors with high float32 matrix-multiplication precision,
+followed by an IEEE FP32 decoder. Focused checks pass with nearly unchanged
+flow runtime; the comparison also validates actual production batch shapes
+before the full sweep. See the numerical diagnosis above for scope and results.
 
 ## Repository synchronization
 

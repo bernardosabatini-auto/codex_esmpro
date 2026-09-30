@@ -6,17 +6,21 @@ optimized TM-score used in the legacy report. No best-of-samples selection.
 import argparse
 from concurrent.futures import ProcessPoolExecutor
 import json
+import hashlib
+import multiprocessing
 from pathlib import Path
 import time
 
 import h5py
 import numpy as np
-from latentfold.metrics import ca_metrics
+from latentfold.metrics import ca_metrics, usalign_coordinates
 
 
 def score_one(payload):
-    setting, name, sample_index, pred, ref, backbone = payload
+    setting, name, sample_index, pred, ref, backbone, binary = payload
     metrics = ca_metrics(pred, ref)
+    if binary:
+        metrics['tm_fixed_reference'] = usalign_coordinates(binary, pred, ref)
     if metrics['ca_lddt'] is None:
         raise ValueError(f'undefined CA lDDT: {name}')
     reference_short = np.linalg.norm(np.diff(ref, axis=0), axis=1) < 4.5
@@ -28,7 +32,7 @@ def score_one(payload):
                 peptide_length_outliers_on_reference_short=int((((peptide < 1.1) | (peptide > 1.6)) & reference_short).sum()))
 
 
-def payloads(run, manifest):
+def payloads(run, manifest, binary=None):
     config = manifest['config']
     expected_ids = set(config['target_ids'])
     expected_settings = {f'steps{s}_cfg{g:g}' for s in config['flow_steps'] for g in config['guidance']}
@@ -47,7 +51,7 @@ def payloads(run, manifest):
                 if set(target) != {str(i) for i in range(config['samples'])}:
                     raise ValueError('missing or extra samples')
                 for k in range(config['samples']):
-                    yield setting, name, k, target[str(k)]['ca'][:], refs[name], target[str(k)]['backbone'][:]
+                    yield setting, name, k, target[str(k)]['ca'][:], refs[name], target[str(k)]['backbone'][:], binary
             if seen != expected_ids:
                 raise ValueError('missing targets')
 
@@ -56,6 +60,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run', type=Path, required=True)
     parser.add_argument('--workers', type=int, default=4)
+    parser.add_argument('--usalign', type=Path, help='verified external USalign executable; adds fixed-correspondence TM-score')
     a = parser.parse_args()
     if a.workers < 1:
         parser.error('workers must be positive')
@@ -63,8 +68,10 @@ def main():
     if manifest['status'] != 'complete':
         raise ValueError('refusing to summarize incomplete GPU run')
     started = time.time()
-    with ProcessPoolExecutor(max_workers=a.workers) as workers:
-        rows = list(workers.map(score_one, payloads(a.run, manifest), chunksize=8))
+    binary = str(a.usalign.resolve()) if a.usalign else None
+    binary_sha256 = hashlib.sha256(a.usalign.read_bytes()).hexdigest() if a.usalign else None
+    with ProcessPoolExecutor(max_workers=a.workers, mp_context=multiprocessing.get_context('spawn')) as workers:
+        rows = list(workers.map(score_one, payloads(a.run, manifest, binary), chunksize=8))
     if len(rows) != manifest['completed_predictions']:
         raise ValueError('score coverage differs from GPU run')
     summaries = {}
@@ -74,8 +81,11 @@ def main():
             mean_ca_lddt=float(np.mean([r['ca_lddt'] for r in selected])),
             mean_ca_rmsd=float(np.mean([r['ca_rmsd'] for r in selected])),
             diagnostic_mean_tm_after_kabsch=float(np.mean([r['tm_after_kabsch'] for r in selected])))
+        if binary:
+            summaries[setting]['mean_tm_fixed_reference'] = float(np.mean([r['tm_fixed_reference'] for r in selected]))
     result = dict(status='complete', model=manifest['model'], coverage=1.0,
                   metric_note='CA lDDT; tm_after_kabsch is NOT optimized TM-score; all samples retained',
+                  usalign=dict(path=binary, sha256=binary_sha256, arguments=['-TMscore', '1']) if binary else None,
                   seconds=time.time()-started, summaries=summaries, records=rows)
     dest = a.run/'scores.json'
     if dest.exists():

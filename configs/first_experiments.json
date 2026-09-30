@@ -45,16 +45,17 @@
       "priority": 1,
       "hypothesis": "The current latent velocity loss weights errors differently from their consequences in decoded geometry.",
       "diagnosis": "With a frozen decoder and fixed decoder noise, measure reconstruction, equal-RMS latent perturbations, and paths from predicted to target latents on an explicit length/continuity-stratified subset. Check latent stability under rigid rotations and small coordinate perturbations where the encoder pipeline is available. These tests select a loss experiment; they do not prove a ceiling.",
-      "comparison": "Untouched checkpoint versus matched continued training with latent-only loss versus latent loss plus a calibrated geometry term. The two training arms start from identical weights and use the same proteins, ordering, latent noise, optimizer and update count for each paired seed.",
+      "comparison": "Untouched checkpoint versus matched latent-only continued training versus a specifically revised geometry objective: conditional late-time endpoint supervision against stored reference coordinates, reproducible decoder noise, a nonsaturating robust distance term, and training-gradient-calibrated weighting. Two training arms start from identical weights and use the same proteins, ordering, latent noise, optimizer and update count for each paired seed.",
       "geometry_loss": "Begin with robust residue-distance errors from decoded endpoint estimates; include an orientation-sensitive local term and physical-geometry checks where residue correspondence is known. Distance-only supervision cannot distinguish mirror structures. Backpropagate through the frozen decoder; keep the latent loss to limit off-distribution drift.",
       "controls": "First establish finite gradients through the actual decoder and calibrate geometry gradient magnitude on training records only. Supervise conditional late-time endpoint estimates; assess actual full sampling because a one-step endpoint surrogate can improve without improving sampled structures. Geometry-specific randomness uses a separate stream so both arms retain identical flow-training draws.",
-      "gate": "Promote only on actual decoded held-out structures; lower latent loss or better training reconstruction alone is insufficient."
+      "gate": "First measure gradients of the legacy and revised terms across denoising time and condition-drop states on training proteins. A revised term must have finite useful gradients and improve actual full-sampling development structures in a bounded pilot; latent loss or endpoint reconstruction alone is insufficient. If it fails, stop this branch rather than rescale it.",
+      "why_revisit": "The prior negative auxiliary-loss experiment is acknowledged. Conditional late-time gating and noise/gradient controls are testable changes; their benefit is unknown."
     },
     {
       "priority": 2,
       "hypothesis": "Cached intermediate ESMC representations expose geometry more usefully than the last layer.",
-      "comparison": "Validate matched sequence/coordinate identities and train/validation cluster separation in the existing last-layer and layer-80 caches. Train identical small distance/contact probes on identical proteins and seeds. If promising, compare last layer, layer 80, and a learned two-layer mixture with the same folding head and unchanged loss.",
-      "gate": "Probe improvement must transfer to sampled structure accuracy before generating a large cache or combining with the geometry-loss winner. Missing development embeddings must be generated from an explicit matched sequence manifest."
+      "comparison": "Audit the negative earlier-layer replacement result first. Validate matched sequence/coordinate identities and train/validation cluster separation in the existing final-layer and layer-80 caches. Use matched small distance/contact probes to ask whether layer 80 contributes complementary information. Only if it does, test an initially zero residual contribution from intermediate features while preserving final-layer conditioning, with the same folding head and unchanged loss.",
+      "gate": "No repeat of an unqualified layer-80 replacement. Complementary probe information must transfer to actual sampled-structure accuracy before generating a large cache or combining with a geometry-loss winner."
     },
     {
       "priority": 3,
@@ -121,7 +122,7 @@
     "diagnostic": {
       "gpus": 1,
       "walltime_cap_minutes": 30,
-      "purpose": "Decoder sensitivity and real-gradient controls; bounded experiment, not an open-ended prerequisite."
+      "purpose": "Audit gradients of the previously failed structural objective versus a conditional late-time alternative; test current-checkpoint decoder sensitivity with fixed noise. Bounded to 30 minutes of GPU allocation."
     },
     "training_profile": {
       "gpus": 1,
@@ -144,5 +145,13 @@
       "followup": "Register explicit IDs and an automatic analysis action before handing off; follow runs through completion and analysis."
     },
     "budget_note": "These are proposed maximum allocations, not measured runtime estimates or scheduled jobs."
+  },
+  "prior_negative_evidence": {
+    "source_report": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/reports/esm_proae_report.html#deadends",
+    "reported_findings": "The original report records negative results for structural lDDT auxiliary loss and replacing final-layer conditioning with the layer at 80 percent depth. Those are legacy-protocol results, not recomputed under the current scoring protocol.",
+    "inspected_code": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate19_struct_loss.py",
+    "structural_loss_details": "Gate 19 chooses a random subset across all sampled times and condition-drop states; compares separately decoded endpoint and true latent with separate decoder-noise draws; applies a sigmoid local-distance score and a fixed auxiliary weight. Its source does not gate the structural loss to conditioned late-time examples.",
+    "interpretation": "These are concrete differences to test, not established explanations for the negative result. Do not rerun the unchanged loss or blindly replace the final ESM layer.",
+    "existing_sensitivity_test": "gate6_decoder_tolerance.py already tests isotropic perturbations and interpolation for an older ESM-2 point head. Extend the evidence to current flow checkpoints, fixed decoder noise, exact coverage and fixed-correspondence metrics rather than presenting sensitivity analysis as new."
   }
 }

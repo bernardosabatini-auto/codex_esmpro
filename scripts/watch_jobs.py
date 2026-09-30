@@ -85,14 +85,20 @@ def notify(root, state, key, message, config):
 
 
 def followup(root, job, config):
-    if job.get('completion_action') != 'summarize_comparison':
+    action = job.get('completion_action')
+    if action not in ('summarize_comparison', 'summarize_hybrid'):
         raise ValueError('unrecognized completion action')
     ids = job_ids(job)
-    if len(ids) != 2:
+    if action == 'summarize_comparison' and len(ids) != 2:
         raise ValueError('comparison follow-up requires two registered tasks')
-    report = root/'reports'/f"comparison_{job['id']}"
-    command = [config['python'], str(root/'scripts/summarize_comparison.py'), '--runs',
-               *[str(root/'runs'/f'comparison_{i}') for i in ids], '--output', str(report)]
+    prefix = 'hybrid' if action == 'summarize_hybrid' else 'comparison'
+    report = root/'reports'/f"{prefix}_{job['id']}"
+    command = [config['python'], str(root/'scripts'/f'{action}.py'), '--runs',
+               *[str(root/'runs'/f'{prefix}_{i}') for i in ids], '--output', str(report)]
+    if action == 'summarize_hybrid':
+        registered = json.loads((root/'runs/jobs.json').read_text())['jobs']
+        reference = next(j for j in registered if j['id'] == job['reference_job'])
+        command += ['--references', *[str(root/'runs'/f'comparison_{i}') for i in job_ids(reference)]]
     env = dict(os.environ, CUDA_VISIBLE_DEVICES='', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1',
                OPENBLAS_NUM_THREADS='1', PYTHONPATH=str(root/'src'))
     with (root/'runs/watch'/f"analysis_{job['id']}.log").open('a') as log:
@@ -140,7 +146,7 @@ def tick(root, config, query=scheduler_states, analyze=followup):
         if not all(rows[i]['state'] in TERMINAL for i in ids):
             continue
         success = all(rows[i]['state'] == 'COMPLETED' and rows[i]['exit_code'] == '0:0' for i in ids)
-        if not success:
+        if not success and job.get('completion_action') != 'summarize_hybrid':
             entry.update(handled=True, outcome='job_failed', handled_at=stamp())
         elif not job.get('completion_action'):
             entry.update(handled=True, outcome='completed', handled_at=stamp())

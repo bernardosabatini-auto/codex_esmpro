@@ -23,7 +23,7 @@ from latentfold.data import read_ids, read_record
 from latentfold.decoder import load_proteinae
 from latentfold.flow import SampleConfig, sample
 from latentfold.metrics import ca_metrics
-from latentfold.precision import inference_precision, MODES
+from latentfold.precision import inference_precision, hybrid_modules, MODES, HYBRID_MODES
 from predict import file_identity
 from profile_gpu import Telemetry, atomic_json
 from score_comparison import score_batch, write_scores
@@ -32,8 +32,9 @@ from score_comparison import score_batch, write_scores
 @torch.no_grad()
 def infer(model, decoder, tensors, cfg, *, flow_precision='bf16', decoder_precision='bf16'):
     esm, mask, noise, dn = (x.to('cuda', non_blocking=True) for x in tensors)
-    with inference_precision(flow_precision):
-        z = sample(model, esm, mask, cfg, noise=noise)
+    with inference_precision('fp32' if flow_precision in HYBRID_MODES else flow_precision):
+        with hybrid_modules(model, flow_precision):
+            z = sample(model, esm, mask, cfg, noise=noise)
     with inference_precision(decoder_precision):
         ca, backbone = decoder(z.float(), mask, return_backbone=True, noise=dn)
     if not torch.isfinite(backbone).all():
@@ -113,7 +114,7 @@ def main():
         parser.error('USalign must be an executable file')
     config = json.loads(a.config.read_text())
     precision_options = {key: config.get(key, 'bf16') for key in ('flow_precision', 'decoder_precision')}
-    if any(value not in MODES for value in precision_options.values()):
+    if precision_options['flow_precision'] not in MODES + HYBRID_MODES or precision_options['decoder_precision'] not in MODES:
         raise ValueError('invalid precision configuration')
     entry = config['models'][a.model]
     ids_file = a.config.parent / config['target_manifest']

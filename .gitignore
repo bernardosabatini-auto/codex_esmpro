@@ -52,3 +52,4 @@ runs/
 reports/*.json
 configs/development*_ids.txt
 configs/comparison626.json
+configs/hybrid_*.json

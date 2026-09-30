@@ -136,7 +136,9 @@ class PairTrack(nn.Module):
                 p = p + self.dist(dist_feats.float())
             else:   # no geometry this step: still touch the parameters so DDP sees them every iteration
                 p = p + self.dist.bias + 0.0 * self.dist.weight.sum()
-        p = p.to(torch.bfloat16) if p.is_cuda else p               # pair track in bf16 on GPU
+        # Honor the caller's precision policy, including a true FP32 reference.
+        if p.is_cuda and torch.is_autocast_enabled('cuda'):
+            p = p.to(torch.get_autocast_dtype('cuda'))
         pmask = (mask[:, :, None] & mask[:, None, :]).unsqueeze(-1).to(p.dtype)
         p = p * pmask
         for blk in self.blocks:
@@ -190,7 +192,9 @@ class PairFlowNet(nn.Module):
         m = mask.unsqueeze(-1).float()
         c_pool = (c_tok * m).sum(1) / m.sum(1).clamp(min=1.0)
         pb_all = self.pair_bias(self.pair_bias_norm(pair)).permute(0, 3, 1, 2)
-        pbs = pb_all.to(torch.bfloat16 if pb_all.is_cuda else pb_all.dtype).contiguous().split(self.n_heads, dim=1)
+        if pb_all.is_cuda and torch.is_autocast_enabled('cuda'):
+            pb_all = pb_all.to(torch.get_autocast_dtype('cuda'))
+        pbs = pb_all.contiguous().split(self.n_heads, dim=1)
         return c_tok, c_pool, pbs
 
     def forward(self, x_t, t, esm, mask, cond_drop=None, x_sc=None, pair=None, contact=None, dist_feats=None, *, prepared=None):

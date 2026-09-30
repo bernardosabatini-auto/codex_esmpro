@@ -9,6 +9,7 @@ from latentfold.decoder import load_proteinae
 from latentfold.flow import FlowConfig
 from latentfold.training import objective,controlled_backward
 from latentfold.precision import inference_precision
+from latentfold.quality import confidence_weights
 from profile_gpu import atomic_json,Telemetry
 
 
@@ -35,12 +36,24 @@ def train(config,task,out):
     torch.cuda.set_per_process_memory_fraction(.85);torch.set_float32_matmul_precision('highest')
     torch.backends.cudnn.allow_tf32=False
     records={};buckets={int(k):[] for k in config['batches']}
+    weights=None
+    if config.get('confidence_weights'):
+        wp=Path(config['confidence_weights'])
+        if sha(wp)!=config['confidence_weights_sha256']:raise ValueError('confidence weights changed')
+        weights=json.loads(wp.read_text())
+        if weights['training_manifest_sha256']!=config['training_manifest_sha256']:raise ValueError('confidence data differ')
+        if task['arm']!='confidence':raise ValueError('confidence weighting must be its own ablation arm')
     with h5py.File(data['dataset'],'r') as h:
         if set(h['train'])!={r['id'] for r in data['records']}:raise ValueError('training coverage changed')
         for meta in data['records']:
             name=meta['id'];g=h['train'][name]
             record=dict(id=name,sequence=str(g.attrs['sequence']),**{k:torch.from_numpy(g[src][:]) for k,src in [('esm','esm2_emb'),('z','z'),('ca','ca_coords'),('adjacent','adjacent')]})
             if hashlib.sha256(record['sequence'].encode()).hexdigest()!=meta['sequence_sha256']:raise ValueError('training sequence mismatch')
+            if weights is not None:
+                confidence=g['plddt'][:].astype(np.float32)
+                if hashlib.sha256(confidence.tobytes()).hexdigest()!=weights['records'][name]['confidence_array_sha256']:
+                    raise ValueError('training confidence changed')
+                record['residue_weights']=confidence_weights(torch.from_numpy(confidence),weights['buckets'][str(meta['bucket'])]['mean_raw_weight'])
             records[name]=record;buckets[meta['bucket']].append(name)
     initial=source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt'
     decoder_path=source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt'
@@ -49,6 +62,16 @@ def train(config,task,out):
     model,arch=load_legacy(initial,trusted_pickle=True)
     model.cuda().train();model.checkpoint_blocks=True;model.pair.checkpoint_blocks=True
     decoder=load_proteinae(source/'ProteinAE_v1',source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt').cuda()
+    if weights is not None:
+        try:
+            from check_training_precision import check
+            report['weighted_gradient_controls']=check(model,decoder,records,buckets)
+            if not all(r['passed'] for r in report['weighted_gradient_controls']):
+                raise ValueError('confidence-weighted FP16 gradient controls failed')
+            atomic_json(out/'training.json',report)
+        except BaseException as error:
+            report.update(status='failed',error=f'{type(error).__name__}: {error}')
+            atomic_json(out/'training.json',report);raise
     optimizer=torch.optim.AdamW(model.parameters(),lr=config['learning_rate'],weight_decay=.01,foreach=False)
     ema={k:v.detach().clone() for k,v in model.state_dict().items()}
     flow_config=FlowConfig();flow_rng=torch.Generator(device='cuda').manual_seed(task['seed'])
@@ -65,11 +88,15 @@ def train(config,task,out):
                 queues[bucket]=order_rng.permutation(buckets[bucket]).tolist()
             ids=queues[bucket][:count];del queues[bucket][:count]
             chosen=[records[name] for name in ids];batch=collate(chosen)
+            if weights is not None:
+                batch['residue_weights']=torch.zeros(count,batch['mask'].shape[1])
+                for i,r in enumerate(chosen):batch['residue_weights'][i,:len(r['residue_weights'])]=r['residue_weights']
             batch['adjacent']=torch.zeros(count,batch['mask'].shape[1]-1,dtype=torch.bool)
             for i,r in enumerate(chosen):batch['adjacent'][i,:len(r['adjacent'])]=r['adjacent']
             padding=bucket-batch['mask'].shape[1]
             for k in ('z','ca','esm'):batch[k]=F.pad(batch[k],(0,0,0,padding))
             for k in ('mask','adjacent'):batch[k]=F.pad(batch[k],(0,padding))
+            if weights is not None:batch['residue_weights']=F.pad(batch['residue_weights'],(0,padding))
             batch={k:v.pin_memory().to('cuda',non_blocking=True) if isinstance(v,torch.Tensor) else v for k,v in batch.items()}
             progress=step/max(config['updates']-1,1)
             lr=config['learning_rate']*min((step+1)/config['warmup_updates'],1)*(.3+.7*.5*(1+math.cos(math.pi*progress)))

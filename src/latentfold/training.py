@@ -11,7 +11,8 @@ def objective(model, decoder, batch, config, *, generator, geometry_weight=0.,
     if config.repeats != 1:
         raise ValueError('matched pilot uses distinct proteins, no repeat copies')
     flow, info = flow_loss(model,batch['z'],batch['esm'],batch['mask'],config,
-                           generator=generator,return_state=geometry_weight>0)
+                           generator=generator,return_state=geometry_weight>0,
+                           residue_weights=batch.get('residue_weights'))
     stats=dict(flow_loss=float(flow.detach()), geometry_loss=0., geometry_count=0)
     if geometry_weight==0: return (flow, None, stats) if return_parts else (flow, stats)
     state=info['state']; eligible=torch.where((state['t']>=.75)&~state['dropped'])[0]

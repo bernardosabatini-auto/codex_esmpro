@@ -15,6 +15,22 @@ policy failed the pair model's shape controls and is rejected. See
 [the validated inference settings](configs/validated_inference.json); these are
 development-set results and exclude ESMC extraction time.
 
+The [matched ESMFold2-Fast benchmark](reports/external_49461971.md) now uses the
+same fixed-correspondence scorer: TM 0.59977 versus 0.56824 for the untouched
+pair head. The [length breakdown](reports/external_strata_49461971.md) shows a
+larger gap on long proteins. Full sequence conditioning is included only in the
+external model's timing, so this is not an end-to-end speed comparison.
+
+The accuracy work now includes an actual continued-training loop, a
+[structural-gradient diagnostic](reports/geometry_49453471.md),
+[verified source-mapped training records](reports/training_data_v1.md), and
+[backward capacity/precision validation](reports/training_profile_49459162.md).
+Six independent single-H200 runs compare latent-only and bounded geometry
+gradients over 500 updates and three paired seeds. A subsequent confidence
+ablation reuses the three controls and changes only source-pLDDT residue weights.
+Earlier-layer ESM work is deferred at the user's request. Neither continued
+training nor the new losses are established accuracy improvements yet.
+
 This is a minimal research core, extracted from the original project with
 [symbol-level provenance](PROVENANCE.json). It retains both flow architectures
 and the differentiable decoder adapter. It adds explicit loss/sampling settings,
@@ -69,15 +85,18 @@ and a matched end-to-end benchmark are future work in the plan.
 
 ## Scope and limits
 
-- Tested: thirteen CPU contract tests; exact forward parity of small pair and pair-free
+- Tested: 31 CPU contract tests; exact forward parity of small pair and pair-free
   models against isolated original definitions; a real pretrained ProteinAE
   decoder on one validation target; the full 626-target artifact/data audit.
 - H200 job 49346371 completed 50 throughput/memory configurations of the actual
   legacy heads and decoder. All eight real-weight cache equivalence checks gave
   exactly identical coordinates. Nsight counters are analyzed separately from
   nvidia-smi GPU busy time in `reports/h200_profile.json`.
-- New-model accuracy has not been tested. No improved structure predictor has
-  been trained. The scheduled comparison concerns existing frozen checkpoints.
+- New weights are being trained and evaluated on reused development proteins.
+  Do not promote them before the declared paired accuracy and geometry checks.
+  Independent final-test curation remains incomplete: the January–September 2026
+  screen yielded only 11 eligible structures, below the fixed minimum of 32.
+  A score-blind date expansion to January 2024 preserves all other selection rules.
 - `flow_loss` supports training, but this restart does not carry over the old
   distributed trainer, RAM caches, monkey patches, or scheduling machinery.
 - `usalign_fixed_tm` requires an external US-align executable. A pinned local

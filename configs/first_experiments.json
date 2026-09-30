@@ -75,7 +75,7 @@
   "predeclared_promotion_rule": {
     "accuracy_track": "Paired mean fixed-correspondence TM gain at least 0.01 over the relevant matched control, sequence-cluster bootstrap lower bound above zero, reproducible across three training seeds, CA-lDDT delta lower confidence bound at least -0.005, geometry-outlier fraction delta upper confidence bound at most 0.001, and complete coverage. Confirm on the locked final test after choosing the recipe.",
     "speed_track": "at least 2x measured end-to-end speed, paired TM noninferiority lower bound above -0.005, predeclared CI procedure",
-    "note": "Practical target, not an achieved accuracy gain. Cluster labels, a separate final test, training-loop implementation and backward profiling remain outstanding."
+    "note": "Practical target, not an achieved accuracy gain. Backward profiling, the training loop and development cluster labels are complete. Independent final-test curation remains pending."
   },
   "authorization": {
     "user_message": "When we are ready to launch, you can use upto 8 H200s at once",
@@ -110,14 +110,14 @@
     },
     "metrics_report": "reports/comparison_49414524.md",
     "precision_report": "reports/hybrid_49427699.md",
-    "status": "Frozen-checkpoint inference evaluated; no new weights trained",
+    "status": "Frozen-checkpoint inference and external ESMFold2 comparison complete; matched new-weight pilots underway.",
     "inference_policy_config": "configs/validated_inference.json",
     "note": "Validated inference precision does not establish safe or efficient backward precision."
   },
   "accuracy_experiment_stages": {
     "data_contract": {
       "development": "Existing 626 proteins remain reused development data. Freeze evaluation at 25 steps, guidance 2 and three paired inference samples per target.",
-      "final_test": "The original pre-training manifest lock could not be satisfied: blind September screening produced only three eligible targets. On 2026-09-30 freeze the broader Jan\u2013Sep selection protocol and exclusion corpus before training; allow score-blind CPU curation during the development pilot. Final manifest and independent confirmation remain required before accuracy promotion.",
+      "final_test": "The original pre-training manifest lock could not be satisfied: blind September screening produced only three eligible targets. On 2026-09-30 freeze the broader Jan\u2013Sep selection protocol and exclusion corpus before training; allow score-blind CPU curation during the development pilot. Final manifest and independent confirmation remain required before accuracy promotion. January\u2013September screening yielded 11 eligible targets. A second blind protocol amendment on 2026-09-30 expands releases back to 2024-01-01, with all other rules unchanged, before inspection of pilot accuracy scores.",
       "missing_maps": "Do not guess adjacency through missing residues. Use verified continuous training records or explicit residue maps for geometry supervision; retain and separately report all development strata.",
       "uncertainty": "Sequence-cluster bootstrap where cluster labels have been constructed; prediction samples are repeated measurements, not independent proteins. Training seeds are independent replications."
     },
@@ -148,7 +148,16 @@
       "precision": "Profile and validate training precision independently of inference precision.",
       "followup": "Register explicit IDs and an automatic analysis action before handing off; follow runs through completion and analysis."
     },
-    "budget_note": "These are proposed maximum allocations, not measured runtime estimates or scheduled jobs."
+    "budget_note": "These are proposed maximum allocations, not measured runtime estimates or scheduled jobs.",
+    "confidence_pilot": {
+      "gpus": 3,
+      "updates": 500,
+      "walltime_cap_minutes_per_job": 75,
+      "comparison": "Reuse the completed latent-only controls for seeds 7919, 7920 and 7921. Change only training-reference confidence weights; no geometry auxiliary term.",
+      "weight": "clip((pLDDT-50)/40, 0.05, 1), normalized by fixed protein-averaged mean within each training length bucket.",
+      "controls": "Same 1024 proteins, batch order, stochastic flow draws, optimizer, EMA and full 626-target scoring. Four FP16-vs-FP32 actual parameter-gradient controls before training; fail on nonfinite gradients or failed precision.",
+      "gate": "Same predeclared accuracy/geometry thresholds. If the bounded pilot fails, do not scale this weighting recipe."
+    }
   },
   "prior_negative_evidence": {
     "source_report": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/reports/esm_proae_report.html#deadends",

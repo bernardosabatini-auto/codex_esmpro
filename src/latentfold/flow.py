@@ -70,7 +70,7 @@ def target_noise(ids, lengths, width, *, seed, sample_index=0, stream="flow", de
     return out.to(device)
 
 
-def flow_loss(net, z, esm, mask, config, *, generator, return_state=False):
+def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, residue_weights=None):
     """One loss, with the effective sample count returned for logging.
 
     Protein weighting is the new default, matching the evaluation's unit of analysis.
@@ -78,6 +78,12 @@ def flow_loss(net, z, esm, mask, config, *, generator, return_state=False):
     not an established accuracy improvement. Pair features are computed once.
     """
     validate_batch(esm, mask, z)
+    if residue_weights is not None:
+        if config.reduction != 'protein' or residue_weights.shape != mask.shape or residue_weights.requires_grad:
+            raise ValueError('fixed residue weights require matching shape and protein reduction')
+        if not torch.isfinite(residue_weights).all() or (residue_weights < 0).any() or not ((residue_weights*mask).sum(1) > 0).all():
+            raise ValueError('invalid or empty residue confidence weights')
+        residue_weights = residue_weights.repeat_interleave(config.repeats, 0)
     kwargs = {}
     if hasattr(net, "compute_pair"):
         kwargs["pair"] = net.compute_pair(esm, mask).repeat_interleave(config.repeats, 0)
@@ -99,6 +105,8 @@ def flow_loss(net, z, esm, mask, config, *, generator, return_state=False):
             sc = (x + (1 - tt) * v0).detach()
     pred = net(x, t, esm, mask, drop, sc, **kwargs)
     errors = ((pred - (z - x0)) ** 2).mean(-1) * mask
+    if residue_weights is not None:
+        errors = errors * residue_weights
     if config.reduction == "protein":
         loss = (errors.sum(1) / mask.sum(1)).mean()
     else:

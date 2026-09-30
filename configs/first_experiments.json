@@ -43,27 +43,36 @@
   "ordered_training_hypotheses": [
     {
       "priority": 1,
-      "hypothesis": "A subset of available ESMC layers exposes geometry better than the last layer",
-      "comparison": "last layer versus scalar mix of a few cached layers; same head, data, optimizer steps, seeds",
-      "gate": "pilot probe and fold improvement on untouched development subset justify full cache"
+      "hypothesis": "The current latent velocity loss weights errors differently from their consequences in decoded geometry.",
+      "diagnosis": "With a frozen decoder and fixed decoder noise, measure reconstruction, equal-RMS latent perturbations, and paths from predicted to target latents on an explicit length/continuity-stratified subset. Check latent stability under rigid rotations and small coordinate perturbations where the encoder pipeline is available. These tests select a loss experiment; they do not prove a ceiling.",
+      "comparison": "Untouched checkpoint versus matched continued training with latent-only loss versus latent loss plus a calibrated geometry term. The two training arms start from identical weights and use the same proteins, ordering, latent noise, optimizer and update count for each paired seed.",
+      "geometry_loss": "Begin with robust residue-distance errors from decoded endpoint estimates; include an orientation-sensitive local term and physical-geometry checks where residue correspondence is known. Distance-only supervision cannot distinguish mirror structures. Backpropagate through the frozen decoder; keep the latent loss to limit off-distribution drift.",
+      "controls": "First establish finite gradients through the actual decoder and calibrate geometry gradient magnitude on training records only. Supervise conditional late-time endpoint estimates; assess actual full sampling because a one-step endpoint surrogate can improve without improving sampled structures. Geometry-specific randomness uses a separate stream so both arms retain identical flow-training draws.",
+      "gate": "Promote only on actual decoded held-out structures; lower latent loss or better training reconstruction alone is insufficient."
     },
     {
       "priority": 2,
-      "hypothesis": "Latent target ambiguity and decoder sensitivity dominate prediction error",
-      "comparison": "stratify errors by decoder sensitivity, PCA eigengaps and sign stability; latent-only versus calibrated geometry-aware endpoint loss",
-      "gate": "positive gradient and geometry controls, no validity regression"
+      "hypothesis": "Cached intermediate ESMC representations expose geometry more usefully than the last layer.",
+      "comparison": "Validate matched sequence/coordinate identities and train/validation cluster separation in the existing last-layer and layer-80 caches. Train identical small distance/contact probes on identical proteins and seeds. If promising, compare last layer, layer 80, and a learned two-layer mixture with the same folding head and unchanged loss.",
+      "gate": "Probe improvement must transfer to sampled structure accuracy before generating a large cache or combining with the geometry-loss winner. Missing development embeddings must be generated from an explicit matched sequence manifest."
     },
     {
       "priority": 3,
-      "hypothesis": "A faster point predictor can distil a good conditional sample",
-      "comparison": "teacher-derived selected targets on training sequences only; one-step and 4-step students versus retained flow teacher",
-      "gate": "non-oracle accuracy-cost improvement including ESMC and decoder; no collapse on difficult targets"
+      "hypothesis": "Coverage and weighting of reliable long-chain and multi-domain training examples limit generalization.",
+      "comparison": "Audit residue maps, chain breaks and structure confidence first. Then change only training sampling or weighting, balancing length and sequence clusters, while retaining the same head and objective.",
+      "gate": "Improvement within prespecified length and continuity strata without hiding failures or reducing reported coverage."
+    },
+    {
+      "priority": 4,
+      "hypothesis": "A faster point or few-step predictor can distil an improved conditional teacher.",
+      "comparison": "Use teacher-derived targets from training sequences only; evaluate one/four-step students at matched end-to-end cost after accuracy improves.",
+      "gate": "Defer until a better teacher exists; no oracle sample selection."
     }
   ],
   "predeclared_promotion_rule": {
-    "accuracy_track": "paired mean TM gain at least 0.01, cluster bootstrap lower bound above zero, three seeds, no material CA-lDDT or geometry regression",
+    "accuracy_track": "Paired mean fixed-correspondence TM gain at least 0.01 over the relevant matched control, sequence-cluster bootstrap lower bound above zero, reproducible across three training seeds, CA-lDDT delta lower confidence bound at least -0.005, geometry-outlier fraction delta upper confidence bound at most 0.001, and complete coverage. Confirm on the locked final test after choosing the recipe.",
     "speed_track": "at least 2x measured end-to-end speed, paired TM noninferiority lower bound above -0.005, predeclared CI procedure",
-    "note": "These are proposed practical thresholds, not achieved results. Cluster labels and a held-out final test still need construction."
+    "note": "Practical target, not an achieved accuracy gain. Cluster labels, a separate final test, training-loop implementation and backward profiling remain outstanding."
   },
   "authorization": {
     "user_message": "When we are ready to launch, you can use upto 8 H200s at once",
@@ -85,5 +94,55 @@
     "sm_activity_minimum": 0.5,
     "metrics": "Nsight SM/tensor/DRAM activity plus NVML, actual proteins/second and residue padding",
     "next_stage": "Size the 626-target comparison from measured throughput. Proposed two H200s up to two hours; do not expand while utilization evidence is absent or fails."
+  },
+  "accuracy_plan_updated": "2026-09-30",
+  "completed_reference": {
+    "comparison_job": "49414524",
+    "precision_job": "49427699",
+    "reference_model": "459M pair checkpoint",
+    "reference_sampling": {
+      "flow_steps": 25,
+      "guidance": 2,
+      "decoder_steps": 3
+    },
+    "metrics_report": "reports/comparison_49414524.md",
+    "precision_report": "reports/hybrid_49427699.md",
+    "status": "Frozen-checkpoint inference evaluated; no new weights trained",
+    "inference_policy_config": "configs/validated_inference.json",
+    "note": "Validated inference precision does not establish safe or efficient backward precision."
+  },
+  "accuracy_experiment_stages": {
+    "data_contract": {
+      "development": "Existing 626 proteins remain reused development data. Freeze evaluation at 25 steps, guidance 2 and three paired inference samples per target.",
+      "final_test": "Select and lock a separate experimental test manifest with sequence-family separation, residue maps and source provenance before new folding-head training; do not tune on its scores.",
+      "missing_maps": "Do not guess adjacency through missing residues. Use verified continuous training records or explicit residue maps for geometry supervision; retain and separately report all development strata.",
+      "uncertainty": "Sequence-cluster bootstrap where cluster labels have been constructed; prediction samples are repeated measurements, not independent proteins. Training seeds are independent replications."
+    },
+    "diagnostic": {
+      "gpus": 1,
+      "walltime_cap_minutes": 30,
+      "purpose": "Decoder sensitivity and real-gradient controls; bounded experiment, not an open-ended prerequisite."
+    },
+    "training_profile": {
+      "gpus": 1,
+      "walltime_cap_minutes": 30,
+      "purpose": "Measure backward memory, examples/second and hardware counters for both objectives. Choose batch size and a fixed update budget that both arms can finish."
+    },
+    "main_pilot": {
+      "gpus": 6,
+      "layout": "Two objectives times three paired training seeds; six independent single-GPU jobs, no distributed training.",
+      "walltime_cap_minutes_per_job": 120,
+      "update_budget": "Set from measured training throughput before submission. Match proteins, stochastic flow draws and optimizer updates; also report total GPU cost, since geometry supervision costs extra.",
+      "reference": "Retain the untouched checkpoint to distinguish continued-training gain from the contribution of the new loss."
+    },
+    "resource_rules": {
+      "max_total_project_gpus_running_or_pending": 8,
+      "target_sm_activity_percent": 50,
+      "target_max_reserved_memory_fraction": 0.85,
+      "measurement": "Report SM active, instruction issue, tensor activity, padding, actual proteins/second and peak memory; SM activity is not percent of peak FLOPs.",
+      "precision": "Profile and validate training precision independently of inference precision.",
+      "followup": "Register explicit IDs and an automatic analysis action before handing off; follow runs through completion and analysis."
+    },
+    "budget_note": "These are proposed maximum allocations, not measured runtime estimates or scheduled jobs."
   }
 }

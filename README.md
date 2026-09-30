@@ -5,6 +5,9 @@ Start with [the critical review and staged plan](reports/review.html), then the
 [batch precision diagnosis](reports/batch_precision.md), plus the
 [proposed experiment settings](configs/first_experiments.json).
 
+The completed 626-target run is summarized in
+[the frozen-head comparison](reports/comparison_49414524.md).
+
 This is a minimal research core, extracted from the original project with
 [symbol-level provenance](PROVENANCE.json). It retains both flow architectures
 and the differentiable decoder adapter. It adds explicit loss/sampling settings,
@@ -112,6 +115,41 @@ with GPU inference, using CPU cores already included in its allocation. It
 records the final scoring wait separately. The standard wrapper requests two
 H200s via two independent tasks, each limited to 90 minutes; GPU count remains
 bounded by the project-wide limit of eight.
+
+## Completion monitoring
+
+`scripts/install_watcher.py` installs the project-specific user systemd timer
+`esm-proae-reboot-watch.timer`. It runs `scripts/watch_jobs.py` once per minute
+on the installation host, survives terminal disconnection, and resumes after a
+host restart when the user systemd manager is available. User lingering is already
+enabled on the current host; the installer does not change that policy.
+
+The watcher queries only exact registered IDs in `runs/jobs.json`. It reports
+completion, failure, timeout, missing scheduler records, and analysis errors in
+`runs/watch/events.jsonl`; `heartbeat.json` records its health. Notifications target
+only the tmux pane/session captured at installation. It never types into tmux,
+submits/cancels jobs, starts agents, or sends email. A tmux alert does not wake an
+idle Codex conversation. During active experiments, continue work/checks through
+completion instead of ending the task at submission.
+
+For a two-task comparison, register `"completion_action": "summarize_comparison"`.
+Once both scheduler tasks succeed, the watcher automatically checks exact score
+coverage and provenance, calculates paired target-bootstrap intervals, joins
+Nsight counters to inference batches, and writes `reports/comparison_JOB.md`.
+Raw JSON remains local. Failed analysis is retried with bounded backoff. Completed
+analyses are recorded and not repeated each minute. New experiment types need an
+explicit supported follow-up action before submission.
+
+```bash
+"$PYTHON" scripts/install_watcher.py
+systemctl --user status esm-proae-reboot-watch.timer
+cat runs/watch/heartbeat.json runs/watch/state.json
+```
+
+The timer uses no GPU. Each check has a five-minute maximum, a one-core CPU limit,
+and a 1 GiB memory limit; idle checks exit immediately. To uninstall monitoring,
+disable only this project's timer with
+`systemctl --user disable --now esm-proae-reboot-watch.timer`.
 
 ## Repository synchronization
 

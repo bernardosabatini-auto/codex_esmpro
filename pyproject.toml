@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "esm-proae-reboot"
+version = "0.1.0"
+description = "Auditable ESM to ProteinAE experiments"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26", "torch>=2.2", "h5py>=3.10"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,89 @@
+{
+  "status": "GPU execution authorized by user; at most eight H200s concurrently",
+  "objective": "Improve deployable sequence-to-structure accuracy at measured end-to-end cost",
+  "primary_metric": "reference-normalized fixed-correspondence TM-score",
+  "secondary_metrics": [
+    "CA lDDT",
+    "CA RMSD",
+    "backbone geometry",
+    "coverage",
+    "latency",
+    "peak GPU memory"
+  ],
+  "development_set": "existing exp-val; explicitly reused development data",
+  "final_test": "new experimental holdout, selected and locked before new training",
+  "first_gpu_stage": {
+    "proposed_gpu_hour_cap": 2,
+    "initial_targets": 64,
+    "target_selection": "fixed manifest, stratified by length and chain continuity",
+    "flow_steps": [
+      10,
+      25,
+      50
+    ],
+    "cfg_weights": [
+      1.0,
+      2.0
+    ],
+    "decoder_steps": 3,
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "selection": "first sample only for primary comparisons; oracle clearly separated",
+    "checkpoints": [
+      "459M pair baseline",
+      "459M pair-free baseline",
+      "ESMFold2-Fast"
+    ],
+    "timing": "same GPU and targets; include ESMC, flow, decoder, selection; warm-up separately",
+    "gate": "100% accounted targets, fixed-correspondence controls pass, legacy parity passes; then extend finalists to all development targets"
+  },
+  "ordered_training_hypotheses": [
+    {
+      "priority": 1,
+      "hypothesis": "A subset of available ESMC layers exposes geometry better than the last layer",
+      "comparison": "last layer versus scalar mix of a few cached layers; same head, data, optimizer steps, seeds",
+      "gate": "pilot probe and fold improvement on untouched development subset justify full cache"
+    },
+    {
+      "priority": 2,
+      "hypothesis": "Latent target ambiguity and decoder sensitivity dominate prediction error",
+      "comparison": "stratify errors by decoder sensitivity, PCA eigengaps and sign stability; latent-only versus calibrated geometry-aware endpoint loss",
+      "gate": "positive gradient and geometry controls, no validity regression"
+    },
+    {
+      "priority": 3,
+      "hypothesis": "A faster point predictor can distil a good conditional sample",
+      "comparison": "teacher-derived selected targets on training sequences only; one-step and 4-step students versus retained flow teacher",
+      "gate": "non-oracle accuracy-cost improvement including ESMC and decoder; no collapse on difficult targets"
+    }
+  ],
+  "predeclared_promotion_rule": {
+    "accuracy_track": "paired mean TM gain at least 0.01, cluster bootstrap lower bound above zero, three seeds, no material CA-lDDT or geometry regression",
+    "speed_track": "at least 2x measured end-to-end speed, paired TM noninferiority lower bound above -0.005, predeclared CI procedure",
+    "note": "These are proposed practical thresholds, not achieved results. Cluster labels and a held-out final test still need construction."
+  },
+  "authorization": {
+    "user_message": "When we are ready to launch, you can use upto 8 H200s at once",
+    "date": "2026-09-29",
+    "max_concurrent_h200": 8,
+    "latest_user_message": "go ahead and schedule jobs without my persmission but not exceed 8 GPUs total",
+    "max_total_gpu_requests": 8,
+    "per_job_confirmation_required": false,
+    "job_scope": "Only this project registry; do not inspect or manipulate jobs belonging to other agents"
+  },
+  "profiling_stage": {
+    "gpus": 1,
+    "gpu": "H200",
+    "walltime_minutes": 30,
+    "internal_work_minutes": 24,
+    "cpus": 8,
+    "host_ram_gb": 64,
+    "memory_target_max_fraction": 0.85,
+    "sm_activity_minimum": 0.5,
+    "metrics": "Nsight SM/tensor/DRAM activity plus NVML, actual proteins/second and residue padding",
+    "next_stage": "Size the 626-target comparison from measured throughput. Proposed two H200s up to two hours; do not expand while utilization evidence is absent or fails."
+  }
+}

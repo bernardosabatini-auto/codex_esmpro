@@ -1,0 +1,95 @@
+{
+  "source_git_head": "c7a78b8e89e0e58536242e0bd80eec60f1a0e936",
+  "source_dirty": true,
+  "copied_symbols": [
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate7_latent_flow.py",
+      "source_sha256": "d95084c9377680aed949671ebddb170f67be9a66769bda41fd4b658e0b234732",
+      "symbol": "timestep_embedding",
+      "line": 285,
+      "end_line": 289
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate7_latent_flow.py",
+      "source_sha256": "d95084c9377680aed949671ebddb170f67be9a66769bda41fd4b658e0b234732",
+      "symbol": "Attention",
+      "line": 292,
+      "end_line": 314
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate7_latent_flow.py",
+      "source_sha256": "d95084c9377680aed949671ebddb170f67be9a66769bda41fd4b658e0b234732",
+      "symbol": "DiTBlock",
+      "line": 317,
+      "end_line": 334
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate7_latent_flow.py",
+      "source_sha256": "d95084c9377680aed949671ebddb170f67be9a66769bda41fd4b658e0b234732",
+      "symbol": "LatentFlowNet",
+      "line": 337,
+      "end_line": 382
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate10_pair_flow.py",
+      "source_sha256": "2b05678eecd80239f26f1da4d501c28ca23f608f6eff1b5e8d5325fe097be341",
+      "symbol": "PairAttention",
+      "line": 32,
+      "end_line": 53
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate10_pair_flow.py",
+      "source_sha256": "2b05678eecd80239f26f1da4d501c28ca23f608f6eff1b5e8d5325fe097be341",
+      "symbol": "PairDiTBlock",
+      "line": 56,
+      "end_line": 65
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate10_pair_flow.py",
+      "source_sha256": "2b05678eecd80239f26f1da4d501c28ca23f608f6eff1b5e8d5325fe097be341",
+      "symbol": "TriangleMultiply",
+      "line": 68,
+      "end_line": 89
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate10_pair_flow.py",
+      "source_sha256": "2b05678eecd80239f26f1da4d501c28ca23f608f6eff1b5e8d5325fe097be341",
+      "symbol": "TriangleMultiplyFused",
+      "line": 92,
+      "end_line": 114
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate10_pair_flow.py",
+      "source_sha256": "2b05678eecd80239f26f1da4d501c28ca23f608f6eff1b5e8d5325fe097be341",
+      "symbol": "PairBlock",
+      "line": 148,
+      "end_line": 161
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate10_pair_flow.py",
+      "source_sha256": "2b05678eecd80239f26f1da4d501c28ca23f608f6eff1b5e8d5325fe097be341",
+      "symbol": "PairTrack",
+      "line": 164,
+      "end_line": 207
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate10_pair_flow.py",
+      "source_sha256": "2b05678eecd80239f26f1da4d501c28ca23f608f6eff1b5e8d5325fe097be341",
+      "symbol": "PairFlowNet",
+      "line": 210,
+      "end_line": 265
+    },
+    {
+      "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/code/gate6_fape_train.py",
+      "source_sha256": "70cb6c03cc7d3138de071c7a38948fbc4ede7e8568213317e3c87102fedd5190",
+      "symbol": "DifferentiableDecoder",
+      "line": 325,
+      "end_line": 420
+    }
+  ],
+  "changes": [
+    "Explicit maximum length and activation checkpointing",
+    "Removed automatic compilation, environment reads, import side effects and monkey patching",
+    "Explicit decoder generator or initial noise; original decoder Euler rule retained"
+  ]
+}

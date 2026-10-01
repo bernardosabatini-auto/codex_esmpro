@@ -25,3 +25,5 @@ CPU checks confirm teacher self-recall and invariance of contact assignment unde
 Noise-time-binned velocity MSE is logged during training to distinguish poor early-flow transport from failures near a known target. No objective or random draws change for this diagnostic. The stricter1A contact-hit threshold is reported alongside the frozen2A primary threshold. CFG1 is the primary capacity comparison and CFG2 is retained as a sensitivity analysis (`configs/overfit_decisions.json`).
 
 A read-only analysis of the previously failed20-step paired sampler found several non-neighboring CA distances near1–1.5A, including one below1A. Its failures are substantial collisions, not merely floating-point changes at a validity threshold. No threshold relaxation or unvalidated structure repair is adopted.
+
+The reliable panel retains the pose effect being tested: median additional PCA frame angle10.40degrees,22.85% of conformations exceed90degrees, and15/32 proteins contain at least one such change. Mean teacher confidence ranges0.822–0.967. Thus confidence selection did not remove the orientation discontinuity. Selection and pose summary arrays remain excluded from Git.

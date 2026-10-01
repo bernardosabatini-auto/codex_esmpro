@@ -5,6 +5,16 @@ import watch_jobs as watch
 from submission_snapshot import freeze_submission
 
 
+def policy_deadline(permission,now,minutes):
+ """Standing authorization does not override a later user-specified deadline."""
+ if permission.get('status')!='active' or permission.get('mode')!='experiment_bounded' or permission.get('max_total_gpus')!=8:
+  raise RuntimeError('invalid or inactive experiment execution policy')
+ deadline=datetime.datetime.fromisoformat(permission['deadline_utc']) if permission.get('deadline_utc') else None
+ if deadline and now+datetime.timedelta(minutes=minutes,seconds=120)>deadline:
+  raise RuntimeError('requested walltime extends beyond the authorized deadline')
+ return deadline
+
+
 def main():
  p=argparse.ArgumentParser(description=__doc__)
  p.add_argument('--script',required=True);p.add_argument('--purpose',required=True)
@@ -29,12 +39,7 @@ def main():
   policy=root/'runs/execution_policy.json'
   if policy.exists():
    permission=json.loads(policy.read_text())
-   if permission.get('status')!='active' or permission.get('mode')!='experiment_bounded' or permission.get('max_total_gpus')!=8:
-    raise RuntimeError('invalid or inactive experiment execution policy')
-   if permission.get('deadline_utc'):
-    deadline=datetime.datetime.fromisoformat(permission['deadline_utc'])
-    if now+datetime.timedelta(minutes=a.minutes,seconds=120)>deadline:
-     raise RuntimeError('requested walltime extends beyond the authorized deadline')
+   deadline=policy_deadline(permission,now,a.minutes)
   elif window.exists():
    execution=json.loads(window.read_text())
    if execution['status']!='active':

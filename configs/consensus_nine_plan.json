@@ -1,0 +1,18 @@
+{
+  "purpose": "CPU-only sample-budget diagnostic: does the same CA lDDT medoid benefit enough from nine predictions to justify additional generation cost?",
+  "status": "Frozen before nine-sample choices or their native scores are computed",
+  "runs": ["runs/comparison_49414524_0", "runs/consensus_49528311_0", "runs/consensus_49528311_1"],
+  "seeds_in_order": [0, 2026100101, 2026100102],
+  "clusters": "runs/development_clusters/clusters.json",
+  "clusters_sha256": "b4af3184ee7089bb6ebfdbd948442514c922add27807569f2a976b6999450e72",
+  "three_sample_choices": ["runs/consensus_final_ema_choices.json", "runs/consensus_49528311_0/consensus_choices.json", "runs/consensus_49528311_1/consensus_choices.json"],
+  "checkpoint": "Untouched final EMA pair; same strict FP32 head/decoder, 25 steps, CFG 2, and all 626 development proteins",
+  "selector": "Concatenate samples 0,1,2 from the three runs in the stated order. Choose the sample with largest average symmetric CA lDDT to the other eight. Keep existing 15 A neighborhoods and strict 0.5/1/2/4 A error thresholds; first index wins exact ties. No native input or fitted coefficients.",
+  "freeze": "Validate matching checkpoint, decoder, data, precision and coverage; hash protocol, manifests, predictions and prior three-sample choices. Write nine-sample choices before opening any native score file. Verify the generic implementation reproduces every previously frozen three-sample choice.",
+  "primary_comparison": "Selected nine-sample TM versus the per-target mean performance of the three existing three-sample medoids. The latter estimates a three-sample selector's expectation over these noise groups; it does not average coordinates.",
+  "secondary_comparison": "Selected nine versus the nine-sample mean (random-sample expectation), with CA lDDT and geometry fractions reported. Native-TM best-of-nine is an oracle upper bound only.",
+  "uncertainty": "Paired sequence-cluster bootstrap; samples are repeated measurements. This pools previously examined noise groups and reused targets, so any benefit is exploratory.",
+  "followup_gate": "New GPU sampling only if selected TM reaches untouched mean plus 0.01, improves over three-sample medoid expectation by at least 0.003 with a positive 95% cluster lower bound, CA lDDT lower bound at least -0.005 and geometry upper bounds at most +0.001. Then repeat with a new nine-sample pool before any further decision.",
+  "cost": "Zero new GPU generation for this diagnostic. Deployment needs nine generated structures per selected protein: three times the head/decoder sample budget of the three-sample rule. ESMC embeddings can be reused. Report existing generation times and measured CPU analysis time without claiming optimized deployment throughput.",
+  "final_test": "Unscored; earlier-layer ESM GPU budget remains zero"
+}

@@ -19,3 +19,11 @@ class SelectionTests(unittest.TestCase):
         self.assertGreater(confidence[1], confidence[0])
         with self.assertRaises(ValueError):
             ca_lddt_medoid([coords, coords, coords*np.nan])
+
+    def test_nine_samples_require_explicit_budget_and_preserve_tie_order(self):
+        coords=np.random.default_rng(7).normal(size=(40,3))*4
+        samples=[coords*3,coords*3]+[coords.copy() for _ in range(7)]
+        with self.assertRaises(ValueError):ca_lddt_medoid(samples)
+        selected,confidence,_=ca_lddt_medoid(samples,expected_samples=9)
+        self.assertEqual(selected,2)
+        self.assertGreater(confidence[2],confidence[0])

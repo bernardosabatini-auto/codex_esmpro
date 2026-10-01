@@ -45,11 +45,14 @@ if m['status']=='complete':
   implementation_reference=m['config'].get('implementation_reference_run')
   if implementation_reference:
    ir=Path(implementation_reference);im=json.loads((ir/'manifest.json').read_text());iscores=json.loads((ir/'scores.json').read_text());validate_scores(im,iscores)
+   _,_,reference_setting=sampling_parameters(im['config'])
    validate_online_pair(m,im,same_batches=True,same_precision=True,same_steps=not bool(step_ablation))
    if s['usalign']!=iscores['usalign']:raise ValueError('implementation comparison scorer changed')
-   result['implementation_comparison']=dict(reference_run=str(ir),speedup=sum(row['seconds'] for row in im['batches'])/seconds,
-       paired={metric:paired_comparison(means_by_target(iscores['records'],'steps25_cfg2',metric),means_by_target(s['records'],setting,metric),clusters=clusters) for metric in ('tm_fixed_reference','ca_lddt')})
-  if step_ablation:result['sampling_comparison_scope']='20 steps versus 25. Precision also differs from the full-FP32 baseline; the separate same-precision comparison isolates step count.'
+   result['implementation_comparison']=dict(reference_run=str(ir),reference_sampling_setting=reference_setting,candidate_sampling_setting=setting,
+       changed_settings={key:dict(reference=im['config'].get(key,False),candidate=m['config'].get(key,False)) for key in ('flow_steps','reuse_sample_conditioning') if im['config'].get(key,False)!=m['config'].get(key,False)},
+       speedup=sum(row['seconds'] for row in im['batches'])/seconds,
+       paired={metric:paired_comparison(means_by_target(iscores['records'],reference_setting,metric),means_by_target(s['records'],setting,metric),clusters=clusters) for metric in ('tm_fixed_reference','ca_lddt')})
+  if step_ablation:result['sampling_comparison_scope']='20 steps versus 25 in the full-FP32 comparison. Precision also differs. The separate same-precision comparison explicitly records its reference setting and changed settings.'
  lines+=['',m['timing_scope'],'','Final ESMC layer only, with three samples averaged per target. Embeddings are recomputed from input sequences. The external ESMFold2 run used one protein at a time, whereas this pipeline batches different proteins: these numbers are not a matched-batch latency or optimized-throughput speed ratio.','', '```json',json.dumps(result,indent=2),'```']
 else:lines+=['',m.get('error','Incomplete; no performance claim.')]
 a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')

@@ -1,0 +1,11 @@
+{
+  "purpose": "Validate the combination of two individually useful inference changes before a contemporary paired timing study",
+  "evidence": "20-step FP16 run 49542864 passed numerical and noninferiority controls and measured 2.0046x versus FP32, too close to the 2x threshold for a robust speed claim across separate GPUs. Conditioning reuse in 49542513 independently improved the 25-step FP16 pipeline by 11.1%, reduced reserved memory to 55.2 GiB and left TM nearly identical.",
+  "candidate": "20 Euler steps, CFG 2, three fixed samples, FP16 final-layer ESMC and MLP head, strict FP32 decoder, original 126/63/30/30 batches, static token/pair conditioning computed once per unique sequence and expanded to the three dynamic sample paths",
+  "comparisons": "Direct comparison with 20-step FP16 run 49542864 isolates conditioning reuse. Full-FP32 25-step run 49470256 remains the speed/accuracy reference; step count, precision and conditioning implementation all differ there.",
+  "controls": "All eight actual-weight batch/padding controls with unchanged thresholds; complete 626-target and 1878-prediction evaluation; no oracle sample selection",
+  "gate": "Keep the 2x throughput, TM/CA lDDT lower bounds at least -0.005 and geometry upper bounds at most +0.001. Report the actual local-accuracy and peptide-geometry costs of the 20-step method even if they remain inside the allowed margins.",
+  "followup": "If the combined candidate passes, compare baseline and candidate on the same H200 with repeated, alternating complete-pipeline timing. Include the fixed three-sample selector in both pipelines and evaluate its chosen structures. Separate that matched deployment experiment from these collection-only screening timings.",
+  "resources": {"gpus": 1, "gpu_type": "H200", "walltime_minutes": 30},
+  "final_test": "Keep the 34 structures unscored; development speed screening does not establish an independent accuracy improvement"
+}

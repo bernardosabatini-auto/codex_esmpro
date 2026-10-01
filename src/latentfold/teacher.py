@@ -21,4 +21,6 @@ def load_fast_model(path):
     if any(not k.startswith('msa_encoder.') for k in missing) or info.get('unexpected_keys') or info.get('mismatched_keys') or info.get('error_msgs'):raise ValueError('unsupported checkpoint loading mismatch: '+str(info))
     def forbid_active_missing_weights(module,args):raise RuntimeError('disabled uninitialized MSA encoder was called')
     model.msa_encoder.register_forward_pre_hook(forbid_active_missing_weights)
-    return model.eval().cuda().requires_grad_(False),dict(loading=info,msa_policy='Explicit no-MSA input; runtime guard rejects execution of missing MSA weights',trunk_randomness='Checkpoint enables per-loop LM dropout under eval; fixed-trunk samples condition on one stochastic trunk realization')
+    # Transformers returns sets for some loading fields; keep provenance JSON-safe.
+    loading={key:sorted(str(value) for value in info.get(key,[])) for key in ('missing_keys','unexpected_keys','mismatched_keys','error_msgs')}
+    return model.eval().cuda().requires_grad_(False),dict(loading=loading,msa_policy='Explicit no-MSA input; runtime guard rejects execution of missing MSA weights',trunk_randomness='Checkpoint enables per-loop LM dropout under eval; fixed-trunk samples condition on one stochastic trunk realization')

@@ -35,7 +35,11 @@ def analyze(runs):
             if seen&ids or c['shard'] in shard_ids:
                 raise ValueError('duplicate shard/target')
             timing = timing_result(m)
-            shard = dict(run=str(run), shard=c['shard'], targets=len(ids), **timing)
+            shard = dict(run=str(run), shard=c['shard'], targets=len(ids),
+                setup_and_controls_seconds=m['setup_and_controls_seconds'],
+                elapsed_seconds=m['elapsed_seconds'],
+                dual_resident_parameters=m['dual_resident_parameters'],
+                active_pipeline_parameters=m['active_pipeline_parameters'], **timing)
             for name,v in VARIANTS.items():
                 child = json.loads((run/name/'manifest.json').read_text())
                 scores = json.loads((run/name/'scores.json').read_text())
@@ -110,6 +114,19 @@ def main():
         for metric,r in result['selected_structure_delta'].items():
             lines.append(f"| {metric} | {r['ours']:.6f} | {r['theirs']:.6f} | {r['theirs_minus_ours']:+.6f} | {r['ci95']} |")
         lines += ['', f"Accuracy gate: {result['accuracy_gate_passed']}. Speed gate (every shard/repeat >=2x and identical repeat outputs): {result['speed_gate_passed']}."]
+        lines += ['', '| Shard | Setup + controls (s) | Process elapsed (s) | Collection SM issue | Whole capture SM issue |',
+            '|---:|---:|---:|---:|---:|']
+        for shard in result['shards']:
+            counters=shard['hardware']
+            issue=counters.get('collection_mean_percent',{}).get('SM Issue [Throughput %]')
+            whole=counters.get('whole_capture_mean_percent',{}).get('SM Issue [Throughput %]')
+            issue_text=f'{issue:.1f}%' if issue is not None else 'unavailable'
+            whole_text=f'{whole:.1f}%' if whole is not None else 'unavailable'
+            lines.append(f"| {shard['shard']} | {shard['setup_and_controls_seconds']:.1f} | {shard['elapsed_seconds']:.1f} | {issue_text} | {whole_text} |")
+        lines += ['', 'SM instruction issue is a measured hardware counter, not percent of peak FLOPs. Whole capture includes setup and controls, but excludes profiler export.',
+            '', '| Selected geometry fraction | Candidate minus reference | 95% cluster CI |', '|---|---:|---|']
+        for field,row in result['selected_geometry_delta'].items():
+            lines.append(f"| {field} | {row['theirs_minus_ours']:+.6f} | {row['ci95']} |")
     else:
         lines += ['', *[str(r) for r in result['failures']]]
     lines += ['', 'The 34 independent-test structures remain unscored. No optimized ESMFold2 throughput comparison is claimed.']

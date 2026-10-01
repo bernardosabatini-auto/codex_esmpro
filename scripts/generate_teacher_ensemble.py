@@ -2,8 +2,7 @@
 import argparse,hashlib,json,time
 from pathlib import Path
 import h5py,numpy as np,torch
-from transformers.models.esmfold2.modeling_esmfold2 import EsmFold2Model
-from transformers.models.esmfold2.protein_utils import prepare_protein_features
+from latentfold.teacher import fast_features,load_fast_model
 from benchmark_esmfold2 import backbone_indices
 from latentfold.metrics import ca_metrics
 from latentfold.precision import inference_precision
@@ -23,11 +22,11 @@ def main():
     atomic_json(a.output/'manifest.json',m)
     try:
         folder=a.source/'data/esmfold2_fast';m['artifacts']=[file_identity(p,hash_contents=True) for p in sorted(folder.glob('*')) if p.suffix in ('.json','.safetensors')]
-        model=EsmFold2Model.from_pretrained(folder,dtype=torch.float32,local_files_only=True).eval().cuda().requires_grad_(False);telemetry=Telemetry(a.output,True)
+        model,loading=load_fast_model(folder);m['teacher_adapter']=loading;atomic_json(a.output/'manifest.json',m);telemetry=Telemetry(a.output,True)
         sampler=model._sample_structure
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'predictions.h5','x') as output:
             for i,row in enumerate(rows):
-                ident=row['query_id'];n=row['length'];features=prepare_protein_features(row['sequence'],device='cuda');atom_index=backbone_indices(features,n);captured={}
+                ident=row['query_id'];n=row['length'];features=fast_features(row['sequence'],device='cuda');atom_index=backbone_indices(features,n);captured={}
                 def capture(**kwargs):
                     captured.update(kwargs=kwargs,cpu_rng=torch.get_rng_state(),cuda_rng=torch.cuda.get_rng_state())
                     return sampler(**kwargs)

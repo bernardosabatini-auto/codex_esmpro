@@ -1,3 +1,5 @@
+> **Invalidated as a teacher comparison (October 1):** active missing MSA weights in the installed HF port. See [adapter audit](teacher_adapter_audit_20261001.md). Do not use these numbers for model selection.
+
 # Development accuracy diagnostics
 
 Exploratory strata; no multiplicity correction and no change to the primary promotion gate. All inference samples are averaged per target; pilot results also average the three training seeds. These confidence intervals are conditional on those seeds.

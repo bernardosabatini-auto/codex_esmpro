@@ -18,11 +18,12 @@ policy failed the pair model's shape controls and is rejected. See
 [the validated inference settings](configs/validated_inference.json); these are
 development-set results and exclude ESMC extraction time.
 
-The [matched ESMFold2-Fast benchmark](reports/external_49461971.md) now uses the
-same fixed-correspondence scorer: TM 0.59977 versus 0.56824 for the untouched
-pair head. The [length breakdown](reports/external_strata_49461971.md) shows a
-larger gap on long proteins. Full sequence conditioning is included only in the
-external model's timing, so this is not an end-to-end speed comparison.
+The earlier [ESMFold2-Fast benchmark](reports/external_49461971.md) is invalidated
+as a teacher baseline: the installed HF port executed an MSA encoder whose
+weights are absent from the Fast checkpoint. See the
+[adapter audit](reports/teacher_adapter_audit_20261001.md). Its reported TM
+0.59977 must not support accuracy comparisons or model selection. Corrected
+ensemble diagnostics explicitly disable that path and guard its execution.
 
 The accuracy work now includes an actual continued-training loop, a
 [structural-gradient diagnostic](reports/geometry_49453471.md),
@@ -31,7 +32,7 @@ The accuracy work now includes an actual continued-training loop, a
 Six independent single-H200 runs compare latent-only and bounded geometry
 gradients over 500 updates and three paired seeds. A subsequent confidence
 ablation reuses the three controls and changes only source-pLDDT residue weights.
-Earlier-layer ESM work is deferred at the user's request. Neither continued
+Earlier-layer ESM work was reopened by the user on October 1. Neither continued
 training nor the new losses are established accuracy improvements yet.
 
 The [geometry pilot](reports/pilot_49461023.md) is now stopped: the two completed

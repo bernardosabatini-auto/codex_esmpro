@@ -1,6 +1,6 @@
 # Cached-frame supervision and shorter sampling
 
-Status: experiments in progress. No model promoted and no confirmation or independent-test targets scored.
+Status: GPU experiments complete; final cached-frame ensemble CPU scoring in progress. No model promoted and no confirmation or independent-test targets scored.
 
 ## Rotation finding and correction
 
@@ -62,3 +62,13 @@ Final ensemble jobs 49672152 and 49672377 are queued. Their requested limits wer
 The reference-control training run measured 58.05% allocation-normalized SM issue, 60.39% during training, and 63.65 GiB peak GPU memory. The aligned-teacher run's counter coverage failed validation, so no utilization figure is assigned to that run. See [allocation accounting](cached_frame_gpu_allocation.md).
 
 Before final sampler outcomes were available, a conditional inference-only extension was declared: if neither 10-step arm passes at 2,000 updates, evaluate 15 and 20 steps on the same 64 tuning families using the unchanged trained weights. This tests integration error without more training. Native gates, ensemble gates and the twofold measured speed requirement remain unchanged; all additional settings and failures are reported. See `configs/reflow_extension_protocol.json`.
+
+## Final shorter-sampler verdict
+
+Both 2,000-update training runs and the conditional inference-only 15/20-step extension completed. No setting passes the native quality-and-validity screen. Paired reflow is the stronger arm, but its 10-step validity is 0.94792 and its 20-step validity is 0.96354 versus 0.97917 for initialization. The latter is a 1.56 percentage-point loss, beyond the predeclared 1-point margin. Its 20-step CA-lDDT increases by 0.00792 [0.00410, 0.01199]; better average similarity does not compensate for invalid geometry. Independent-noise 20-step validity is 0.94792.
+
+See [final 5/10-step results](reflow_training_2000.md), [all 15/20-step results](reflow_extension_2000.md), and [optimized fixed-correspondence TM](tm_reflow_49662855_49662912.md). Paired 10-step optimized TM changes by +0.00231 [−0.00595, +0.01150] from initialization. No optimized-TM claim is made for the 15/20 extension. Native failures stop this sampler branch: no follow-up ensemble generation, speed claim, confirmation scoring or promotion is justified.
+
+## Whole-allocation utilization
+
+[Four-run accounting](campaign_training_gpu_allocation.md) gives allocation-normalized SM issue of 58.05% for cached-reference training and 59.29% for independent reflow. Aligned-teacher counters failed coverage validation. Paired reflow reports only 29.45%, with an unexplained 50% ceiling in SM-active counters despite comparable runtime, GPU memory and clocks to the independent run. The raw measurement is retained; it is not multiplied by two or counted as meeting the target. Both reflow runs used approximately 63.66 GiB peak reserved GPU memory. Future telemetry records CUDA-visible SM count and the process MPS thread-percentage setting without inspecting other jobs or changing shared GPU settings.

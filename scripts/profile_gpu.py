@@ -32,7 +32,11 @@ class Telemetry:
     def __init__(self, output, nsys_metrics=False):
         self.processes, self.files = [], []
         self.info = {}
-        uuid = str(torch.cuda.get_device_properties(0).uuid)
+        properties = torch.cuda.get_device_properties(0)
+        self.info.update(cuda_device_name=properties.name, cuda_visible_sm_count=properties.multi_processor_count,
+                         cuda_total_memory_bytes=properties.total_memory,
+                         mps_active_thread_percentage=os.environ.get('CUDA_MPS_ACTIVE_THREAD_PERCENTAGE'))
+        uuid = str(properties.uuid)
         if not uuid.startswith("GPU-"):
             uuid = "GPU-" + uuid
         self.info["uuid"] = uuid
@@ -59,6 +63,8 @@ class Telemetry:
                 self.start([dcgmi, "dmon", "-i", indices[0], "-e", "1002,1004,1005", "-d", "1000"], output / "dcgm.txt")
                 self.info["dcgm_status"] = "requested; counter output must be validated"
         self.info["nvml_caveat"] = "GPU busy time is not SM activity or FLOP efficiency"
+
+        atomic_json(output / "device_metadata.json", self.info)
 
     def start(self, command, path):
         handle = path.open("w")

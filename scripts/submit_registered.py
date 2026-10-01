@@ -12,7 +12,7 @@ def main():
  p.add_argument('--minutes',type=int,required=True);p.add_argument('--action',required=True)
  a=p.parse_args();root=Path(__file__).resolve().parents[1]
  if not 0<=a.gpus_per_task<=8 or not 1<=a.tasks<=8 or a.gpus_per_task*a.tasks>8:raise ValueError('invalid resource request')
- if a.action not in ('summarize_geometry','summarize_training_profile','summarize_holdout','summarize_pilot','summarize_external','summarize_quality','summarize_online','summarize_recovery','summarize_checkpoint','summarize_efficiency','summarize_consensus','summarize_optimizer','summarize_optimizer_state','summarize_kernels','summarize_matched_online'):raise ValueError('unsupported completion action')
+ if a.action not in ('summarize_geometry','summarize_training_profile','summarize_holdout','summarize_pilot','summarize_external','summarize_quality','summarize_online','summarize_recovery','summarize_checkpoint','summarize_efficiency','summarize_consensus','summarize_optimizer','summarize_optimizer_state','summarize_kernels','summarize_matched_online','summarize_roundtrip'):raise ValueError('unsupported completion action')
  script=(root/a.script).resolve()
  if script.parent!=root/'slurm':raise ValueError('script must be in project slurm folder')
  with (root/'runs/submit.lock').open('w') as lock:
@@ -26,7 +26,12 @@ def main():
   count=sum(j.get('gpus_per_task',j['gpus']//len(watch.job_ids(j)))*sum(states.get(i,{}).get('state') not in watch.TERMINAL for i in watch.job_ids(j)) for j in outstanding)
   if count+a.gpus_per_task*a.tasks>8:raise RuntimeError('project GPU cap would be exceeded')
   window=root/'runs/autonomous_20261001.json';deadline=None
-  if window.exists():
+  policy=root/'runs/execution_policy.json'
+  if policy.exists():
+   permission=json.loads(policy.read_text())
+   if permission.get('status')!='active' or permission.get('mode')!='experiment_bounded' or permission.get('max_total_gpus')!=8:
+    raise RuntimeError('invalid or inactive experiment execution policy')
+  elif window.exists():
    execution=json.loads(window.read_text())
    if execution['status']!='active':
     raise RuntimeError('autonomous execution window is not active; refusing late submission')
@@ -47,6 +52,7 @@ def main():
     time_limit_minutes=a.minutes,submitted=now.isoformat(),script=a.script,state='SUBMITTED',
     completion_action=a.action,code_commit=commit,code_snapshot=str(snapshot))
   if deadline:job['deadline_utc']=deadline.isoformat()
+  if policy.exists():job['execution_policy']=json.loads(policy.read_text())
   if a.tasks>1:job['tasks']=[f'{jid}_{i}' for i in range(a.tasks)]
   registry['jobs'].append(job);watch.write_json(path,registry)
   print(json.dumps(dict(submitted=jid,total_requested_gpus=count+a.gpus_per_task*a.tasks)))

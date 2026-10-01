@@ -1,0 +1,71 @@
+{
+  "purpose": "Assess useful generative diversity, reconstruction limits and compute efficiency before ensemble distillation",
+  "authorization": "2026-10-01: user approved full plan, earlier ESM layers and question-appropriate GPU run lengths; at most 8 GPUs queued plus running",
+  "stages": [
+    {
+      "name": "adapter_calibration",
+      "data": "16 previously mapped training structures; not the ensemble evaluation panel",
+      "experiment": "Re-encode complete N/CA/C/O source coordinates, compare cached latents/reconstructions; paired 8 decoder seeds at 3 and 10 steps; strict FP32"
+    },
+    {
+      "name": "curation",
+      "targets": {
+        "multiconformation": 16,
+        "reference_ensemble_or_MD": 16,
+        "rigid_controls": 16
+      },
+      "rules": "Freeze residue mapping and state features before model predictions; sequence-family isolation for reserved confirmation and teacher pilot; preserve original 34-test quarantine; record inherited training overlaps and environmental conditions"
+    },
+    {
+      "name": "diversity",
+      "ours": "32 latent seeds with fixed decoder; 32 decoder seeds at fixed latent; 8x4 factorial; CFG1/2 sensitivity on 8 proteins",
+      "teacher": "ESMFold2-Fast 32 samples, extend to128 only if coverage rises; fixed trunk3, diffusion50; 25/50/100 step sensitivity on8 proteins; validate conditioner reuse"
+    },
+    {
+      "name": "layers",
+      "layers": [
+        20,
+        40,
+        60,
+        80
+      ],
+      "arms": [
+        "final layer",
+        "best individual screened layer",
+        "learned scalar mixture"
+      ],
+      "rules": "One extraction pass retaining only selected layers; matched capacity/data/update budgets and sequence-disjoint evaluation; decoded ensemble metrics"
+    },
+    {
+      "name": "conditional_training",
+      "training_sequences": 512,
+      "teacher_samples_per_sequence": 16,
+      "arms": [
+        "native only",
+        "native plus empirical teacher distribution",
+        "native plus cluster-balanced teacher distribution"
+      ],
+      "gate": "Proceed only if teacher adds valid state coverage and ProteinAE preserves alternative states; one paired training-seed screen followed by three-seed replication only for eligible arm"
+    }
+  ],
+  "metrics": [
+    "backbone validity",
+    "state coverage at K=1,4,16,32,128",
+    "domain/contact-coordinate distributions",
+    "within-state versus between-state diversity",
+    "coverage per GPU second",
+    "first-sample latency",
+    "marginal sample cost",
+    "memory",
+    "hardware instruction issue"
+  ],
+  "promotion": {
+    "state_coverage_gain_at_32": 0.1,
+    "protein_cluster_ci_lower_positive": true,
+    "mean_tm_lddt_noninferiority_margin": 0.005,
+    "validity_noninferiority_margin": 0.01
+  },
+  "statistics": "Targets/families are independent units; seeds are repeated sampling; physical populations claimed only against appropriate reference ensembles; retain and report rejected samples",
+  "resources": "Profile each new workload on one H200; scale independent workloads up to eight queued+running; adapt individual Slurm walltimes to measured cost; do not install into inherited environment",
+  "test": "Original 34 locked targets unscored. New confirmation panel reserved before tuning."
+}

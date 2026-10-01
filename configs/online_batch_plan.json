@@ -1,0 +1,11 @@
+{
+  "purpose": "Use the measured FP16 pipeline memory headroom for a single larger-batch throughput test",
+  "prior_evidence": "Run 49537668 passed all eight online controls and development noninferiority: 2.034 proteins/s, 66.58 GiB reserved, 1.711x versus full FP32. It missed the 2x speed gate.",
+  "only_change_from_fp16": "Prediction batches 126/63/30/30 become 189/96/45/45 at padded lengths 128/256/384/512. Three samples remain adjacent; ESMC is computed once per unique sequence in each batch.",
+  "rationale": "Approximately 1.5x larger batches should use more of H200 memory within the existing 85% allocator cap. No performance or memory result is assumed before measurement.",
+  "controls": "The same eight unpadded single-versus-production-batch controls, thresholds unchanged. Stop on any failure or out-of-memory; do not silently retry smaller batches within this attempt.",
+  "comparison": "All 626 targets, seed zero, 25 flow steps, CFG 2, three samples, same checkpoints, sequence inputs, scorer, FP16 ESMC/feed-forward head and strict FP32 decoder. Compare directly with FP16 run 49537668 to isolate batching. Also report versus FP32 run 49470256 with the explicit caveat that precision and batch sizes both differ.",
+  "gate": "Keep the 2x throughput versus FP32 gate, paired TM and CA lDDT lower bounds at least -0.005, geometry upper bounds at most +0.001. Report all results even if the gate fails.",
+  "resources": {"gpus": 1, "gpu_type": "H200", "walltime_minutes": 30},
+  "final_test": "Unscored; no earlier ESM layers"
+}

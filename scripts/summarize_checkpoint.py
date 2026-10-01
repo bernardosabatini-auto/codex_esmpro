@@ -28,7 +28,8 @@ def main():
             if hashlib.sha256(cp.read_bytes()).hexdigest()!=cfg['development_clusters_sha256']:raise ValueError('cluster mapping changed')
             clusters=json.loads(cp.read_text())['clusters'];setting='steps25_cfg2'
             paired={metric:paired_comparison(means_by_target(bs['records'],setting,metric),means_by_target(s['records'],setting,metric),clusters=clusters) for metric in ['tm_fixed_reference','ca_lddt']}
-            geom={key:paired_comparison(geometry_by_target(bs['records'],key),geometry_by_target(s['records'],key),clusters=clusters) for key in ['predicted_ca_gaps_on_reference_short','peptide_length_outliers_on_reference_short']}
+            baseline_rows=[r for r in bs['records'] if r['setting']==setting]
+            geom={key:paired_comparison(geometry_by_target(baseline_rows,key),geometry_by_target(s['records'],key),clusters=clusters) for key in ['predicted_ca_gaps_on_reference_short','peptide_length_outliers_on_reference_short']}
             row=dict(probe=cfg['probe'],paired=paired,geometry=geom,accuracy=s['summaries'][setting])
             try:row['hardware']=hardware(Path(str(run)+'_nsight.sqlite'),m['batches'])
             except Exception as error:row['hardware']=dict(status='unavailable',error=str(error))

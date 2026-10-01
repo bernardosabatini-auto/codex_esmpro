@@ -56,30 +56,30 @@ Results are checkpoint diagnostics, not independent training-seed replications. 
           "n": 626,
           "clusters": 606,
           "bootstrap_unit": "cluster",
-          "ours": 0.0013118909803609866,
+          "ours": 0.0017808713131418513,
           "theirs": 0.0015788278723439708,
-          "theirs_minus_ours": 0.00026693689198298444,
+          "theirs_minus_ours": -0.00020204344079788008,
           "ci95": [
-            0.00010070793976002836,
-            0.0004429468662880738
+            -0.00041648326151311367,
+            1.080480660951088e-05
           ],
-          "ours_wins": 159,
-          "ties": 376,
+          "ours_wins": 76,
+          "ties": 490,
           "coverage": 1.0
         },
         "peptide_length_outliers_on_reference_short": {
           "n": 626,
           "clusters": 606,
           "bootstrap_unit": "cluster",
-          "ours": 0.008932701734823516,
+          "ours": 0.003857566643250553,
           "theirs": 0.0033774240961159147,
-          "theirs_minus_ours": -0.0055552776387076015,
+          "theirs_minus_ours": -0.00048014254713463813,
           "ci95": [
-            -0.0062226793184778275,
-            -0.004951499628107897
+            -0.0008473292929251221,
+            -0.00011309713811743297
           ],
-          "ours_wins": 506,
-          "ties": 62,
+          "ours_wins": 151,
+          "ties": 361,
           "coverage": 1.0
         }
       },
@@ -157,30 +157,30 @@ Results are checkpoint diagnostics, not independent training-seed replications. 
           "n": 626,
           "clusters": 606,
           "bootstrap_unit": "cluster",
-          "ours": 0.0013118909803609866,
+          "ours": 0.0017808713131418513,
           "theirs": 0.0026483606314077206,
-          "theirs_minus_ours": 0.001336469651046734,
+          "theirs_minus_ours": 0.0008674893182658696,
           "ci95": [
-            0.0010503484265652592,
-            0.0016316206669077643
+            0.0006150349851223241,
+            0.0011309629998419934
           ],
-          "ours_wins": 100,
-          "ties": 368,
+          "ours_wins": 36,
+          "ties": 467,
           "coverage": 1.0
         },
         "peptide_length_outliers_on_reference_short": {
           "n": 626,
           "clusters": 606,
           "bootstrap_unit": "cluster",
-          "ours": 0.008932701734823516,
+          "ours": 0.003857566643250553,
           "theirs": 0.00517222554012904,
-          "theirs_minus_ours": -0.003760476194694476,
+          "theirs_minus_ours": 0.0013146588968784882,
           "ci95": [
-            -0.0043993932662153646,
-            -0.0031330294472840586
+            0.0008870506462093152,
+            0.0017609131395529614
           ],
-          "ours_wins": 449,
-          "ties": 60,
+          "ours_wins": 86,
+          "ties": 359,
           "coverage": 1.0
         }
       },

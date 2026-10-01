@@ -22,6 +22,7 @@ def validate_training_evaluation(training,manifest,scores):
   raise ValueError('evaluation correspondence protocol changed')
 
 def geometry_by_target(records,field):
+ if len({r['setting'] for r in records})!=1:raise ValueError('geometry comparison requires exactly one sampling setting')
  groups={}
  for row in records:groups.setdefault(row['target_id'],[]).append(row[field]/max(1,row['reference_adjacent_short_count']))
  return {k:float(np.mean(v)) for k,v in groups.items()}

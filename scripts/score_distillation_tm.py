@@ -17,7 +17,8 @@ def digest(path):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--runs', nargs=4, type=Path, required=True)
+    p.add_argument('--runs', nargs="+", type=Path, required=True)
+    p.add_argument('--control', choices=('reference','cached_reference'), default='reference')
     p.add_argument('--usalign', type=Path, required=True)
     p.add_argument('--references', type=Path, required=True)
     p.add_argument('--output', type=Path, required=True)
@@ -34,10 +35,10 @@ def main():
             raise ValueError('reference coverage mismatch')
         for ident in ids:
             references[ident] = f[ident]['backbone'][:, 1, :]
-    result = dict(status='running', rows=[], sources={}, binary_sha256=digest(binary),
+    result = dict(status='running', control=a.control, rows=[], sources={}, binary_sha256=digest(binary),
                   arguments=['-TMscore', '1'], reference_manifest_sha256=digest(a.references / 'manifest.json'),
                   reference_array_sha256=digest(a.references / 'backbones.h5'),
-                  scope='All 64 tuning families, three samples, all four arms at 0/500/2000. No checkpoint selection or test scoring.')
+                  scope='All 64 tuning families, three samples, all specified matched arms at 0/500/2000. No checkpoint selection or test scoring.')
     def save():
         temporary = a.output / 'score.tmp'; temporary.write_text(json.dumps(result, indent=2) + '\n')
         temporary.replace(a.output / 'score.json')
@@ -68,23 +69,24 @@ def main():
                 with ThreadPoolExecutor(max_workers=2) as pool:
                     result['rows'].extend(pool.map(score, tasks))
                 save(); print(arm, step, flush=True)
-        if arm_names != {'raw_reference', 'reference', 'empirical', 'balanced'}:
+        expected = {'raw_reference','reference','empirical','balanced'} if a.control == 'reference' else {'cached_reference','cached_aligned_empirical'}
+        if arm_names != expected:
             raise ValueError('incorrect experiment arms')
         values = {}
         for arm in sorted(arm_names):
             for step in (0, 500, 2000):
                 values[arm, step] = [np.mean([r['tm_fixed_reference'] for r in result['rows'] if r['arm'] == arm and r['step'] == step and r['target_id'] == ident]) for ident in ids]
         result['comparisons'] = {arm: {str(step): {'initial': comparison(values[arm, step], values[arm, 0]),
-                                                  'canonical_reference': comparison(values[arm, step], values['reference', step])}
+                                                  'matched_reference': comparison(values[arm, step], values[a.control, step])}
                                       for step in (500, 2000)} for arm in sorted(arm_names)}
         result['status'] = 'complete'; save()
         lines = ['# Optimized fixed-correspondence TM accuracy', '', result['scope'], '',
                  'USalign optimizes the rigid fit while retaining the verified residue correspondence. AFDB reference structures are predictions. This supplements the separately reported Kabsch-based score; it does not replace or alter the state-coverage gate.', '',
-                 '| Arm | Updates | Mean TM | Change from own initialization | 95% family interval | Change from canonical reference | 95% family interval |',
+                 '| Arm | Updates | Mean TM | Change from own initialization | 95% family interval | Change from matched reference | 95% family interval |',
                  '|---|---:|---:|---:|---|---:|---|']
         for arm, steps in result['comparisons'].items():
             for step, metrics in steps.items():
-                x, y = metrics['initial'], metrics['canonical_reference']
+                x, y = metrics['initial'], metrics['matched_reference']
                 lines.append(f"| {arm} | {step} | {x['candidate_mean']:.5f} | {x['difference']:+.5f} | [{x['ci95'][0]:+.5f}, {x['ci95'][1]:+.5f}] | {y['difference']:+.5f} | [{y['ci95'][0]:+.5f}, {y['ci95'][1]:+.5f}] |")
         (a.output / 'score.md').write_text('\n'.join(lines) + '\n')
     except Exception as error:

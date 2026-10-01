@@ -4,9 +4,9 @@ Complete and report both predeclared checkpoints of all four matched arms before
 
 ## Preserve compatibility with the inherited latent pose
 
-The existing raw-reference control retrains on raw AFDB latents, while both teacher-supervised arms use a new canonical pose for reference and teacher labels. Canonicalization removes arbitrary rotation, but also changes the target distribution relative to the inherited head. A negative canonical pilot would not distinguish teacher supervision from this adaptation burden.
+The inherited cache was already PCA-canonicalized. The fresh raw-file and first-residue-frame labels both changed that convention; the prior pilot cannot establish that the inherited pipeline had untreated rotations. See [the corrected rotation verdict](rotation_verdict_20261001.md).
 
-The most direct additional pose control is to rigidly align each teacher backbone to its own AFDB reference before encoding, while keeping raw AFDB reference latents unchanged. Use a proper rotation fitted on a predeclared common confidence core, with explicit minimum coverage and fallback policy. The reference is training supervision; no reference structure is supplied at inference. Recheck all teacher latent round trips and internal geometry. Then train raw-reference plus aligned empirical teacher labels against the existing matched raw-reference control, using the same 512 families, noise streams, update schedule and evaluation checkpoints. This remains a hypothesis; it must not be described as a proven fix.
+Preserve cached reference latents bit-for-bit. Align every teacher backbone to the cached reference CA frame with one proper global rotation, using the predeclared common confidence core and fallback. The 512-reference parity and all 8,192-label reconstruction audits passed. Compare cached-reference-only with cached-reference plus aligned empirical labels at 500 and 2,000 updates, followed by the frozen ensemble evaluation. No reference structure is required at inference.
 
 ## Label-quality diagnosis
 

@@ -23,3 +23,5 @@ For a future autoencoder redesign, explicitly enforce rotation-invariant latent 
 ## Cached-frame verification completed
 
 All512 training references now pass: mean re-encoding latent RMSE0.000304, maximum0.002069, after aligning full verified backbones to the cached CA coordinates. This is approximately three orders of magnitude smaller than raw-file mismatch. The actual training reference latent arrays are copied bit-for-bit rather than substituted with fresh encodings. All four label shards preserve the previous16 teacher conformations per sequence. The full8192-label reconstruction audit is job49653539.
+
+The full reconstruction audit completed successfully: mean CA-lDDT 0.999408, mean CA RMSD 0.1953 Å, decoded coarse validity 0.991455 versus input 0.995728. Matched training jobs 49654680 (cached reference) and 49654703 (aligned empirical teacher supervision) are registered with completion analysis and final-checkpoint ensemble follow-ups. Each requests one H200 for at most 100 minutes. Accuracy benefit remains unresolved until these comparisons finish.

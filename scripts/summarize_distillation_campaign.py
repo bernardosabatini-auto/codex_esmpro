@@ -15,7 +15,8 @@ def comparison(left, right):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('--runs', type=Path, nargs=4, required=True)
+    p.add_argument('--runs', type=Path, nargs="+", required=True)
+    p.add_argument('--control', choices=('reference','cached_reference'), default='reference')
     p.add_argument('--step', type=int, choices=(500, 2000), required=True)
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
@@ -44,24 +45,25 @@ def main():
             if any(sorted(r['sample'] for r in rows if r['target_id'] == i) != [0, 1, 2] for i in ids):
                 raise ValueError('invalid sampling replication')
             arms[arm][step] = {key: [float(np.mean([r[key] for r in rows if r['target_id'] == i])) for i in ids] for key in metrics}
-    if set(arms) != {'raw_reference', 'reference', 'empirical', 'balanced'} or len(selection_hashes) != 1:
+    expected = {'raw_reference','reference','empirical','balanced'} if a.control == 'reference' else {'cached_reference','cached_aligned_empirical'}
+    if set(arms) != expected or len(selection_hashes) != 1:
         raise ValueError('unmatched arm selection')
     for arm in arms:
         for key in metrics:
-            if not np.allclose(arms[arm][0][key], arms['reference'][0][key], atol=2e-5, rtol=0):
+            if not np.allclose(arms[arm][0][key], arms[a.control][0][key], atol=2e-5, rtol=0):
                 raise ValueError('initial predictions differ across matched arms')
     results = {}
     for arm in arms:
-        results[arm] = {baseline: {key: comparison(arms[arm][a.step][key], arms['reference'][step][key]) for key in metrics}
-                        for baseline, step in [('initial', 0), ('canonical_reference', a.step)]}
-    d = dict(status='complete', step=a.step, source_manifest_sha256=source_hashes, comparisons=results,
+        results[arm] = {baseline: {key: comparison(arms[arm][a.step][key], arms[a.control][step][key]) for key in metrics}
+                        for baseline, step in [('initial', 0), ('matched_reference', a.step)]}
+    d = dict(status='complete', step=a.step, control=a.control, source_manifest_sha256=source_hashes, comparisons=results,
              scope='64 tuning families, three samples each; single training seed. TM is after Kabsch, not TM-align optimization. No ensemble promotion claim.')
     a.output.with_suffix('.json').write_text(json.dumps(d, indent=2) + '\n')
     lines = [f'# Matched training at {a.step} updates', '', d['scope'], '']
     for key in metrics:
-        lines += [f'## {key}', '', '| Arm | Mean | Change from initial | 95% family interval | Change from canonical reference | 95% family interval |', '|---|---:|---:|---|---:|---|']
+        lines += [f'## {key}', '', '| Arm | Mean | Change from initial | 95% family interval | Change from matched reference | 95% family interval |', '|---|---:|---:|---|---:|---|']
         for arm, result in results.items():
-            x, y = result['initial'][key], result['canonical_reference'][key]
+            x, y = result['initial'][key], result['matched_reference'][key]
             lines.append(f"| {arm} | {x['candidate_mean']:.5f} | {x['difference']:+.5f} | [{x['ci95'][0]:+.5f}, {x['ci95'][1]:+.5f}] | {y['difference']:+.5f} | [{y['ci95'][0]:+.5f}, {y['ci95'][1]:+.5f}] |")
         lines.append('')
     lines += ['AFDB reference coordinates are predictions. Evaluate state coverage and validity separately on the frozen development ensemble panel before any replication or promotion. Reserved confirmation and original test remain unscored.']

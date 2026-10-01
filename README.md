@@ -1,5 +1,7 @@
 # ESM → ProteinAE restart
 
+Latest evidence and next experiments: [ensemble progress, October 1](reports/ensemble_progress_20261001.md).
+
 See [the current results snapshot](reports/progress.html) for the active accuracy
 experiments and their decisions.
 

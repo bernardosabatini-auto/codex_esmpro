@@ -24,23 +24,35 @@ def main():
     atomic_json(a.output/'manifest.json',m)
     try:
         telemetry=Telemetry(a.output,True)
-        e=FinalESMC(a.source/'data/esmc6b',precision='fp32')
-        m['embedding_artifacts']=[file_identity(p,hash_contents=True) for p in sorted((a.source/'data/esmc6b').glob('*')) if p.suffix in ('.json','.safetensors')]
-        with h5py.File(a.output/'embeddings.h5','x') as cache:
-            for length,batch in ((128,32),(256,16),(384,8),(512,8)):
-                group=[r for r in rows if next(x for x in (128,256,384,512) if r['length']<=x)==length]
-                for offset in range(0,len(group),batch):
-                    chunk=group[offset:offset+batch];name=f'collect::embedding::{length}::{offset}';torch.cuda.synchronize();tick=time.monotonic();torch.cuda.nvtx.range_push(name)
-                    try:
-                        values={k:v.cpu().numpy() for k,v in e([r['sequence'] for r in chunk],length,layers=(20,40,60,80)).items()};torch.cuda.synchronize();seconds=time.monotonic()-tick
-                    finally:torch.cuda.nvtx.range_pop()
-                    m['batches'].append(dict(nvtx_range=name,stage='embedding',seconds=seconds,length=length,batch=len(chunk),peak_reserved_bytes=torch.cuda.max_memory_reserved()))
-                    for i,row in enumerate(chunk):
-                        g=cache.create_group(row['query_id']);g.attrs['sequence_sha256']=hashlib.sha256(row['sequence'].encode()).hexdigest()
-                        for layer,value in values.items():g.create_dataset(str(layer),data=value[i,:row['length']])
-        del e;torch.cuda.empty_cache()
-        ckpt=a.source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt';ae=a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt'
+        if c.get('embedding_cache'):
+            path=Path(c['embedding_cache']).resolve();identity=file_identity(path,hash_contents=True)
+            if identity['sha256']!=c['embedding_cache_sha256']:raise ValueError('changed ensemble embedding cache')
+            with h5py.File(path) as cached:
+                if set(cached)!={r['query_id'] for r in rows}:raise ValueError('ensemble cache target coverage mismatch')
+                for row in rows:
+                    g=cached[row['query_id']]
+                    if g.attrs['sequence_sha256']!=hashlib.sha256(row['sequence'].encode()).hexdigest() or g['80'].shape!=(row['length'],2560):raise ValueError('cached sequence/shape mismatch')
+            (a.output/'embeddings.h5').symlink_to(path);m['embedding_cache']=identity
+            m['timing_scope']='Cached-conditioner ensemble generation; excludes ESMC extraction. Not end-to-end sequence timing.'
+        else:
+            e=FinalESMC(a.source/'data/esmc6b',precision='fp32')
+            m['embedding_artifacts']=[file_identity(p,hash_contents=True) for p in sorted((a.source/'data/esmc6b').glob('*')) if p.suffix in ('.json','.safetensors')]
+            with h5py.File(a.output/'embeddings.h5','x') as cache:
+                for length,batch in ((128,32),(256,16),(384,8),(512,8)):
+                    group=[r for r in rows if next(x for x in (128,256,384,512) if r['length']<=x)==length]
+                    for offset in range(0,len(group),batch):
+                        chunk=group[offset:offset+batch];name=f'collect::embedding::{length}::{offset}';torch.cuda.synchronize();tick=time.monotonic();torch.cuda.nvtx.range_push(name)
+                        try:
+                            values={k:v.cpu().numpy() for k,v in e([r['sequence'] for r in chunk],length,layers=(20,40,60,80)).items()};torch.cuda.synchronize();seconds=time.monotonic()-tick
+                        finally:torch.cuda.nvtx.range_pop()
+                        m['batches'].append(dict(nvtx_range=name,stage='embedding',seconds=seconds,length=length,batch=len(chunk),peak_reserved_bytes=torch.cuda.max_memory_reserved()))
+                        for i,row in enumerate(chunk):
+                            g=cache.create_group(row['query_id']);g.attrs['sequence_sha256']=hashlib.sha256(row['sequence'].encode()).hexdigest()
+                            for layer,value in values.items():g.create_dataset(str(layer),data=value[i,:row['length']])
+            del e;torch.cuda.empty_cache()
+        ckpt=Path(c['checkpoint']) if c.get('checkpoint') else a.source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt';ae=a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt'
         m['checkpoint']=file_identity(ckpt,hash_contents=True);m['decoder_checkpoint']=file_identity(ae,hash_contents=True)
+        if c.get('checkpoint') and m['checkpoint']['sha256']!=c['checkpoint_sha256']:raise ValueError('changed trained checkpoint')
         model,_=load_legacy(ckpt,trusted_pickle=True);model.cuda().eval().requires_grad_(False)
         decoder=load_proteinae(a.source/'ProteinAE_v1',ae,steps=3).cuda().eval()
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'embeddings.h5') as cache,h5py.File(a.output/'predictions.h5','x') as output:

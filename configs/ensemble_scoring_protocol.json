@@ -1,0 +1,14 @@
+{
+  "frozen_before": "Reference scoring of generated ensembles; generation and native reconstruction diagnostics already executed",
+  "scope": "Development diagnostic; no promotion from dispersion or oracle nearest-reference quality alone",
+  "coarse_validity": {"maximum_peptide_outlier_fraction": 0.05, "maximum_ca_clashing_residue_fraction": 0.01, "maximum_ca_gap_fraction": 0.01},
+  "state_features": "Common observed CA positions; sequence separation >3; reference distance range >=2 A and minimum distance <=12 A. No generated coordinates enter feature selection.",
+  "state_merging": "Connected components of reference feature RMSE <=1 A; multiple crystallographic copies cannot count as distinct states",
+  "state_assignment": "Nearest reference feature vector; assigned component only if feature RMSE <= threshold, maximum reference CA lDDT >=0.8 and coarse-valid geometry. All generated samples retained in denominators.",
+  "feature_rmse_threshold_angstrom": 2.0,
+  "sensitivity_thresholds_angstrom": [1.0, 2.0, 3.0],
+  "coverage_samples": [1, 4, 16, 32],
+  "md_distribution": "Published 2D projections; mean one-dimensional Wasserstein distance across 64 fixed angles, all generated samples and reference projections. No alignment or fitted parameters from generated samples.",
+  "controls": "NMR is a low experimental-model dispersion control, not a population reference. Report generated/reference dispersion and nearest-reference quality without counting NMR models as states.",
+  "statistics": "One family per target; paired comparisons and family bootstrap. Seeds are repeated measurements. Feature-poor or single-state cases reported explicitly, excluded only from multistate state-coverage denominators."
+}

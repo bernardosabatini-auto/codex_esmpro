@@ -31,6 +31,10 @@ def current_round():
     if d:
         s=d['pairs']['tm_fixed_reference']['sample_mean'];ci=s['ci95']
         lines.append(f'<p><strong>Reference-free selection screen:</strong> choosing the most mutually consistent of three predictions raised TM from {s["ours"]:.5f} to {s["theirs"]:.5f}; change {s["theirs_minus_ours"]:+.5f}, 95% cluster interval [{ci[0]:+.5f}, {ci[1]:+.5f}]. lDDT and aggregate geometry also improved. Choices were frozen before reading native scores. This falls below the +0.01 practical accuracy target and requires two new inference-noise replications.</p>')
+    d=read('reports/consensus_pairfree_vs_pair.json')
+    if d:
+        s=d['paired']['tm_fixed_reference'];ci=s['ci95']
+        lines.append(f'<p><strong>Pair-free selection:</strong> the same frozen rule gives TM {s["theirs"]:.5f}, versus {s["ours"]:.5f} for selected pair; difference {s["theirs_minus_ours"]:+.5f}, 95% cluster interval [{ci[0]:+.5f}, {ci[1]:+.5f}]. It fails development noninferiority; no GPU follow-up is assigned to this branch.</p>')
     for path in sorted((ROOT/'reports').glob('recovery_*.json')):
         d=read(str(path.relative_to(ROOT)))
         for row in d.get('runs',{}).values():
@@ -108,7 +112,7 @@ def main():
     if perf and perf['status']=='complete':
         h=perf['hardware']['collection_mean_percent']
         lines.insert(-1,f'<p>Measured complete-pipeline throughput: {perf["proteins_per_second"]:.2f} proteins/s, three structures each, with {perf["peak_reserved_gib"]:.1f} GiB reserved. Computation: {h["SMs Active [Throughput %]"]:.1f}% SM activity and {h["SM Issue [Throughput %]"]:.1f}% instruction issue. Development accuracy/geometry noninferiority passed: {perf.get("development_noninferiority_passed", "pending")}.</p>')
-    for filename in ('comparison_49414524.md','external_49461971.md','external_strata_49461971.md','geometry_49453471.md','training_data_v1.md','canonical_frames_v1.md','training_profile_49459162.md','pilot_49461023.md','quality_49466461.md','online_49468214.md','online_49470256.md','holdout_expanded_20260930.md','recovery_data_16384.md','training_state_audit.md','consensus_final_ema.md'):
+    for filename in ('comparison_49414524.md','external_49461971.md','external_strata_49461971.md','geometry_49453471.md','training_data_v1.md','canonical_frames_v1.md','training_profile_49459162.md','pilot_49461023.md','quality_49466461.md','online_49468214.md','online_49470256.md','holdout_expanded_20260930.md','recovery_data_16384.md','training_state_audit.md','consensus_final_ema.md','consensus_strata_final_ema.md','consensus_pairfree.md','consensus_pairfree_vs_pair.md'):
         if (ROOT/'reports'/filename).exists():lines.append(f'<li><a href="{filename}">{filename}</a></li>')
     lines += ['</ul><p>Code and aggregate reports are synchronized to GitHub. Datasets, weights, target manifests, predictions and profiler traces remain local and ignored by Git.</p></html>']
     (ROOT/'reports/progress.html').write_text('\n'.join(lines)+'\n')

@@ -68,6 +68,10 @@ development result below the +0.01 promotion threshold. Two fixed new inference
 seeds are queued for replication; no independent-test structures have been scored.
 The [existing length/continuity strata](reports/consensus_strata_final_ema.md)
 show a smaller, uncertain selection benefit for the longest chains.
+The same rule improves pair-free to 0.56230 TM, but it remains
+[0.01137 below selected pair](reports/consensus_pairfree_vs_pair.md)
+(95% cluster interval −0.01515 to −0.00763). No GPU follow-up is assigned to
+that branch: it fails development noninferiority despite its within-model gain.
 
 The current autonomous window ends at 2026-10-01 13:30 UTC (09:30 EDT).
 New requests receive a Slurm completion deadline. A one-shot project timer

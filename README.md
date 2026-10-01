@@ -130,6 +130,15 @@ The [larger-batch result](reports/online_49539818.md) uses 93.0 GiB for only
 tests now examine [conditioning reuse across samples](configs/online_reuse_plan.json)
 and [20 rather than 25 flow steps](configs/online_twenty_plan.json), retaining
 the same numerical and accuracy thresholds.
+Those tests have now completed. [Conditioning reuse](reports/online_49542513.md)
+improves FP16 throughput by 11.1%, lowers reserved memory to 55.2 GiB, and leaves
+TM nearly identical. The [20-step screen](reports/online_49542864.md) measures
+2.005x versus FP32 and passes the declared noninferiority limits: TM change
+−0.0000013, CA lDDT −0.00134, and peptide-outlier fraction +0.000416.
+The speed result is too close to 2x for a robust claim across separate GPUs.
+A [combined candidate](configs/online_combined_plan.json) is being validated
+before repeated timing on the same H200, including the fixed sample selector
+in both candidate and reference pipelines.
 
 This is a minimal research core, extracted from the original project with
 [symbol-level provenance](PROVENANCE.json). It retains both flow architectures
@@ -185,7 +194,7 @@ final-layer ESMC; the validated configuration is in `configs/validated_inference
 
 ## Scope and limits
 
-- Tested: 42 CPU contract tests; exact forward parity of small pair and pair-free
+- Tested: 47 CPU contract tests; exact forward parity of small pair and pair-free
   models against isolated original definitions; a real pretrained ProteinAE
   decoder on one validation target; the full 626-target artifact/data audit.
 - H200 job 49346371 completed 50 throughput/memory configurations of the actual

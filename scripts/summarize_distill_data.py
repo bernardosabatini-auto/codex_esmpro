@@ -26,6 +26,8 @@ def main():
     lines=['# Teacher label generation','',f"Status: {d['status']}.",'',str(d['scope'])]
     if d['status']=='complete':lines+=['',f"Targets: 128. Teacher samples: 2048; coarse-valid: {d['valid_teacher_samples']}. Mean reconstruction RMSD: reference {d['native_reconstruction_rmsd_mean']:.4f} A, teacher sample zero {d['teacher_reconstruction_rmsd_mean']:.4f} A.",'',f"Teacher cluster-count histogram: {d['cluster_histogram']}.",'','Clusters are geometry-based training strata, not experimentally established states or populations. Fresh reference and teacher latents use the same encoder path.']
     else:lines+=['',d['error']]
+    if m.get('config',{}).get('latent_frame')=='teacher_CA_aligned_to_cached_reference':
+        lines=[line.replace('Fresh reference and teacher latents use the same encoder path.','Reference latents are copied bit-for-bit from the inherited cache. Teacher latents are freshly encoded after alignment to the cached reference frame; fresh reference re-encoding is a parity check only.') for line in lines]
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 
 

@@ -61,6 +61,16 @@ run alongside those screens. The [saved-state audit](reports/training_state_audi
 validates all optimizer moments and parameter ordering; missing CUDA RNG state
 prevents claiming an exact replay of the inherited run.
 
+All three recovery screens completed without qualifying for replication:
+[beta2 and loss reduction](reports/recovery_49523242.md) each changed TM by
+about −0.00021 versus the matched trained control; the
+[larger pool](reports/recovery_49526215.md) gained +0.00072 but remained
+0.00117 below untouched final EMA. The next
+[matched optimizer-history pair](configs/optimizer_state_plan.json) starts both
+arms from identical raw weights and saved EMA, restoring AdamW moments and
+step counters in only one arm. All four actual-gradient controls passed in
+both arms. Their final structure evaluations determine the next accuracy action.
+
 A CPU-only [reference-free selection screen](reports/consensus_final_ema.md)
 raised TM from 0.56824 to 0.57367 by choosing the most mutually consistent of
 three predictions. The selector sees predicted coordinates only. This is a
@@ -70,6 +80,11 @@ TM gains of +0.00352 and +0.00368. Their pooled gain, excluding the initial
 screen, is +0.00360 [95% cluster interval +0.00219, +0.00507]. This is a
 consistent modest benefit on reused targets, not independent-target or
 training-seed confirmation. No independent-test structures have been scored.
+The CPU-only [nine-sample diagnostic](reports/consensus_nine.md) reaches
+0.57539 TM, +0.00353 over the three-sample selector's expectation, at three
+times the head/decoder sample budget. It misses its accuracy threshold, so
+no new nine-sample GPU generation is assigned. Best-of-nine by native TM
+is 0.60614, an oracle upper bound that cannot be used for deployment.
 The [existing length/continuity strata](reports/consensus_strata_final_ema.md)
 show a smaller, uncertain selection benefit for the longest chains.
 The same rule improves pair-free to 0.56230 TM, but it remains
@@ -108,6 +123,13 @@ below the predeclared 2x speed gate. A single
 [larger-batch test](configs/online_batch_plan.json) uses that measured memory
 headroom. A separate [AdamW implementation profile](configs/optimizer_profile_plan.json)
 tests optimizer overhead with the validated all-block recomputation policy.
+That [optimizer profile](reports/optimizer_49538855.md) found only 0.38–0.79%
+speed gains and roughly 40–43% instruction issue; no kernel change is adopted.
+The [larger-batch result](reports/online_49539818.md) uses 93.0 GiB for only
+1.24% more throughput, so smaller FP16 batches remain preferred. Separate
+tests now examine [conditioning reuse across samples](configs/online_reuse_plan.json)
+and [20 rather than 25 flow steps](configs/online_twenty_plan.json), retaining
+the same numerical and accuracy thresholds.
 
 This is a minimal research core, extracted from the original project with
 [symbol-level provenance](PROVENANCE.json). It retains both flow architectures
@@ -135,7 +157,7 @@ export PYTHONPATH="$PWD/src"
 PYTHON=/n/home08/bsabatini/.conda/envs/proteinae/bin/python
 SOURCE=/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae
 
-"$PYTHON" -m unittest discover -s tests -v
+LD_LIBRARY_PATH=/n/home08/bsabatini/.conda/envs/proteinae/lib "$PYTHON" -m unittest discover -s tests -v
 "$PYTHON" scripts/audit_existing.py --source "$SOURCE" --output reports/existing_audit.json
 "$PYTHON" scripts/check_legacy_parity.py --source "$SOURCE" --output reports/legacy_parity.json
 ```

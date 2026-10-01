@@ -51,12 +51,28 @@ def current_round():
     if d:
         s=d['paired']['tm_fixed_reference'];ci=s['ci95']
         lines.append(f'<p><strong>Pair-free selection:</strong> the same frozen rule gives TM {s["theirs"]:.5f}, versus {s["ours"]:.5f} for selected pair; difference {s["theirs_minus_ours"]:+.5f}, 95% cluster interval [{ci[0]:+.5f}, {ci[1]:+.5f}]. It fails development noninferiority; no GPU follow-up is assigned to this branch.</p>')
+    d=read('reports/consensus_nine.json')
+    if d:
+        s=d['pairs']['tm_fixed_reference']['three_sample_medoid_expectation'];ci=s['ci95']
+        lines.append(f'<p><strong>Nine-sample diagnostic:</strong> selected TM {s["theirs"]:.5f}, gain versus three-sample expectation {s["theirs_minus_ours"]:+.5f}, interval [{ci[0]:+.5f}, {ci[1]:+.5f}]. This needs three times the head/decoder sample budget. Eligible for more GPU generation: {d["eligible_for_new_noise_pool"]}. Native-TM best-of-nine {d["oracle_tm_only"]:.5f} is an unavailable oracle, not a deployable score.</p>')
     for path in sorted((ROOT/'reports').glob('recovery_*.json')):
         d=read(str(path.relative_to(ROOT)))
         for row in d.get('runs',{}).values():
             tm=row['paired']['tm_fixed_reference'];delta=row['vs_untouched']['tm_fixed_reference']['theirs_minus_ours']
             lines.append(f'<p>Recovery {esc(row["task"]["name"])}: TM {tm["theirs"]:.5f}, change versus control {tm["theirs_minus_ours"]:+.5f}, versus untouched {delta:+.5f}; screen passed: {row["recovery_screen_passed"]}.</p>')
         for failure in d.get('failures',[]):lines.append(f'<p>Recovery result unavailable: {esc(failure["error"])}.</p>')
+    for path in sorted((ROOT/'reports').glob('optimizer_state_*.json')):
+        d=read(str(path.relative_to(ROOT)))
+        if d.get('paired'):
+            s=d['paired']['tm_fixed_reference'];ci=s['ci95']
+            lines.append(f'<p><strong>Restored optimizer history:</strong> fresh TM {s["ours"]:.5f}, restored {s["theirs"]:.5f}, change {s["theirs_minus_ours"]:+.5f}, interval [{ci[0]:+.5f}, {ci[1]:+.5f}]. Both start from identical raw weights and saved EMA. Replication screen: {d["screen_passed"]}.</p>')
+        for failure in d.get('failures',[]):lines.append(f'<p>Optimizer-history result unavailable: {esc(failure["error"])}.</p>')
+    lines.append('<h3>Complete-pipeline efficiency candidates</h3><table><tr><th>Run</th><th>Setting</th><th>Proteins/s</th><th>GiB reserved</th><th>Speedup vs FP32</th><th>2x/noninferiority gate</th></tr>')
+    for path in sorted((ROOT/'reports').glob('online_*.json')):
+        d=read(str(path.relative_to(ROOT)))
+        if d.get('status')=='complete' and 'speedup_vs_full_precision' in d:
+            lines.append(f'<tr><td>{esc(path.stem)}</td><td>{esc(d.get("sampling_setting","steps25_cfg2"))}</td><td>{d["proteins_per_second"]:.3f}</td><td>{d["peak_reserved_gib"]:.1f}</td><td>{d["speedup_vs_full_precision"]:.2f}x</td><td>{d["development_speed_gate_passed"]}</td></tr>')
+    lines.append('</table><p>Each protein receives three generated structures. Larger batches added only 1.24% speed at 93.0 versus 66.6 GiB, so the smaller FP16 batches remain preferred. Fused AdamW added less than 1%; training still measures about 41% instruction issue. Neither SM issue nor SM activity measures percent of peak FLOPs.</p>')
     return lines
 
 

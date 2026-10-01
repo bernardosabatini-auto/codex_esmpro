@@ -26,7 +26,7 @@ def main():
     # The live training manifest keeps changing; snapshot the completed endpoint.
     if not snapshot.exists():snapshot.write_text(json.dumps(m,indent=2)+'\n')
     config=json.loads(Path('runs/ensemble_49618816/manifest.json').read_text())['config'];cache=Path('runs/ensemble_49618816/embeddings.h5').resolve()
-    config.update(checkpoint=str(checkpoint.resolve()),checkpoint_sha256=digest(checkpoint),embedding_cache=str(cache),embedding_cache_sha256=digest(cache),training_manifest=str(snapshot.resolve()),training_manifest_sha256=digest(snapshot),checkpoint_selection=dict(rule='Predeclared 500/2000 and 5/10-step native evaluations; only quality-qualified samplers get ensemble evaluation',selected_step=a.step,mean_ca_lddt=means,arm=c['arm']),native_quality_screen=screen,flow_steps=a.sampling_steps,primary_guidance=1,guidance_controls=[],work_cap_seconds=1500)
+    config.update(checkpoint=str(checkpoint.resolve()),checkpoint_sha256=digest(checkpoint),embedding_cache=str(cache),embedding_cache_sha256=digest(cache),training_manifest=str(snapshot.resolve()),training_manifest_sha256=digest(snapshot),checkpoint_selection=dict(rule='Predeclared 500/2000 and 5/10-step native evaluations; only quality-qualified samplers get ensemble evaluation',selected_step=a.step,mean_ca_lddt=means,arm=c['arm']),native_quality_screen=screen,flow_steps=a.sampling_steps,primary_guidance=1,guidance_controls=[],work_cap_seconds=780)
     a.output.parent.mkdir(parents=True,exist_ok=True);a.output.write_text(json.dumps(config,indent=2)+'\n');print(json.dumps(config['checkpoint_selection']))
 
 

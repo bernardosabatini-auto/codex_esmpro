@@ -45,7 +45,7 @@ def tick(root, *, dry_run=False):
             try:
                 subprocess.run(prepare,cwd=root,env=env,capture_output=True,text=True,check=True,timeout=90)
                 env.pop('CUDA_VISIBLE_DEVICES',None)
-                command=[python,'scripts/submit_registered.py','--script',node['script'],'--purpose',f"Predeclared final ensemble follow-up of own training{parent}, arm{node['arm']},2000updates",'--minutes','30','--action','summarize_ensemble']
+                command=[python,'scripts/submit_registered.py','--script',node['script'],'--purpose',f"Predeclared final ensemble follow-up of own training{parent}, arm{node['arm']},2000updates",'--minutes',str(node.get('minutes',30)),'--action','summarize_ensemble']
                 completed=subprocess.run(command,cwd=root,env=env,capture_output=True,text=True,check=True);result['submitted']=json.loads(completed.stdout)['submitted'];result['nodes'][-1].update(status='submitted',child=result['submitted'])
             except (subprocess.CalledProcessError,subprocess.TimeoutExpired) as error:
                 result['nodes'][-1].update(status='retry',error=str(error.stderr or error)[-2000:]);break

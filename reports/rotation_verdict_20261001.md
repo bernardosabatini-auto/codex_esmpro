@@ -19,3 +19,7 @@ First verify fresh re-encoding against cached latent targets, along with all-sam
 Independent PCA canonicalization of each conformation can change axes/sign choices when the structure changes, particularly near eigenvalue or sign degeneracy. Aligning conformers to one fixed per-sequence reference avoids that particular change of convention. Whether this improves state coverage remains an experimental question.
 
 For a future autoencoder redesign, explicitly enforce rotation-invariant latent codes, with reconstruction assessed up to proper rigid alignment and output pose handled separately. Ordinary rotation augmentation alone does not guarantee invariant latents. For the current pretrained model, preserve its existing convention rather than replacing it silently.
+
+## Cached-frame verification completed
+
+All512 training references now pass: mean re-encoding latent RMSE0.000304, maximum0.002069, after aligning full verified backbones to the cached CA coordinates. This is approximately three orders of magnitude smaller than raw-file mismatch. The actual training reference latent arrays are copied bit-for-bit rather than substituted with fresh encodings. All four label shards preserve the previous16 teacher conformations per sequence. The full8192-label reconstruction audit is job49653539.

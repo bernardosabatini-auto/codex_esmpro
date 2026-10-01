@@ -26,6 +26,10 @@ def main():
         frame=c.get('latent_frame','first_residue_N_CA_C')
         if (c['arm'] in ('cached_reference','cached_aligned_empirical')) != (frame=='teacher_CA_aligned_to_cached_reference'):raise ValueError('arm/frame mismatch')
         if frame not in ('first_residue_N_CA_C','teacher_CA_aligned_to_cached_reference'):raise ValueError('unknown label frame')
+        if frame=='teacher_CA_aligned_to_cached_reference':
+            path=Path(c['cached_identity_audit']);identity=json.loads(path.read_text())
+            expected={str((Path(x['manifest']).parent/'labels.h5').resolve()):x['labels_sha256'] for x in c['label_shards']}
+            if hashlib.sha256(path.read_bytes()).hexdigest()!=c['cached_identity_audit_sha256'] or identity['status']!='complete' or identity['label_files']!=expected or not identity['cached_reference_labels_bitwise_equal']:raise ValueError('cached-reference label identity mismatch')
         if c['updates']<1 or c['evaluation_steps'][-1]!=c['updates']:raise ValueError('invalid update protocol')
         if not c.get('profile_only'):
             audit=Path(c['audit_result'])

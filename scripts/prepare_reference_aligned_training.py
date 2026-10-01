@@ -26,7 +26,11 @@ def main():
     selection=json.loads(Path(c['selection']).read_text())
     if seen!={r['id'] for r in selection['train']} or origins!={f'distill_data_{j}' for j in recipe['source_teacher_jobs']}:raise ValueError('incorrect source corpus')
     c.update(arm='cached_aligned_empirical',latent_frame=recipe['latent_frame'],label_shards=shards,
-             protocol_sha256=sha(protocol),matched_control_manifest=str(control.resolve()),matched_control_manifest_sha256=sha(control))
+             protocol_sha256=sha(protocol),recipe_source_manifest=str(control.resolve()),recipe_source_manifest_sha256=sha(control))
+    identity_path=Path('runs/cached_reference_identity_audit.json');identity=json.loads(identity_path.read_text())
+    expected={str((Path(x['manifest']).parent/'labels.h5').resolve()):x['labels_sha256'] for x in shards}
+    if identity['status']!='complete' or identity['targets']!=512 or not identity['cached_reference_labels_bitwise_equal'] or not identity['source_cached_z_and_ca_match_frozen_array_hashes'] or identity['selection_sha256']!=c['selection_sha256'] or identity['label_files']!=expected:raise ValueError('cached-reference identity gate failed')
+    c.update(cached_identity_audit=str(identity_path.resolve()),cached_identity_audit_sha256=sha(identity_path))
     if a.audit_only:
         c['work_cap_seconds']=780
     else:

@@ -33,6 +33,11 @@ def main():
         lines+=['','Latent diagnostics (nearest teacher RMSE): global reference fits below are evaluation-only and never alter predictions.','','| Updates / guidance | Sampled latent | Re-encoded backbone | Pose-aligned re-encoded backbone | Decoder/encoder RMSE |','|---|---:|---:|---:|---:|']
         for key,r in d['latent_diagnostics'].items():lines.append(f"| {key} | {r['sampled_to_teacher_rmse']:.5f} | {r['reencoded_to_teacher_rmse']:.5f} | {r['pose_aligned_reencoded_to_teacher_rmse']:.5f} | {r['decoder_encoder_rmse']:.5f} |")
     if 'error' in d:lines+=['',d['error']]
+    if 'training_seconds' in d:
+        lines+=['',f"Training: {d['training_seconds']:.2f} seconds; peak reserved memory: {d['max_reserved_gib']:.2f} GiB."]
+        h=d.get('hardware',{})
+        if 'collection_mean_percent' in h:
+            lines+=['',f"SM issue: {h['collection_mean_percent'].get('SM Issue [Throughput %]')}% within measured collection ranges; {h['whole_capture_mean_percent'].get('SM Issue [Throughput %]')}% over the entire capture. For full runs collection ranges include evaluation. Short-profile startup is not amortized."]
     if d['target_estimator']=='posterior':
         lines+=['',f"Target estimator: posterior mean plus detached conditional variance. Logged mean variance: {d.get('logged_posterior_variance_mean')}; logged mean variance/loss fraction: {d.get('logged_posterior_floor_fraction')}. These sparse logs are diagnostic, not an estimate of gradient-variance reduction. Time-bin errors still use sampled-label targets."]
     lines+=['','This is a training-capacity experiment. No model promotion or unseen-family accuracy claim is possible from these scores.']

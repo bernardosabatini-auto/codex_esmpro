@@ -54,6 +54,21 @@ class WatcherTests(unittest.TestCase):
         self.assertEqual(args[args.index('-j')+1],'123_0')
         self.assertNotIn('-u',args)
 
+    def test_completing_allocation_overrides_terminal_accounting(self):
+        run=Mock(side_effect=[Mock(stdout='123_0|COMPLETED|0:0|00:01:00|end\n'),
+                              Mock(stdout='123_0|COMPLETING|1:00\n999|RUNNING|0:20\n')])
+        rows=watch.scheduler_states(['123_0'],run)
+        self.assertEqual(set(rows),{'123_0'})
+        self.assertEqual(rows['123_0']['state'],'COMPLETING')
+        self.assertNotIn(rows['123_0']['state'],watch.TERMINAL)
+
+    def test_live_query_failure_does_not_assume_gpu_release(self):
+        import subprocess
+        run=Mock(side_effect=[Mock(stdout='123_0|COMPLETED|0:0|00:01:00|end\n'),
+                              subprocess.CalledProcessError(1,['squeue'])])
+        with self.assertRaises(subprocess.CalledProcessError):
+            watch.scheduler_states(['123_0'],run)
+
     def test_missing_or_running_tasks_never_trigger_analysis(self):
         analyze = Mock()
         for rows in [{}, {'123_0': self.rows()['123_0']}, self.rows('RUNNING')]:

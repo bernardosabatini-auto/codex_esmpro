@@ -57,3 +57,9 @@ All three completed baseline evaluations match, including sample state assignmen
 The CFG1 nearest-teacher latent RMSE is 0.44329, whereas re-encoding globally aligned predicted backbones gives 0.13363. At CFG2 these are 0.43580 and 0.11507. Decoder-to-encoder RMSE is about 0.0055. Much of the raw latent discrepancy is therefore associated with global pose; the alignment is diagnostic only and does not alter any generated prediction or structural score.
 
 Posterior-target profile job49712994 tests the cost of an objective-preserving reduction in target noise, using one H200 for 40 updates. The [declared plan and equivalence tests](posterior_target_plan_20261001.md) precede any full training with that estimator.
+
+## Posterior-target profile passed
+
+Job49712994 completed 40 updates in 80.88 seconds with 64.72 GiB peak reserved memory, compared with 81.99 seconds and 64.96 GiB for the ordinary aligned-target profile. Training SM issue was 58.05%; whole-capture SM issue was 21.69%. Startup dominates the short capture. Sparse logged conditional variance averaged 0.002203, or 3.43% of the logged objective; this is not a measurement of gradient-variance reduction. The method is computationally viable, but its expected benefit appears modest and no full posterior-target training has been launched. See [profile](overfit_49712994.md).
+
+A live check caught terminal accounting while a completed job still appeared as COMPLETING in Slurm. Scheduler queries now always consult the live queue for exact registered IDs and give live allocation state precedence. Regression tests cover the race and fail closed on a live-query error; a real query of all 30 nonterminal-registry IDs found exactly the three running training jobs, with none missing. No cap violation occurred.

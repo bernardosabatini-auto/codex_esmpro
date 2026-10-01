@@ -4,6 +4,21 @@ import numpy as np
 import torch
 
 
+def canonical_backbone_frame(backbone):
+    """Fix rigid pose using the first residue's complete N/CA/C frame.
+
+    This preserves internal geometry and chirality. It is intended for complete
+    sequence backbones; it does not choose an anchor across missing residues.
+    """
+    if backbone.ndim!=4 or backbone.shape[2:]!=(4,3) or backbone.shape[1]<1 or not torch.isfinite(backbone).all():raise ValueError('expected finite complete backbone batch')
+    origin=backbone[:,0,1];axis=backbone[:,0,2]-origin;length=axis.norm(dim=-1,keepdim=True)
+    if (length<1e-5).any():raise ValueError('degenerate CA-C axis')
+    x=axis/length;offset=backbone[:,0,0]-origin;y=offset-(offset*x).sum(-1,keepdim=True)*x;length=y.norm(dim=-1,keepdim=True)
+    if (length<1e-5).any():raise ValueError('collinear first-residue frame')
+    y=y/length;z=torch.linalg.cross(x,y,dim=-1);basis=torch.stack((x,y,z),dim=-1)
+    return torch.einsum('bnai,bij->bnaj',backbone-origin[:,None,None,:],basis)
+
+
 def mapped_backbone(pdb_path, residue_map):
     atoms={}
     for line in Path(pdb_path).read_text().splitlines():

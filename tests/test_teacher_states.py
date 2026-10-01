@@ -18,6 +18,14 @@ def test_identical_teachers_do_not_make_distinct_states():
     assert definition(bb,np.ones(4,dtype=bool),np.ones((4,40))) is None
 
 
+def test_family_bootstrap_uses_explicit_mapping():
+    from latentfold.teacher_states import paired_change
+    result=paired_change({'a':.7,'b':.7,'c':.3},{'a':.5,'b':.5,'c':.5},families={'a':'one','b':'one','c':'two'})
+    assert result['families']==2 and result['targets']==3
+    assert result['bootstrap_unit']=='cluster'
+    assert np.isclose(result['difference'],.2/3)
+
+
 def test_paired_change_is_candidate_minus_reference():
     from latentfold.teacher_states import paired_change
     result=paired_change({'a':.75,'b':.5},{'a':.5,'b':.25})

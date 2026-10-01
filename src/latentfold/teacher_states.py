@@ -32,11 +32,25 @@ def contact_assignments(backbone, state, valid):
     return nearest,errors,clusters
 
 
-def paired_change(candidate, reference):
+def paired_change(candidate, reference, *, families=None):
     """Positive values always mean candidate minus comparator."""
     from .metrics import paired_comparison
-    d=paired_comparison(reference,candidate)
-    return dict(candidate=d['theirs'],reference=d['ours'],difference=d['theirs_minus_ours'],ci95=d['ci95'],families=d['clusters'],targets=d['n'])
+    d=paired_comparison(reference,candidate,clusters=families)
+    return dict(candidate=d['theirs'],reference=d['ours'],difference=d['theirs_minus_ours'],ci95=d['ci95'],families=d['clusters'] if families is not None else None,bootstrap_unit=d['bootstrap_unit'],targets=d['n'])
+
+
+def audited_families(config):
+    """Read the frozen training-family mapping, checking the label-manifest hash."""
+    import hashlib,json
+    from pathlib import Path
+    raw=Path(config['label_manifest']).read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=config['label_manifest_sha256']:
+        raise ValueError('label manifest changed before analysis')
+    rows=json.loads(raw)['config']['targets']
+    families={r['id']:r['family'] for r in rows}
+    if len(families)!=len(rows) or any(not f for f in families.values()):
+        raise ValueError('missing or duplicate family metadata')
+    return families
 
 
 def bridge_posterior(latents, clusters, chosen, noise, time):

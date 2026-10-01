@@ -4,6 +4,8 @@
   "guidance_sensitivity": 2,
   "primary_contact_threshold_angstrom": 2,
   "strict_contact_threshold_angstrom": 1,
+  "minimum_recall_gain_vs_reference": 0.10,
+  "minimum_validity_delta_vs_initial": -0.01,
   "capacity_evidence": "Aligned or PCA teacher supervision improves training-mode recall versus initialization and reference-only control with positive paired95% family lower bound; mean gain at least0.10 versus reference, valid fraction no more than0.01 below initialization. Report strict-threshold sensitivity and all settings. This is evidence to test generalization, not promotion.",
   "frame_evidence": "Matched aligned-versus-PCA comparison with identical labels, seeds and budgets. Report intervals; no causal conclusion from aligned-versus-reference alone.",
   "if_capacity_learned": "Evaluate held-out development/native tuning before broader training. A successful small-panel fit is not expected to improve generalization directly. Carry successful recipe to broader frozen training data only with matched control and reconstruction checks.",

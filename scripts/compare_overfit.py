@@ -2,7 +2,7 @@
 import argparse,json
 from pathlib import Path
 import numpy as np
-from latentfold.teacher_states import paired_change
+from latentfold.teacher_states import paired_change,audited_families
 
 
 def main():
@@ -11,6 +11,7 @@ def main():
         m=json.loads((path/'manifest.json').read_text());c=dict(m['config']);arm=c.pop('arm');runs[arm]=m;matched.append(c)
         if m['status'] not in ('running','complete') or m['updates']<a.step:raise ValueError('checkpoint not reached')
     if set(runs)!={'reference','aligned_teacher','pca_teacher'} or not all(x==matched[0] for x in matched) or len({m['initial_checkpoint_sha256'] for m in runs.values()})!=1:raise ValueError('unmatched experiments')
+    families=audited_families(matched[0])
     logs=[]
     for m in runs.values():logs.append([{k:r[k] for k in ('step','length','batch','learning_rate','ids_sha256','label_choices_sha256')} for r in m['training'] if r['step']<=a.step])
     if not all(x==logs[0] for x in logs):raise ValueError('training draws differ')
@@ -29,7 +30,21 @@ def main():
         for arm,m in runs.items():
             cand=scores(m,a.step,guidance);key=f'{arm}_cfg{guidance}';d['summaries'][key]={metric:float(np.mean([r[metric] for r in cand.values()])) for metric in metrics};v=d['summaries'][key]
             lines.append(f"| {key} | {v['coverage32']:.5f} | {v['strict_coverage32']:.5f} | {v['valid_fraction']:.5f} | {v['teacher_ca_lddt']:.5f} | {v['reference_ca_lddt']:.5f} | {v['state_total_variation']:.5f} |")
-            for name,other in [('initial',initial[0]),('reference',reference),('pca',scores(runs['pca_teacher'],a.step,guidance))]:d['comparisons'][f'{key}_vs_{name}']={metric:paired_change({i:r[metric] for i,r in cand.items()},{i:r[metric] for i,r in other.items()}) for metric in metrics}
+            for name,other in [('initial',initial[0]),('reference',reference),('pca',scores(runs['pca_teacher'],a.step,guidance))]:d['comparisons'][f'{key}_vs_{name}']={metric:paired_change({i:r[metric] for i,r in cand.items()},{i:r[metric] for i,r in other.items()},families=families) for metric in metrics}
+    decisions=json.loads((Path(__file__).resolve().parents[1]/'configs/overfit_decisions.json').read_text())
+    guidance=decisions['primary_guidance'];d['capacity_checks']={}
+    lines+=['','Paired 95% intervals below resample frozen sequence families and are unadjusted for multiple comparisons. Positive differences favor the named candidate.','','| Candidate / comparator / CFG | Recall difference | 95% interval | Validity difference | 95% interval |','|---|---:|---|---:|---|']
+    for arm in ('aligned_teacher','pca_teacher'):
+        for comparator in ('initial','reference'):
+            key=f'{arm}_cfg{guidance}_vs_{comparator}';c=d['comparisons'][key];r=c['coverage32'];v=c['valid_fraction']
+            lines.append(f"| {arm} / {comparator} / {guidance} | {r['difference']:+.5f} | {r['ci95']} | {v['difference']:+.5f} | {v['ci95']} |")
+        r=d['comparisons'][f'{arm}_cfg{guidance}_vs_reference']['coverage32'];i=d['comparisons'][f'{arm}_cfg{guidance}_vs_initial']
+        checks=dict(recall_gain=r['difference']>=decisions['minimum_recall_gain_vs_reference'],positive_ci_vs_reference=r['ci95'][0]>0,positive_ci_vs_initial=i['coverage32']['ci95'][0]>0,validity_margin=i['valid_fraction']['difference']>=decisions['minimum_validity_delta_vs_initial'])
+        d['capacity_checks'][arm]=dict(checks=checks,passed=all(checks.values()))
+    frame=d['comparisons'][f'aligned_teacher_cfg{guidance}_vs_pca']['coverage32']
+    lines+=['',f"Aligned minus PCA recall at CFG{guidance}: {frame['difference']:+.5f}, paired 95% interval {frame['ci95']}."]
+    for arm,result in d['capacity_checks'].items():lines+=['',f"{arm} capacity screen: {'PASS' if result['passed'] else 'NOT PASSED'}; {result['checks']}."]
+    lines+=['','A screen at an intermediate checkpoint is provisional. Even a final training-capacity pass requires separate development/generalization testing and does not authorize a model-quality claim.']
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 
 if __name__=='__main__':main()

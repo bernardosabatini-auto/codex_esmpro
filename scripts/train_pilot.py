@@ -47,7 +47,10 @@ def train(config,task,out):
         if set(h['train'])!={r['id'] for r in data['records']}:raise ValueError('training coverage changed')
         for meta in data['records']:
             name=meta['id'];g=h['train'][name]
-            record=dict(id=name,sequence=str(g.attrs['sequence']),**{k:torch.from_numpy(g[src][:]) for k,src in [('esm','esm2_emb'),('z','z'),('ca','ca_coords'),('adjacent','adjacent')]})
+            record=dict(id=name,sequence=str(g.attrs['sequence']),**{k:torch.from_numpy(g[src][:]) for k,src in [('esm','esm2_emb'),('z','z'),('ca','ca_coords')]})
+            if 'adjacent' in g:record['adjacent']=torch.from_numpy(g['adjacent'][:])
+            elif task['arm']=='geometry':raise ValueError('geometry training requires verified residue correspondence')
+            else:record['adjacent']=torch.zeros(len(record['sequence'])-1,dtype=torch.bool)
             if hashlib.sha256(record['sequence'].encode()).hexdigest()!=meta['sequence_sha256']:raise ValueError('training sequence mismatch')
             if weights is not None:
                 confidence=g['plddt'][:].astype(np.float32)
@@ -62,6 +65,13 @@ def train(config,task,out):
     model,arch=load_legacy(initial,trusted_pickle=True)
     model.cuda().train();model.checkpoint_blocks=True;model.pair.checkpoint_blocks=True
     decoder=load_proteinae(source/'ProteinAE_v1',source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt').cuda()
+    if config.get('gradient_controls'):
+        from check_training_precision import check
+        report['gradient_controls']=check(model,decoder,records,buckets,flow_config=FlowConfig(**config.get('flow_config',{})),weighted=False)
+        atomic_json(out/'training.json',report)
+        if not all(r['passed'] for r in report['gradient_controls']):
+            report.update(status='failed',error='FP16 actual parameter-gradient controls failed')
+            atomic_json(out/'training.json',report);raise ValueError(report['error'])
     if weights is not None:
         try:
             from check_training_precision import check
@@ -144,6 +154,7 @@ def main():
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('--config',type=Path,required=True)
     p.add_argument('--task',type=int,required=True);p.add_argument('--output',type=Path,required=True)
     a=p.parse_args();config=json.loads(a.config.read_text());task=config['tasks'][a.task]
+    config.update(task.get('overrides',{}))
     a.output.mkdir(parents=True,exist_ok=False)
     report=train(config,task,a.output)
     gc.collect();torch.cuda.empty_cache()

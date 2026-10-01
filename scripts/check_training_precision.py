@@ -1,5 +1,6 @@
 """Four bounded actual-weight gradient checks before confidence-weighted training."""
 import gc
+from dataclasses import replace
 import torch
 from torch.nn import functional as F
 from latentfold.data import collate
@@ -8,21 +9,25 @@ from latentfold.training import objective
 from latentfold.precision import inference_precision
 
 
-def check(model, decoder, records, buckets):
+def check(model, decoder, records, buckets, *, flow_config=None, weighted=True):
     rng = torch.get_rng_state(); cuda_rng = torch.cuda.get_rng_state()
     results = []
-    config = FlowConfig(condition_dropout=0, self_condition_probability=1, time_mean=2, time_std=.1)
+    config = replace(flow_config or FlowConfig(),condition_dropout=0, self_condition_probability=1, time_mean=2, time_std=.1)
     try:
         for bucket, names in sorted(buckets.items()):
             # Fixed data-only choice; stress the strongest confidence downweighting.
-            record = min((records[n] for n in names), key=lambda r: (float(r['residue_weights'].mean()), r['id']))
-            batch = collate([record]); padding = bucket-len(record['sequence'])
+            if weighted:
+                chosen=[min((records[n] for n in names), key=lambda r: (float(r['residue_weights'].mean()), r['id']))]
+            else:
+                ordered=sorted((records[n] for n in names),key=lambda r:(len(r['sequence']),r['id']))
+                chosen=[ordered[0],ordered[-1]]
+            batch = collate(chosen); padding = bucket-batch['mask'].shape[1]
             for k in ('z', 'ca', 'esm'):
                 batch[k] = F.pad(batch[k], (0, 0, 0, padding))
             batch['mask'] = F.pad(batch['mask'], (0, padding))
-            batch['residue_weights'] = F.pad(record['residue_weights'][None], (0, padding))
+            if weighted:batch['residue_weights'] = F.pad(chosen[0]['residue_weights'][None], (0, padding))
             batch = {k:v.cuda() if isinstance(v,torch.Tensor) else v for k,v in batch.items()}
-            control = dict(id=record['id'], bucket=bucket)
+            control = dict(ids=[r['id'] for r in chosen], bucket=bucket)
             for mode in ('fp32', 'fp16'):
                 model.zero_grad(set_to_none=True)
                 gen = torch.Generator(device='cuda').manual_seed(1729)

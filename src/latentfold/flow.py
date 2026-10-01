@@ -70,7 +70,7 @@ def target_noise(ids, lengths, width, *, seed, sample_index=0, stream="flow", de
     return out.to(device)
 
 
-def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, residue_weights=None):
+def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, residue_weights=None, initial_noise=None):
     """One loss, with the effective sample count returned for logging.
 
     Protein weighting is the new default, matching the evaluation's unit of analysis.
@@ -78,6 +78,11 @@ def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, resid
     not an established accuracy improvement. Pair features are computed once.
     """
     validate_batch(esm, mask, z)
+    if initial_noise is not None:
+        if initial_noise.requires_grad or initial_noise.device != z.device or initial_noise.dtype != z.dtype:
+            raise ValueError('paired noise must be fixed and match latent device/dtype')
+        validate_batch(esm, mask, initial_noise)
+        initial_noise = initial_noise.repeat_interleave(config.repeats, 0)
     if residue_weights is not None:
         if config.reduction != 'protein' or residue_weights.shape != mask.shape or residue_weights.requires_grad:
             raise ValueError('fixed residue weights require matching shape and protein reduction')
@@ -91,6 +96,9 @@ def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, resid
     b = len(z)
     rnd = lambda shape: torch.rand(shape, device=z.device, generator=generator)
     x0 = torch.randn(z.shape, device=z.device, generator=generator)
+    # Consume the same draw in paired and independent arms to preserve time/dropout RNG.
+    if initial_noise is not None:
+        x0 = initial_noise
     t = torch.sigmoid(config.time_mean + config.time_std * torch.randn(b, device=z.device, generator=generator))
     if config.uniform_fraction:
         t = torch.where(rnd((b,)) < config.uniform_fraction, rnd((b,)), t)

@@ -1,0 +1,19 @@
+{
+  "purpose": "Learn a shorter sampler separately from pose-label experiments",
+  "families": 512,
+  "samples": 16,
+  "teacher": "Inherited student 25-step CFG2, layer80, FP32, final layer normalization",
+  "arms": [
+    "reflow_paired",
+    "reflow_independent"
+  ],
+  "coupling": "Identical endpoint draws; paired arm uses recorded input noise, independent arm draws fresh Gaussian noise. Both consume identical time/dropout RNG.",
+  "flow": {
+    "condition_dropout": 0,
+    "uniform_fraction": 0.5
+  },
+  "training": "Matched initialization, seed, optimizer and 2000 updates; evaluate 500 and 2000",
+  "evaluation": "5 and 10 steps, CFG1; decoded quality, validity and frozen ensemble coverage against original 25-step CFG2 baseline",
+  "promotion": "Require preserved quality and coverage plus measured >=2x K32 speedup over inherited student; report direct teacher latency",
+  "test": "Reserved confirmation and original test remain unscored"
+}

@@ -1,0 +1,21 @@
+{
+  "purpose": "Confirm a useful sequence-to-selected-backbone speed/accuracy tradeoff on the same H200",
+  "trigger": "Combined FP16/20-step/conditioning-reuse run 49544240 passed its full 626-target development screen: 2.2806x collection throughput versus the earlier FP32 reference, 55.2 GiB, TM nearly unchanged and local-accuracy/geometry changes within declared margins.",
+  "reference": "Full FP32 ESMC, head and decoder; 25 Euler steps, CFG 2, no cross-sample conditioning reuse; select the CA-lDDT medoid of three generated structures",
+  "candidate": "FP16 final-layer ESMC, FP16 MLP head with other operations and decoder FP32; 20 steps, CFG 2, static conditioning reused across samples; same three-sample selector",
+  "inputs": "Same 626 development sequences, target/sample noise, checkpoints, 126/63/30/30 batches and fixed-correspondence native scorer. Sequence-only mask/noise construction must match the older cached-batch constructor exactly. Cached embeddings are not used in inference.",
+  "schedule": "Three complete paired repeats on each shard GPU in fixed order reference/candidate, candidate/reference, reference/candidate. Both ESMC precisions stay resident, with a shared frozen head and decoder. Controls and tail-batch warmups precede timing. Record setup and allocation costs separately.",
+  "timing": "Time tokenization, fresh ESMC, deterministic input/noise construction, head, decoder, coordinate transfer and CPU medoid selection in every batch. Exclude pre-bucketing, model loading, validation, scoring and artifact writes. No intermediate prediction or embedding cache is reused across repeats.",
+  "accuracy": "Retain and score all first-repeat predictions; freeze native-free choices before submitting native scoring. Evaluate selected structures and three-sample means separately. Repeated timing passes are not extra statistical targets or inference seeds. Record prediction fingerprints and require identical repeated outputs/choices for the speed gate.",
+  "gate": "Every one of the three paired timing ratios must be at least 2x. Selected-structure TM and CA lDDT paired sequence-cluster lower bounds must be at least -0.005; geometry upper bounds at most +0.001. All 16 original batch/padding controls must pass unchanged and exact score/choice coverage is required.",
+  "memory": "Two resident ESMC copies make this a paired timing experiment; its memory peak is not the standalone deployment footprint. Keep the 85% allocator cap and report resident parameters and measured peaks explicitly. No fallback to smaller batches within this attempt.",
+  "resources": {
+    "gpus": 4,
+    "gpu_type": "H200",
+    "walltime_minutes": 22,
+    "work_cap_seconds": 1200,
+    "shards": 4
+  },
+  "final_test": "The 34 locked structures remain unscored; these are development results, not independent accuracy confirmation or an optimized throughput comparison with ESMFold2",
+  "amendment_before_submission": "2026-10-01 12:57 UTC: user resumed with 33 minutes left in the original window. Use four independent one-H200 shards, deterministic round-robin within each length bucket after sorting target IDs. All 626 targets are retained exactly once. Both variants and all three alternating repeats run on the same GPU for each shard. Aggregate each repeat by summing measured reference and candidate seconds over shards; also require every shard/repeat ratio >=2 for the speed gate. Queue time and parallel walltime are not speedup measures. Per-shard numerical controls precede timing. No outcomes from this study have been observed."
+}

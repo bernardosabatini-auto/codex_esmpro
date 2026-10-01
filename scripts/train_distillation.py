@@ -8,6 +8,7 @@ from latentfold.decoder import load_proteinae
 from latentfold.flow import FlowConfig,SampleConfig,flow_loss,sample,target_noise
 from latentfold.precision import inference_precision
 from latentfold.metrics import ca_metrics
+from latentfold.ensemble_metrics import backbone_geometry
 from profile_gpu import Telemetry,atomic_json
 from predict import file_identity
 
@@ -91,8 +92,8 @@ def main():
                             n=records[chunk[0]]['length'];single=sample(model,esm[:1,:n],mask[:1,:n],SampleConfig(steps=25,guidance=2),noise=noise[:1,:n]);alone=decoder(single,mask[:1,:n],noise=dn[:1,:4*n])[0].cpu().numpy();control=ca_metrics(bb[0,:n,1],alone);m['controls'].append(dict(length=length,**control))
                             if control['ca_rmsd']>.2 or control['ca_lddt']<.99:raise ValueError('evaluation batching control failed')
                         for i,ident in enumerate(chunk):
-                            r=records[ident];pred=bb[3*i:3*i+3,:r['length']];out.create_dataset(ident,data=pred)
-                            for k,x in enumerate(pred):m['scores'].append(dict(step=step,target_id=ident,sample=k,**ca_metrics(x[:,1],r['ca'])))
+                            r=records[ident];pred=bb[3*i:3*i+3,:r['length']];out.create_dataset(ident,data=pred);geometry=backbone_geometry(pred)
+                            for k,x in enumerate(pred):m['scores'].append(dict(step=step,target_id=ident,sample=k,**ca_metrics(x[:,1],r['ca']),**{key:float(value[k]) for key,value in geometry.items()}))
             model.load_state_dict(raw);model.train();del raw
             atomic_json(a.output/'manifest.json',m);print('evaluated',step,flush=True)
         if not c.get('profile_only'):evaluate(0)

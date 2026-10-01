@@ -3,6 +3,7 @@ import argparse,hashlib,json,time
 from pathlib import Path
 import h5py,numpy as np,torch
 from latentfold.checkpoints import load_legacy
+from latentfold.conditioning import ResidualConditioner
 from latentfold.decoder import load_proteinae
 from latentfold.embedding import FinalESMC
 from latentfold.flow import SampleConfig,sample,target_noise
@@ -54,12 +55,23 @@ def main():
         m['checkpoint']=file_identity(ckpt,hash_contents=True);m['decoder_checkpoint']=file_identity(ae,hash_contents=True)
         if c.get('checkpoint') and m['checkpoint']['sha256']!=c['checkpoint_sha256']:raise ValueError('changed trained checkpoint')
         model,_=load_legacy(ckpt,trusted_pickle=True);model.cuda().eval().requires_grad_(False)
+        conditioner=None
+        if c.get('conditioner'):
+            adapter=c['conditioner'];identity=file_identity(Path(adapter['checkpoint']),hash_contents=True)
+            if identity['sha256']!=adapter['sha256']:raise ValueError('changed conditioner weights')
+            conditioner=ResidualConditioner(adapter['arm'],width=adapter['width'],bound=adapter['bound']).cuda().eval().requires_grad_(False)
+            conditioner.load_state_dict(torch.load(adapter['checkpoint'],map_location='cuda',weights_only=True),strict=True);m['conditioner']=identity
         decoder=load_proteinae(a.source/'ProteinAE_v1',ae,steps=3).cuda().eval()
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'embeddings.h5') as cache,h5py.File(a.output/'predictions.h5','x') as output:
             for index,row in enumerate(rows):
                 if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('experiment work cap')
                 ident=row['query_id'];n=row['length'];length=next(x for x in (128,256,384,512) if n<=x)
                 esm=torch.zeros(1,length,2560,device='cuda');esm[:,:n]=torch.from_numpy(cache[ident]['80'][:]).cuda();mask=torch.arange(length,device='cuda')[None]<n
+                if conditioner is not None:
+                    layers={80:esm}
+                    for layer in (20,40,60):
+                        layers[layer]=torch.zeros_like(esm);layers[layer][:,:n]=torch.from_numpy(cache[ident][str(layer)][:]).cuda()
+                    esm=conditioner(layers,mask)
                 noise=torch.zeros(32,length,8,device='cuda');dn=torch.zeros(32,4*length,3,device='cuda')
                 for k in range(32):
                     noise[k,:n]=target_noise([ident],[n],8,seed=c['seed'],sample_index=k,device='cuda')[0]

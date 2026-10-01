@@ -1,6 +1,6 @@
 # Ensemble research: evidence and next experiments
 
-The student has useful latent-driven diversity, but no new training intervention has yet improved it. The strongest actionable finding is that ProteinAE latents depend strongly on rigid rotation. We are testing whether removing that nuisance variation makes sequence-conditioned learning easier.
+The student has useful latent-driven diversity, but no new training intervention has yet demonstrated a statistically supported improvement. The strongest actionable finding is that ProteinAE latents depend strongly on rigid rotation. We are testing whether removing that nuisance variation makes sequence-conditioned learning easier.
 
 ## Results
 
@@ -10,7 +10,7 @@ The student has useful latent-driven diversity, but no new training intervention
 - Teacher versus student at thirty-two samples: +15.625 points, interval [6.25,28.125]. Three reference cases include up to two substitutions in one experimental construct; the exact-sequence thirteen-case sensitivity remains positive: +19.23 points, interval [7.69,30.77]. Reference environmental conditions also differ.
 - Teacher 25/50/100 diffusion-step pilot found equal multi-state coverage on its four eligible proteins. Fifty steps is retained; a longer trajectory is not justified by this small pilot. Eight independently sampled trunks also did not add coverage on that pilot.
 - Layer 60 beats layer 80 in a matched linear latent probe on 64 reserved probe families: CA lDDT 0.2418 versus 0.1792, paired gain 0.06256, interval [0.05223,0.07293]. Absolute quality is poor; this is evidence of accessible signal, not a usable structure predictor.
-- The final-layer bounded residual conditioning control slightly worsened mean CA lDDT, 0.78384 to 0.78190 after 500 updates. Training SM instruction issue was 59.26%, whole capture 55.72%, peak reserved memory about 52 GiB. Matched layer-60 and learned-mixture arms are submitted.
+- The final-layer bounded residual conditioning control slightly worsened mean CA lDDT, 0.78384 to 0.78190 after 500 updates. Training SM instruction issue was 59.26%, whole capture 55.72%, peak reserved memory about 52 GiB. Layer 60 finishes at 0.78663 (+0.00279; family interval approximately [-0.00078,0.00771]), while the mixture ends at 0.78385. The layer-60 effect is uncertain; its ensemble evaluation is next, before replication.
 - Sixteen training backbones under eight proper rotations: raw latent RMSE 0.98927, despite decoded CA RMSD 0.3361 A. A first-residue N/CA/C frame reduces latent RMSE to 0.00000198, with reconstruction RMSD 0.3516 A. Translation alone is effectively removed already. Canonicalization preserves internal geometry and chirality; its effect on learned accuracy remains untested.
 
 ## Consequent experiments
@@ -30,3 +30,7 @@ The earlier teacher path incorrectly activated an untrained MSA branch. It is qu
 Matched end-to-end ensemble timing is still needed. Existing teacher sampling and student flow timings cover different stages, so they do not establish a student speed advantage. Measure sequence-to-ensemble cost, first-sample latency and marginal sample cost before claiming efficiency.
 
 At most eight registered project GPUs running plus pending. Each new workload is profiled on one H200. Only registered project jobs are queried or managed. Completion watchers run every minute, with automatic result summaries. Code and written reports are synchronized to Git; generated data and weights remain excluded.
+
+The first teacher-label shard completed 128 targets and 2,048 conformations, 2,041 coarse-valid. Canonical reference reconstruction averaged 0.1896 A CA RMSD; teacher sample zero averaged 0.1744 A. Peak reserve was 82.4 GiB, SM instruction issue 58.89% during generation and 50.44% across capture. Cluster balancing changes the conditional distribution for 43/128 targets (mean total variation 0.107 across all targets). Remaining shards use the same validated recipe.
+
+The full-head FP32 capacity pilot completed 64 updates in 124.0 seconds, peak65.0 GiB, training SM instruction issue60.21%. Whole short capture was40.68% because initialization dominates a short profile. Four 2,000-update arms will use100-minute limits and a95-minute work guard, with evaluation at0/500/2000 and explicit coarse-geometry metrics.

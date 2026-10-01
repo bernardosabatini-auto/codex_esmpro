@@ -21,7 +21,7 @@ def main():
         covered|=ids;shards.append(dict(manifest=str(path.resolve()),manifest_sha256=sha(path),labels_sha256=sha(run/'labels.h5')))
     if len(covered)!=(128 if a.profile_only else 512):raise ValueError('wrong number of training labels')
     batches={'128':32,'256':16,'384':8,'512':8}
-    config=dict(selection=base['selection'],selection_sha256=base['selection_sha256'],embedding_cache=base['embedding_cache'],label_shards=shards,seed=2026100131,evaluation_seed=base['evaluation_seed'],batches=batches,learning_rate=protocol['optimizer']['learning_rate'],ema_decay=protocol['optimizer']['ema_decay'],warmup_updates=protocol['warmup_updates'],updates=64 if a.profile_only else protocol['updates'],evaluation_steps=[64] if a.profile_only else protocol['evaluate_at_updates'][1:],work_cap_seconds=780 if a.profile_only else 10500,profile_only=a.profile_only,protocol_sha256=sha('configs/distillation_protocol.json'))
+    config=dict(selection=base['selection'],selection_sha256=base['selection_sha256'],embedding_cache=base['embedding_cache'],label_shards=shards,seed=2026100131,evaluation_seed=base['evaluation_seed'],batches=batches,learning_rate=protocol['optimizer']['learning_rate'],ema_decay=protocol['optimizer']['ema_decay'],warmup_updates=protocol['warmup_updates'],updates=64 if a.profile_only else protocol['updates'],evaluation_steps=[64] if a.profile_only else protocol['evaluate_at_updates'][1:],work_cap_seconds=780 if a.profile_only else 5700,profile_only=a.profile_only,protocol_sha256=sha('configs/distillation_protocol.json'))
     if not a.profile_only:
         if a.profile_result is None:raise ValueError('successful capacity profile required')
         result=json.loads(a.profile_result.read_text())

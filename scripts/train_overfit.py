@@ -97,6 +97,7 @@ def main():
                             state=info['state'];times=state['t'].detach();target_velocity=(z-state['x'].detach())/(1-times[:,None,None]);per_protein=(((state['velocity'].detach()-target_velocity)**2).mean(-1)*mask).sum(1)/mask.sum(1)
                             bins={f'{lo}_{hi}':dict(count=int(((times>=lo)&(times<hi)).sum()),mse=float(per_protein[(times>=lo)&(times<hi)].mean()) if ((times>=lo)&(times<hi)).any() else None) for lo,hi in ((0.,.1),(.1,.25),(.25,.5),(.5,.75),(.75,.9),(.9,1.))}
                             m['training'].append(dict(time_bins=bins,step=step+1,length=length,batch=count,flow_loss=float(loss.detach()),gradient_norm=float(norm),learning_rate=lr,ids_sha256=hashlib.sha256('\n'.join(ids).encode()).hexdigest(),label_choices_sha256=hashlib.sha256(np.asarray(choices,dtype='int64').tobytes()).hexdigest()));atomic_json(a.output/'manifest.json',m)
+                            del state,times,target_velocity,per_protein,bins
                         del mask,z,esm,loss,info
                     torch.cuda.synchronize();seconds=time.monotonic()-tick
                 finally:torch.cuda.nvtx.range_pop()

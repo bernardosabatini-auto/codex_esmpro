@@ -63,6 +63,15 @@ def train(config,task,out):
     if sha(initial)!=config['initial_checkpoint_sha256'] or sha(decoder_path)!=config['decoder_checkpoint_sha256']:
         raise ValueError('source checkpoint changed since the strict FP32 baseline')
     model,arch=load_legacy(initial,trusted_pickle=True)
+    continuation=config.get('optimizer_state_experiment');saved=None;saved_ema=None
+    if continuation is not None:
+        if continuation not in ('fresh','restored') or task['arm']!='flow' or tuple(config['optimizer_betas'])!=(.9,.95):
+            raise ValueError('invalid saved-state continuation protocol')
+        from latentfold.continuation import validate_saved_state
+        saved=torch.load(initial,map_location='cpu',weights_only=False,mmap=True)
+        raw,saved_ema=validate_saved_state(model,saved);model.load_state_dict(raw,strict=True)
+        report['initialization']=dict(model_weights='saved_raw',ema_weights='saved_ema',optimizer_state=continuation,
+            optimizer_initial_step=int(saved['step']) if continuation=='restored' else 0,historical_step=int(saved['step']),exact_resume=False)
     model.cuda().train();model.checkpoint_blocks=True;model.pair.checkpoint_blocks=True
     decoder=load_proteinae(source/'ProteinAE_v1',source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt').cuda()
     if config.get('gradient_controls'):
@@ -85,7 +94,20 @@ def train(config,task,out):
     # Keep previous pilots reproducible while making recovery ablations explicit.
     optimizer=torch.optim.AdamW(model.parameters(),lr=config['learning_rate'],weight_decay=.01,
                                betas=tuple(config.get('optimizer_betas',(.9,.999))),foreach=False)
-    ema={k:v.detach().clone() for k,v in model.state_dict().items()}
+    if continuation=='restored':
+        from latentfold.continuation import restore_adam_state
+        restore_adam_state(optimizer,saved['opt'])
+        counters=[int(v['step']) for v in optimizer.state.values()]
+        if len(counters)!=len(list(model.parameters())) or set(counters)!={int(saved['step'])}:
+            raise ValueError('restored optimizer counters differ')
+        if any(v['step'].device.type!='cpu' for v in optimizer.state.values()):
+            raise ValueError('single-tensor optimizer requires host step counters in this protocol')
+        report['initialization']['observed_optimizer_steps']=sorted(set(counters))
+    elif continuation=='fresh':
+        if optimizer.state:raise ValueError('fresh optimizer unexpectedly has history')
+        report['initialization']['observed_optimizer_steps']=[]
+    ema={k:v.detach().to('cuda').clone() for k,v in (saved_ema if continuation else model.state_dict()).items()}
+    if continuation is not None:del saved,saved_ema,raw;gc.collect()
     flow_config=FlowConfig(**config.get('flow_config',{}));flow_rng=torch.Generator(device='cuda').manual_seed(task['seed'])
     order_rng=np.random.default_rng(task['seed']);queues={k:[] for k in buckets}
     weight=config['geometry_weight'] if task['arm']=='geometry' else 0.

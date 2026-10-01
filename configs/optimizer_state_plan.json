@@ -1,0 +1,12 @@
+{
+  "purpose": "Test whether discarding the inherited AdamW history contributes to continued-training regression",
+  "trigger": "All three recovery screens failed. Saved raw/EMA weights and all 469 moment tensors passed the CPU audit; raw weights alone scored worse than final EMA.",
+  "comparison": "Two new matched seed-7919 runs. Both start from saved raw model weights and saved EMA, with beta=(0.9,0.95), per-protein latent loss, the original 1024-protein pool, 500 updates, pilot LR 1e-5 with 100-step warmup/cosine decay and EMA decay 0.99. Both use unchanged single-tensor AdamW and all-block recomputation. Only restored versus fresh optimizer history differs.",
+  "treatment": "Restore exp_avg, exp_avg_sq and per-parameter step counters (63235). Preserve the new experiment's LR schedule and optimizer kernel. The comparison isolates complete optimizer history, not moments independently of their bias-correction counters.",
+  "beta_rationale": "Both new arms use the original beta2=0.95 so historical moments are interpreted with their original decay. These new arms do not reuse the EMA-initialized pilot as their causal control.",
+  "controls": "Revalidate saved ordering, coverage, shapes, finiteness and counters; require four actual FP16-versus-FP32 parameter-gradient controls in each run. Require identical logged input IDs, flow RNG, batch shapes, updates and all other settings between arms. Full strict-FP32 evaluation and unchanged shape controls on 626 targets with three samples, 25 steps, CFG 2.",
+  "followup": "Replicate this pair for seeds 7920/7921 only if restored history improves TM at least 0.002 over fresh history and reaches untouched final-EMA TM 0.5682384930777423, with complete valid evaluation. Report lDDT and geometry separately. No accuracy promotion until the existing +0.01, uncertainty and replication gates and independent confirmation are met.",
+  "limitations": "This resets the original LR schedule and data stream; missing CUDA RNG prevents exact replay. It tests a bounded state-restored continuation, not an exact resumption or the general benefit of longer training.",
+  "resources": {"gpus": 2, "gpu_type": "H200", "walltime_minutes_each": 60},
+  "final_test": "Unscored; no earlier-layer ESM work"
+}

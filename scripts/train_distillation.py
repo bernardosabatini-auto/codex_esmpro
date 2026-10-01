@@ -24,6 +24,9 @@ def main():
     try:
         if c['arm'] not in ('raw_reference','reference','empirical','balanced'):raise ValueError('invalid distribution')
         if c['updates']<1 or c['evaluation_steps'][-1]!=c['updates']:raise ValueError('invalid update protocol')
+        if not c.get('profile_only'):
+            audit=Path(c['audit_result'])
+            if hashlib.sha256(audit.read_bytes()).hexdigest()!=c['audit_result_sha256'] or not json.loads(audit.read_text())['training_gate_passed'] or json.loads(audit.read_text())['label_shards']!=c['label_shards']:raise ValueError('label audit gate failed')
         records={};buckets={k:[] for k in (128,256,384,512)}
         with h5py.File(c['embedding_cache']) as cache,h5py.File(selection['dataset']) as source:
             for split in ('train','tuning'):

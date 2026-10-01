@@ -19,7 +19,7 @@ def main():
         path=Path(m['config']['panel'])
         if hashlib.sha256(path.read_bytes()).hexdigest()!=m['config']['panel_sha256']:raise ValueError('changed frozen panel')
         rows={r['query_id']:r for r in json.loads(path.read_text())['development']}
-        if len(m['targets'])!=48 or len(m['controls'])!=56:raise ValueError('incomplete predictions/controls')
+        if len(m['targets'])!=48 or len(m['controls'])!=48+len(m['config']['guidance_controls']):raise ValueError('incomplete predictions/controls')
         with h5py.File(run/'predictions.h5') as h:
             if set(h)!=set(rows):raise ValueError('incorrect target coverage')
             for ident,g in h.items():
@@ -39,7 +39,7 @@ def main():
         except Exception as error:result['hardware']=dict(status='unavailable',error=str(error))
     else:result['error']=m.get('error','Incomplete run')
     a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n')
-    lines=['# Sequence-conditioned ensemble diagnostic','',f"Status: {result['status']}.",'',result['scope'],'','48 frozen development proteins; 32 samples per noise arm; CFG 2, plus CFG 1 on eight preselected proteins. Strict FP32, 25 latent-flow steps and three decoder steps. Confirmation targets remain unscored.','', '| Noise arm | Mean pairwise CA RMSD (A) | Peptide outlier fraction |','|---|---:|---:|']
+    lines=['# Sequence-conditioned ensemble diagnostic','',f"Status: {result['status']}.",'',result['scope'],'',f"48 frozen development proteins; 32 samples per noise arm; CFG2 with {len(m.get('config',{}).get('guidance_controls',[]))} CFG1 controls. Strict FP32, {m.get('config',{}).get('flow_steps',25)} latent-flow steps and three decoder steps. Confirmation targets remain unscored.",'', '| Noise arm | Mean pairwise CA RMSD (A) | Peptide outlier fraction |','|---|---:|---:|']
     for arm,row in result.get('summaries',{}).items():lines.append(f"| {arm} | {row['pairwise_ca_rmsd']:.4f} | {row['peptide_outlier_fraction']:.4f} |")
     if 'error' in result:lines+=['',result['error']]
     lines+=['','Reference-state and MD-distribution evaluations are separate; this report alone cannot justify teacher distillation or model promotion.']

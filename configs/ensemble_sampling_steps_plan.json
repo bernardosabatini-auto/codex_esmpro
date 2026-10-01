@@ -1,0 +1,11 @@
+{
+  "motivation": "Matched same-H200 timing found the inherited student slower than teacher for ensembles:7.30 vs3.86 seconds at32 structures, despite faster single-structure prediction.",
+  "screen": "Inherited student at5/10/20 versus25 flow steps; strictFP32, CFG2, decoder3,32 identical latent seeds and fixed decoder noise per protein",
+  "data": "Same frozen48 ensemble development families; no confirmation or independent test",
+  "conditioning": "Frozen final ESMC layer, identical cached embeddings; no layer60 adapter",
+  "quality": "Use existing reference-state coverage, coarse validity, nearest-reference mean CA lDDT, MD projected W1 and NMR dispersion; retain all samples",
+  "candidate_gate": "No loss of state coverage@32, paired family CA-lDDT noninferiority lower bound above-0.005, coarse validity no more than0.01 below25-step baseline",
+  "speed": "Generation-only timings exclude cached embedding extraction; repeat matched sequence-to-backbone latency for an eligible candidate before claiming a speed advantage",
+  "interaction": "This is an inherited-model sampling screen while four matched training arms run. Revalidate sampling settings on any promoted trained checkpoint.",
+  "resources": "One H200 per short screen, at most eight project GPUs running plus pending"
+}

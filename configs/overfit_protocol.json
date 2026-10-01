@@ -1,0 +1,19 @@
+{
+  "purpose": "Can a conditioned flow memorize a small teacher ensemble, and does independent PCA prevent it?",
+  "deadline_utc": "2026-10-02T15:00:00+00:00",
+  "selection": "32 members of frozen512 training corpus, eight per length bucket; rank by teacher contact-state count, then mean contact-feature distance, then ID. No student predictions or locked-test outcomes used.",
+  "state_definition": "Shared mean-confidence >=0.7 core; all residues if fewer than max(32,ceil(L/2)); separation>3, teacher distance range>=2A and min<=12A; deterministic lexicographic subsample at most4096 contacts. Connected components at feature RMSD<=1A; only coarse-valid source teachers define states.",
+  "evaluation": "Fresh flow seeds;32 samples per training protein at0/500/2000; CFG1 and CFG2 both reported. Valid state hit requires featureRMSE<=2A, nearest-contact teacher CA-lDDT>=0.8, coarse-valid geometry. No native filtering of generated samples. This measures teacher-mode recall, not biological-state coverage.",
+  "arms": ["reference", "aligned_teacher", "pca_teacher"],
+  "teacher_distribution": "Uniform over the same valid teacher conformations, no reference mixture. Reference control draws only bitwise cached labels. Pure-teacher supervision deliberately tests capacity before repeating mixed-data optimization.",
+  "batching": "32/16/8/8 for length128/256/384/512, permutation cycles over eight proteins per bucket; repeated IDs have independent training noise and label draws",
+  "updates": 2000,
+  "evaluation_steps": [500,2000],
+  "learning_rate": 0.00003,
+  "ema_decay": 0.99,
+  "warmup_updates": 100,
+  "seed": 2026100161,
+  "evaluation_seed": 2026100162,
+  "precision": "strict FP32",
+  "decision": "First test training-set valid mode recall versus initialization and reference control. If it improves, test generalization before promotion; otherwise diagnose optimization, conditioning and decoded geometry. All settings retained, no test scoring."
+}

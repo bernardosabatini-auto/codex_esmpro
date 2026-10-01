@@ -145,7 +145,7 @@ def tick_local(root, state, config):
             data.update(status='failed',error=f"CPU unit stopped before completion: {fields}")
             write_json(status_path,data)
         action=job['action']
-        if action not in ('summarize_holdout','summarize_training_data','summarize_recovery_data'):raise ValueError('unrecognized local action')
+        if action not in ('summarize_holdout','summarize_training_data','summarize_recovery_data','summarize_nmr_controls'):raise ValueError('unrecognized local action')
         report=root/'reports'/job['report']
         command=[config['python'],str(root/'scripts'/f'{action}.py'),'--runs',str(status_path.parent),'--output',str(report)]
         env=dict(os.environ,CUDA_VISIBLE_DEVICES='',OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1')

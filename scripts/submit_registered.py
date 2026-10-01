@@ -11,7 +11,7 @@ def main():
  p.add_argument('--minutes',type=int,required=True);p.add_argument('--action',required=True)
  a=p.parse_args();root=Path(__file__).resolve().parents[1]
  if not 0<=a.gpus_per_task<=8 or not 1<=a.tasks<=8 or a.gpus_per_task*a.tasks>8:raise ValueError('invalid resource request')
- if a.action not in ('summarize_geometry','summarize_training_profile','summarize_holdout','summarize_pilot','summarize_external','summarize_quality','summarize_online','summarize_recovery'):raise ValueError('unsupported completion action')
+ if a.action not in ('summarize_geometry','summarize_training_profile','summarize_holdout','summarize_pilot','summarize_external','summarize_quality','summarize_online','summarize_recovery','summarize_checkpoint'):raise ValueError('unsupported completion action')
  script=(root/a.script).resolve()
  if script.parent!=root/'slurm':raise ValueError('script must be in project slurm folder')
  with (root/'runs/submit.lock').open('w') as lock:

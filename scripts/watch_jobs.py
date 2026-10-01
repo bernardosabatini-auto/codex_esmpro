@@ -86,12 +86,12 @@ def notify(root, state, key, message, config):
 
 def followup(root, job, config):
     action = job.get('completion_action')
-    if action not in ('summarize_comparison', 'summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout', 'summarize_pilot', 'summarize_external', 'summarize_quality', 'summarize_online', 'summarize_recovery'):
+    if action not in ('summarize_comparison', 'summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout', 'summarize_pilot', 'summarize_external', 'summarize_quality', 'summarize_online', 'summarize_recovery','summarize_checkpoint'):
         raise ValueError('unrecognized completion action')
     ids = job_ids(job)
     if action == 'summarize_comparison' and len(ids) != 2:
         raise ValueError('comparison follow-up requires two registered tasks')
-    prefix = {'summarize_hybrid': 'hybrid', 'summarize_comparison': 'comparison', 'summarize_geometry': 'geometry', 'summarize_training_profile': 'training_profile', 'summarize_holdout': 'holdout', 'summarize_pilot': 'pilot', 'summarize_external': 'external', 'summarize_quality': 'quality', 'summarize_online': 'online', 'summarize_recovery': 'recovery'}[action]
+    prefix = {'summarize_hybrid': 'hybrid', 'summarize_comparison': 'comparison', 'summarize_geometry': 'geometry', 'summarize_training_profile': 'training_profile', 'summarize_holdout': 'holdout', 'summarize_pilot': 'pilot', 'summarize_external': 'external', 'summarize_quality': 'quality', 'summarize_online': 'online', 'summarize_recovery': 'recovery', 'summarize_checkpoint': 'checkpoint'}[action]
     report = root/'reports'/f"{prefix}_{job['id']}"
     command = [config['python'], str(root/'scripts'/f'{action}.py'), '--runs',
                *[str(root/'runs'/f'{prefix}_{i}') for i in ids], '--output', str(report)]
@@ -181,7 +181,7 @@ def tick(root, config, query=scheduler_states, analyze=followup):
         if not all(rows[i]['state'] in TERMINAL for i in ids):
             continue
         success = all(rows[i]['state'] == 'COMPLETED' and rows[i]['exit_code'] == '0:0' for i in ids)
-        if not success and job.get('completion_action') not in ('summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout', 'summarize_pilot', 'summarize_external', 'summarize_quality', 'summarize_online', 'summarize_recovery'):
+        if not success and job.get('completion_action') not in ('summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout', 'summarize_pilot', 'summarize_external', 'summarize_quality', 'summarize_online', 'summarize_recovery','summarize_checkpoint'):
             entry.update(handled=True, outcome='job_failed', handled_at=stamp())
         elif not job.get('completion_action'):
             entry.update(handled=True, outcome='completed', handled_at=stamp())

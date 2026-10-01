@@ -28,6 +28,8 @@ def main():
   window=root/'runs/autonomous_20261001.json';deadline=None
   if window.exists():
    execution=json.loads(window.read_text())
+   if execution['status']!='active':
+    raise RuntimeError('autonomous execution window is not active; refusing late submission')
    if execution['status']=='active':
     deadline=datetime.datetime.fromisoformat(execution['deadline'].replace('Z','+00:00'))
     if now+datetime.timedelta(minutes=a.minutes,seconds=120)>deadline:

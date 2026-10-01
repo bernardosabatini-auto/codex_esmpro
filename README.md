@@ -305,3 +305,11 @@ After running and summarizing profiling, regenerate the local comparison inputs:
 "$PYTHON" scripts/prepare_comparison.py --source "$SOURCE" \
   --profile reports/h200_profile.json --output configs/comparison626.json
 ```
+
+### October 1 execution-window close
+
+All registered GPU jobs finished; the 09:30 EDT deadline closed with no cancellations needed. The combined inference screen reached 2.2806x throughput and 55.2 GiB reserved, with development accuracy changes inside its declared margins. A repeated comparison on the same H200, including native-free sample selection, remains necessary.
+
+The four-shard benchmark and analysis are implemented in `scripts/benchmark_matched_online.py` and `scripts/summarize_matched_online.py`, with the frozen protocol in `configs/matched_online_plan.json`. **This experiment was not submitted or run.** The sandbox blocked the required systemd watcher check; the escalated submission did not return success before the deadline. The existing 50 CPU tests and two new timing/selection validation tests passed. No GPU performance result is implied by those tests.
+
+The completed training trace assigns roughly 69–72% of summed kernel duration to backward/clip. Copies, elementwise operations and layer normalization dominate long-sequence kernels; AdamW contributes less than 1%. These are profiling observations, not proof of a particular source-level optimization. The 34 independent-test structures remain unscored.

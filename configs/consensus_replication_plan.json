@@ -1,0 +1,22 @@
+{
+  "purpose": "Replicate the frozen three-sample medoid using two new inference-noise seeds after the CPU-only screen passed its follow-up gate",
+  "screen_report": "reports/consensus_final_ema.md",
+  "screen_tm_gain": 0.005427161874334396,
+  "screen_ci95": [
+    0.003580402607988014,
+    0.007337033623539502
+  ],
+  "inference_seeds": [
+    2026100101,
+    2026100102
+  ],
+  "checkpoint_sha256": "241ec496e222fd52a43d88e4eede1b1885027ab70d8f796fcb4a5197800985c0",
+  "selector_protocol_sha256": "c3f330e47985ee4d1eb41e3405f56fc6e91d2be73c67bdc620fd855567abac24",
+  "sampling": "25 steps, CFG 2, three samples per target, strict FP32, all 626 development targets",
+  "resources": {
+    "gpus": 2,
+    "minutes_cap_per_gpu": 20
+  },
+  "replication_success": "Positive TM gain over sample-mean expectation in each new seed; pooled replication-only cluster CI above zero; no lDDT or geometry regression. Report first-sample comparison too. These are inference-noise replications, not training replications or independent targets.",
+  "promotion": "Unchanged practical +0.01 accuracy gate and independent confirmation. Keep final test unscored until a recipe qualifies."
+}

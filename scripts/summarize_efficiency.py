@@ -11,7 +11,8 @@ def main():
     for row in d['rows']:
         if row['status']!='complete':lines.append(f"| {row['length']} | {row['policy']} | {row['batch']} | out of memory | — | — |");continue
         try:
-            row['hardware']=hardware(Path(str(run)+'_nsight.sqlite'),row['batches'],prefix='checkpoint_profile::')
+            prefix=f"checkpoint_profile::{row['length']}::{row['policy']}::{row['batch']}::"
+            row['hardware']=hardware(Path(str(run)+'_nsight.sqlite'),row['batches'],prefix=prefix)
             issue=f"{row['hardware']['collection_mean_percent']['SM Issue [Throughput %]']:.1f}"
         except Exception as error:row['hardware']=dict(status='unavailable',error=str(error));issue='unavailable'
         lines.append(f"| {row['length']} | {row['policy']} | {row['batch']} | {row['proteins_per_second']:.2f} | {row['peak_reserved_bytes']/2**30:.1f} | {issue} |")

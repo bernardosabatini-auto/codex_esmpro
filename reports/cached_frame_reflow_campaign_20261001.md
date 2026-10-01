@@ -1,6 +1,6 @@
 # Cached-frame supervision and shorter sampling
 
-Status: GPU experiments complete; final cached-frame ensemble CPU scoring in progress. No model promoted and no confirmation or independent-test targets scored.
+Status: all declared GPU experiments and CPU scoring complete. No model promoted and no confirmation or independent-test targets scored.
 
 ## Rotation finding and correction
 
@@ -72,3 +72,21 @@ See [final 5/10-step results](reflow_training_2000.md), [all 15/20-step results]
 ## Whole-allocation utilization
 
 [Four-run accounting](campaign_training_gpu_allocation.md) gives allocation-normalized SM issue of 58.05% for cached-reference training and 59.29% for independent reflow. Aligned-teacher counters failed coverage validation. Paired reflow reports only 29.45%, with an unexplained 50% ceiling in SM-active counters despite comparable runtime, GPU memory and clocks to the independent run. The raw measurement is retained; it is not multiplied by two or counted as meeting the target. Both reflow runs used approximately 63.66 GiB peak reserved GPU memory. Future telemetry records CUDA-visible SM count and the process MPS thread-percentage setting without inspecting other jobs or changing shared GPU settings.
+
+## Final ensemble verdict
+
+The final 48-protein ensembles and CPU state scoring completed (49672152 reference; 49672377 aligned teacher). All own campaign GPU jobs are terminal. Neither final model passes the sampling-quality or primary training-diversity gate.
+
+| Model | State coverage at 32 | Nearest-reference CA-lDDT | Coarse validity | MD W1 |
+|---|---:|---:|---:|---:|
+| Inherited baseline | 0.43750 | 0.86794 | 0.99414 | 0.48850 |
+| Cached reference, 2000 | 0.46875 | 0.86402 | 0.98828 | 0.48165 |
+| Aligned teacher, 2000 | 0.43750 | 0.86461 | 0.98828 | 0.47530 |
+
+Aligned teacher coverage is unchanged from initialization on every family and lower than the reference control by 0.03125 [−0.09375, 0.00000]. Its nearest-reference quality falls by 0.00333 [−0.00555, −0.00116] versus initialization, failing the predeclared lower-bound margin of −0.005. MD W1 improves versus initialization by 0.01320 [0.00654, 0.02082], but the matched-control difference is only −0.00635 [−0.01388, +0.00113]. A secondary distributional improvement cannot replace the missing state-coverage result. See [baseline comparison](cached_aligned_2000_vs_baseline.md), [matched control](cached_aligned_2000_vs_reference.md), and [reference-only comparison](cached_reference_2000_vs_baseline.md).
+
+## Decision and remaining causal question
+
+Retain the original model weights. Keep fixed-reference alignment as the explicit preparation convention for future ensemble labels, since it removes rigid-pose nuisance variation while preserving each conformation. Do not promote these fine-tuned weights, launch confirmation, or infer useful speed from fewer steps. No independent-test or reserved-confirmation scores were inspected.
+
+This matched study changes teacher supervision as well as its frame treatment; it does not isolate the causal benefit of alignment. A direct future ablation would keep cached reference labels, teacher conformations, sampling weights, batches, random streams and training budget identical, changing only teacher encoding between independent inherited PCA and fixed-reference alignment. That is a targeted causal test, not justification for another broad fine-tuning sweep. A subsequent sampler experiment should address decoded clashes and peptide geometry explicitly before expanding its training budget. Neither future experiment has been launched by this report.

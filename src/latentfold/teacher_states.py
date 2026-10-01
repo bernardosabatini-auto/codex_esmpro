@@ -30,3 +30,28 @@ def contact_assignments(backbone, state, valid):
     reference=np.asarray(state['features']);distance=cdist(features,reference)/np.sqrt(len(i));nearest=distance.argmin(1);errors=distance[np.arange(len(bb)),nearest]
     clusters=np.asarray(state['clusters'])[nearest];clusters=np.where((errors<=2.)&np.asarray(valid,dtype=bool),clusters,-1)
     return nearest,errors,clusters
+
+
+def paired_change(candidate, reference):
+    """Positive values always mean candidate minus comparator."""
+    from .metrics import paired_comparison
+    d=paired_comparison(reference,candidate)
+    return dict(candidate=d['theirs'],reference=d['ours'],difference=d['theirs_minus_ours'],ci95=d['ci95'],families=d['clusters'],targets=d['n'])
+
+
+def bridge_posterior(latents, clusters, chosen, noise, time):
+    """Exact empirical-label posterior for x_t=(1-t)*N(0,I)+t*z.
+
+    This is an oracle diagnostic knowing all target labels. It is not a learned
+    model score and does not assume teacher frequencies are physical populations.
+    """
+    from scipy.special import logsumexp
+    y=np.asarray(latents,dtype='float64');clusters=np.asarray(clusters,dtype=int);chosen=np.asarray(chosen,dtype=int);noise=np.asarray(noise,dtype='float64')
+    if y.ndim!=2 or clusters.shape!=(len(y),) or noise.shape!=(len(chosen),y.shape[1]) or not 0<=time<1 or not np.isfinite(y).all() or not np.isfinite(noise).all():raise ValueError('invalid Gaussian bridge inputs')
+    if (chosen<0).any() or (chosen>=len(y)).any() or (clusters<0).any():raise ValueError('invalid teacher or cluster index')
+    gram=y@y.T;norm=np.diag(gram);ratio=time/(1-time)
+    logits=ratio*(noise@y.T)+ratio**2*(gram[chosen]-.5*norm[None]);prob=np.exp(logits-logsumexp(logits,axis=1,keepdims=True));prob/=prob.sum(1,keepdims=True)
+    state_prob=prob@np.eye(int(clusters.max())+1)[clusters];truth=clusters[chosen]
+    entropy=np.maximum(0,-(state_prob*np.log2(np.maximum(state_prob,1e-300))).sum(1)).mean();mean_norm=np.einsum('bi,ij,bj->b',prob,gram,prob)
+    floor=np.maximum(0,prob@norm-mean_norm).mean()/y.shape[1]/(1-time)**2
+    return dict(oracle_state_accuracy=float((state_prob.argmax(1)==truth).mean()),true_state_posterior=float(state_prob[np.arange(len(truth)),truth].mean()),state_entropy_bits=float(entropy),oracle_velocity_mse_floor=float(floor))

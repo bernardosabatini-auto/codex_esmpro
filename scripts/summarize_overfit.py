@@ -2,7 +2,7 @@
 import argparse,json
 from pathlib import Path
 import numpy as np
-from latentfold.metrics import paired_comparison
+from latentfold.teacher_states import paired_change
 from summarize_comparison import hardware
 
 
@@ -17,7 +17,7 @@ def main():
                 for step in [0]+c['evaluation_steps']:
                     rows=[r for r in m['scores'] if r['step']==step and r['guidance']==guidance]
                     if len(rows)!=32 or len({r['target_id'] for r in rows})!=32 or any(len(r['assignments'])!=32 for r in rows):raise ValueError('incomplete target/sample coverage')
-                    key=f'{step}_cfg{guidance}';d['summaries'][key]={k:float(np.mean([r[k] for r in rows])) for k in ('valid_fraction','teacher_ca_lddt','reference_ca_lddt','teacher_feature_rmse','valid_teacher_hit_fraction','state_total_variation','teacher_sampling_expected_coverage32')};d['summaries'][key]['coverage32']=float(np.mean([r['coverage']['32'] for r in rows]));d['paired'][key]=paired_comparison({r['target_id']:r['coverage']['32'] for r in rows},baseline)
+                    key=f'{step}_cfg{guidance}';d['summaries'][key]={k:float(np.mean([r[k] for r in rows])) for k in ('valid_fraction','teacher_ca_lddt','reference_ca_lddt','teacher_feature_rmse','valid_teacher_hit_fraction','state_total_variation','teacher_sampling_expected_coverage32')};d['summaries'][key]['coverage32']=float(np.mean([r['coverage']['32'] for r in rows]));d['paired'][key]=paired_change({r['target_id']:r['coverage']['32'] for r in rows},baseline)
                     d['latent_diagnostics'][key]={metric:float(np.mean([r['latent_diagnostic'][metric] for r in rows])) for metric in rows[0]['latent_diagnostic']}
         d['max_reserved_gib']=max(r['peak_reserved_bytes'] for r in m['batches'])/1024**3;d['training_seconds']=sum(r['seconds'] for r in m['batches'] if r['stage']=='training')
         try:d['hardware']=hardware(Path(str(run)+'_nsight.sqlite'),m['batches'])

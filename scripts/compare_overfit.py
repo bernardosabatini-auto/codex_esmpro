@@ -2,7 +2,7 @@
 import argparse,json
 from pathlib import Path
 import numpy as np
-from latentfold.metrics import paired_comparison
+from latentfold.teacher_states import paired_change
 
 
 def main():
@@ -29,7 +29,7 @@ def main():
         for arm,m in runs.items():
             cand=scores(m,a.step,guidance);key=f'{arm}_cfg{guidance}';d['summaries'][key]={metric:float(np.mean([r[metric] for r in cand.values()])) for metric in metrics};v=d['summaries'][key]
             lines.append(f"| {key} | {v['coverage32']:.5f} | {v['strict_coverage32']:.5f} | {v['valid_fraction']:.5f} | {v['teacher_ca_lddt']:.5f} | {v['reference_ca_lddt']:.5f} | {v['state_total_variation']:.5f} |")
-            for name,other in [('initial',initial[0]),('reference',reference),('pca',scores(runs['pca_teacher'],a.step,guidance))]:d['comparisons'][f'{key}_vs_{name}']={metric:paired_comparison({i:r[metric] for i,r in cand.items()},{i:r[metric] for i,r in other.items()}) for metric in metrics}
+            for name,other in [('initial',initial[0]),('reference',reference),('pca',scores(runs['pca_teacher'],a.step,guidance))]:d['comparisons'][f'{key}_vs_{name}']={metric:paired_change({i:r[metric] for i,r in cand.items()},{i:r[metric] for i,r in other.items()}) for metric in metrics}
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 
 if __name__=='__main__':main()

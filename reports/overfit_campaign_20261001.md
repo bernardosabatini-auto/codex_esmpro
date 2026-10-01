@@ -35,3 +35,11 @@ Read-only encoder inspection also clarifies the rotation verdict: coordinate com
 ## Reliable-panel audit passed
 
 Job49693246 completes the full512-conformation audit: mean CA-lDDT0.999111 for fixed-reference encoding and0.999091 for independent PCA; both decoded coarse-valid fractions are0.998047 versus1.0 at input. Both pass the original reconstruction gate. The fixed handoff submits40-update capacity profile49702037. No training input or sample was removed after this audit. Exact ESM-array and cached-reference-array identity checks precede training configuration preparation.
+
+## Matched training submitted
+
+Capacity profile49702037 completes40updates in81.99seconds of training with64.96GiB peak reserved GPU memory. Training SM issue is57.24%; whole-capture issue is20.12% because startup dominates this short profile. Do not describe the short allocation as meeting the50% whole-run goal. The longer runs amortize startup and will be measured separately.
+
+The fixed handoff submitted reference49704029, aligned-teacher49704255 and PCA-teacher49704413, all from commit9be9139 with identical scientific code trees and configuration except arm. Each requests one H200,24GiB host memory,8CPUs and115minutes; the profile suggests roughly68minutes of training plus evaluation. The handoff timer stopped after all submissions; the completion watcher remains active. No manual duplicate submissions are needed.
+
+The [Gaussian-bridge oracle diagnostic](overfit_teacher_bridge_20261001.md) uses only these teacher labels and simulated noise. At time0, per-coordinate conditional velocity variance is0.007592 aligned versus0.086632 PCA (11.4-fold), while the physical-mode prior is identical. By time0.5, oracle state classification is0.895 and0.919 respectively. This exposes nuisance variation and time dependence but does not establish a trained-model advantage. Actual matched training and structure evaluation decide that question.

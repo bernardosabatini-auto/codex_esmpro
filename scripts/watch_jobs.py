@@ -54,6 +54,19 @@ def scheduler_states(ids, run=subprocess.run):
         name, state, code, elapsed, end = parts[:5]
         rows[name] = dict(state=state.split()[0].rstrip('+'), exit_code=code,
                           elapsed=elapsed, ended=end)
+    # Accounting can lag while a submitted array waits for priority. Query only
+    # the missing registered IDs, and expand pending arrays into exact task IDs.
+    missing=[i for i in ids if i not in rows]
+    if missing:
+        try:
+            live=run(['squeue','-h','-r','-j',','.join(missing),'--format=%i|%T|%M'],
+                     capture_output=True,text=True,timeout=20,check=True)
+            for line in live.stdout.splitlines():
+                fields=line.strip().split('|')
+                if len(fields)==3 and fields[0] in missing:
+                    rows[fields[0]]=dict(state=fields[1],exit_code='unknown',elapsed=fields[2],ended='',source='squeue')
+        except subprocess.CalledProcessError:
+            pass  # A job can leave the live queue before accounting catches up.
     return rows
 
 

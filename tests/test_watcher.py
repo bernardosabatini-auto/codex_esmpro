@@ -44,6 +44,16 @@ class WatcherTests(unittest.TestCase):
         self.assertEqual(analyze.call_count, 1)
         self.assertEqual(query.call_args.args[0], ['123_0', '123_1'])
 
+    def test_pending_accounting_fallback_is_scoped(self):
+        run=Mock(side_effect=[Mock(stdout=''),Mock(stdout='123_0|PENDING|0:00\n999|RUNNING|0:20\n')])
+        rows=watch.scheduler_states(['123_0'],run)
+        self.assertEqual(set(rows),{'123_0'})
+        self.assertEqual(rows['123_0']['state'],'PENDING')
+        args=run.call_args.args[0]
+        self.assertEqual(args[0],'squeue')
+        self.assertEqual(args[args.index('-j')+1],'123_0')
+        self.assertNotIn('-u',args)
+
     def test_missing_or_running_tasks_never_trigger_analysis(self):
         analyze = Mock()
         for rows in [{}, {'123_0': self.rows()['123_0']}, self.rows('RUNNING')]:

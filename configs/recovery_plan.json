@@ -1,11 +1,17 @@
 {
-  "status": "planned; no new GPU jobs submitted; expanded training manifest must be prepared and frozen before execution",
+  "status": "Execution started 2026-10-01 UTC; expanded pool verified and frozen. Live scheduler state is recorded only in the local project registry and watcher.",
   "purpose": "Identify a cause of the latent-only pilot regression before changing architecture or adding another loss.",
   "evidence": {
     "untouched_mean_tm": 0.5682384930777423,
     "continued_training_mean_tm": 0.5657611377351792,
-    "checkpoint_optimizer_betas": [0.9, 0.95],
-    "pilot_optimizer_betas": [0.9, 0.999],
+    "checkpoint_optimizer_betas": [
+      0.9,
+      0.95
+    ],
+    "pilot_optimizer_betas": [
+      0.9,
+      0.999
+    ],
     "checkpoint_has_raw_weights_optimizer_and_scheduler": true,
     "interpretation": "The earlier pilots warm-started from EMA weights with a fresh optimizer; they did not resume the original training state. Comparisons between their matched arms remain valid. The beta difference alone has not been shown to cause regression."
   },
@@ -17,22 +23,37 @@
       {
         "name": "optimizer_beta",
         "only_change": "AdamW beta2: 0.999 to 0.95",
-        "optimizer_betas": [0.9, 0.95],
-        "flow_config": {"reduction": "protein"},
+        "optimizer_betas": [
+          0.9,
+          0.95
+        ],
+        "flow_config": {
+          "reduction": "protein"
+        },
         "training_proteins": 1024
       },
       {
         "name": "residue_reduction",
         "only_change": "Per-protein to per-residue loss reduction",
-        "optimizer_betas": [0.9, 0.999],
-        "flow_config": {"reduction": "residue"},
+        "optimizer_betas": [
+          0.9,
+          0.999
+        ],
+        "flow_config": {
+          "reduction": "residue"
+        },
         "training_proteins": 1024
       },
       {
         "name": "broader_training_pool",
         "only_change": "Expand the training pool to 16384 proteins from the same cache sources, keeping bucket frequencies and update budget fixed",
-        "optimizer_betas": [0.9, 0.999],
-        "flow_config": {"reduction": "protein"},
+        "optimizer_betas": [
+          0.9,
+          0.999
+        ],
+        "flow_config": {
+          "reduction": "protein"
+        },
         "training_proteins": 16384,
         "per_bucket": 4096,
         "data_preflight": "Deterministic nested selection that contains the original 1024 records; train splits only; verify sequence, finite latent/embedding arrays and shapes; verify original records are unchanged. All sources must be covered by the frozen holdout exclusion audit. Freeze manifest before scoring. No new ESM embeddings or source-structure downloads."
@@ -42,7 +63,10 @@
     "resource_plan": {
       "gpus_concurrent": 3,
       "gpu_type": "H200",
-      "estimated_minutes_per_job": [40, 50],
+      "estimated_minutes_per_job": [
+        40,
+        50
+      ],
       "walltime_cap_minutes_per_job": 60,
       "maximum_screen_gpu_hours": 3,
       "maximum_screen_plus_two_replications_gpu_hours": 5,
@@ -59,5 +83,6 @@
     "stop": "Do not expand failed arms into a hyperparameter sweep or combine individually unhelpful changes. Audit the saved raw-model/optimizer resume path separately if recovery fails. Do not claim these three arms exhaust possible causes.",
     "earlier_layer_gpu_budget": 0,
     "final_test": "Keep the locked 34 targets unscored. Only two are longer than 256 residues; long-chain confirmation needs better coverage."
-  }
+  },
+  "expanded_training_manifest_sha256": "8bdeb68ce039bd34397a9cdedc3b4f56f62822b06e6a77c5924b2539d9054253"
 }

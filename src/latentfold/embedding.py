@@ -5,11 +5,12 @@ from .precision import inference_precision
 
 class FinalESMC:
     def __init__(self, path, device='cuda', precision='bf16'):
-        if precision not in ('bf16','fp32'):
+        if precision not in ('bf16','fp16','fp32'):
             raise ValueError('unsupported conditioner precision')
         from transformers import AutoModel, AutoTokenizer
         self.tokenizer = AutoTokenizer.from_pretrained(path, local_files_only=True, trust_remote_code=False)
-        self.model = AutoModel.from_pretrained(path, dtype=torch.bfloat16 if precision=='bf16' else torch.float32,
+        dtype={'bf16':torch.bfloat16,'fp16':torch.float16,'fp32':torch.float32}[precision]
+        self.model = AutoModel.from_pretrained(path, dtype=dtype,
             local_files_only=True, trust_remote_code=False).eval().to(device).requires_grad_(False)
         self.device = device
         self.precision = precision

@@ -1,0 +1,12 @@
+{
+  "purpose": "Test a higher-precision alternative to the failed BF16 ESMC speed policy: FP16 final-layer ESMC plus the previously validated FP16 feed-forward folding-head policy and strict FP32 decoder",
+  "reference": "Complete strict-FP32 online run 49470256; same checkpoint, ESMC files, data, seed, batches, target correspondence, 25 steps, CFG 2 and three samples",
+  "rationale": "FP16 retains more significand precision than BF16 and may pass the unchanged shape controls while using tensor cores. Benefit is unknown; finite outputs alone do not qualify.",
+  "controls": "All eight existing online batch/padding controls must pass without changing thresholds. Then score all 626 development proteins and 1878 predictions, with fresh ESMC embeddings.",
+  "accuracy_gate": "Paired sequence-cluster lower confidence bounds above -0.005 for TM and CA lDDT; upper bounds at most +0.001 for geometry-outlier fractions against the full FP32 online reference",
+  "speed_gate": "At least 2x measured sequence-to-three-backbone collection throughput versus the matched FP32 online run, including tokenization, ESMC, head, decoder and coordinate transfer. Report SM active, instruction issue, peak memory, and complete allocated walltime separately.",
+  "interpretation": "An inference speed/accuracy tradeoff, not a training-recipe accuracy gain. No optimized speed ratio against ESMFold2 is inferred. Three-sample selection is outside this timed collection and must be included before a deployment timing claim.",
+  "resources": {"gpus": 1, "gpu_type": "H200", "walltime_minutes": 30},
+  "failure_action": "Preserve any failed numerical control and stop this attempt. Do not relax tolerances.",
+  "final_test": "Keep the 34 locked structures unscored. No earlier-layer computation."
+}

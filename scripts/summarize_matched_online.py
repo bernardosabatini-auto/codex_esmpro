@@ -11,7 +11,7 @@ from summarize_pilot import geometry_by_target
 
 
 def analyze(runs):
-    result = dict(status='incomplete', shards=[], failures=[], independent_test_scored=False)
+    result = dict(status='incomplete', shards=[], failures=[], numerical_failures=[], independent_test_scored=False)
     combined = {n:[] for n in VARIANTS}
     chosen = {n:[] for n in VARIANTS}
     seen = set()
@@ -22,6 +22,13 @@ def analyze(runs):
         try:
             m = json.loads((run/'manifest.json').read_text())
             if m['status']!='complete':
+                for name in VARIANTS:
+                    child_path=run/name/'manifest.json'
+                    if child_path.exists():
+                        child=json.loads(child_path.read_text())
+                        for control in child.get('controls',[]):
+                            if control['ca_rmsd']>.2 or control['ca_lddt']<.99 or control['reference_ca_lddt_absolute_change']>.005:
+                                result['numerical_failures'].append(dict(run=str(run),variant=name,**control))
                 raise ValueError(m.get('error','incomplete collection'))
             c = m['config']
             for key in ('target_manifest','development_clusters','protocol'):
@@ -68,6 +75,8 @@ def analyze(runs):
         except Exception as error:
             result['failures'].append(dict(run=str(run),error=f'{type(error).__name__}: {error}'))
     if result['failures']:
+        if result['numerical_failures']:
+            result.update(status='rejected_numerical_controls',development_gate_passed=False)
         return result
     if shard_ids!={0,1,2,3} or len(seen)!=626 or seen!=set(c['all_target_ids']):
         result['failures'].append(dict(error='Incomplete four-shard 626-target coverage'))
@@ -105,7 +114,7 @@ def main():
     result = analyze(args.runs)
     args.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n')
     lines = ['# Alternating sequence-to-selected-backbone comparison','',f"Status: {result['status']}.",'',
-        'Four deterministic target shards cover 626 development proteins once. Each GPU compares both pipelines on its own targets in three alternating repeats. Repeats are timing measurements, not extra targets or independent inference noise. Timings include CPU sample selection. Dual ESMC residency increases memory above standalone deployment.']
+        'The planned comparison assigns 626 development proteins across four deterministic shards, with three alternating repeats of both pipelines on each GPU. Planned timings include CPU sample selection. Repeats are not extra targets or independent inference noise. Dual ESMC residency increases memory above standalone deployment. Numerical controls must pass before timing begins.']
     if result['status']=='complete':
         lines += ['', '| Repeat | Reference GPU seconds | Candidate GPU seconds | Speedup |','|---:|---:|---:|---:|']
         for i,r in enumerate(result['aggregate_repeats']):
@@ -129,6 +138,12 @@ def main():
             lines.append(f"| {field} | {row['theirs_minus_ours']:+.6f} | {row['ci95']} |")
     else:
         lines += ['', *[str(r) for r in result['failures']]]
+        if result['numerical_failures']:
+            lines += ['', '| Task | Variant | Length bucket | CA RMSD (A) | Cross-prediction CA lDDT | Native CA lDDT absolute change |',
+                '|---|---|---:|---:|---:|---:|']
+            for row in result['numerical_failures']:
+                lines.append(f"| {Path(row['run']).name} | {row['variant']} | {row['bucket']} | {row['ca_rmsd']:.6f} | {row['ca_lddt']:.6f} | {row['reference_ca_lddt_absolute_change']:.6f} |")
+            lines += ['', 'Required bounds: RMSD <=0.2 A, cross-prediction CA lDDT >=0.99, native CA lDDT absolute change <=0.005. The candidate is rejected under these unchanged bounds. No repeated throughput or selected-accuracy result is available.']
     lines += ['', 'The 34 independent-test structures remain unscored. No optimized ESMFold2 throughput comparison is claimed.']
     args.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 

@@ -25,7 +25,7 @@ def main():
     a.output.mkdir(exist_ok=False,parents=True);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85);tick=time.monotonic();telemetry=None
     m=dict(status='running',config=c,rows=[],batches=[],controls=[]);atomic_json(a.output/'manifest.json',m)
     try:
-        decoder=load_proteinae(a.source/'ProteinAE_v1',a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt',steps=3).cuda();telemetry=Telemetry(a.output,True);tested=set()
+        decoder=load_proteinae(a.source/'ProteinAE_v1',a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt',steps=c.get('decoder_steps',3)).cuda();telemetry=Telemetry(a.output,True);tested=set()
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'labels.h5','x') as out,h5py.File(c['embedding_cache']) as embeddings,h5py.File(selection['dataset']) as inherited:
             for index,r in enumerate(c['targets']):
                 ident=r['id'];n=r['length']

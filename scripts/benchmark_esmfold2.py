@@ -3,8 +3,7 @@ import argparse,hashlib,json,multiprocessing,time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 import h5py,numpy as np,torch
-from transformers.models.esmfold2.modeling_esmfold2 import EsmFold2Model
-from transformers.models.esmfold2.protein_utils import prepare_protein_features
+from latentfold.teacher import load_fast_model,fast_features
 from latentfold.metrics import ca_metrics
 from latentfold.precision import inference_precision
 from profile_gpu import Telemetry,atomic_json
@@ -44,7 +43,7 @@ def main():
      for block in iter(lambda:stream.read(1024*1024),b''):digest.update(block)
     artifacts.append(dict(name=path.name,bytes=path.stat().st_size,sha256=digest.hexdigest()))
   report['model_artifacts']=artifacts
-  model=EsmFold2Model.from_pretrained(a.source/'data/esmfold2_fast',dtype=torch.float32,local_files_only=True).eval().cuda().requires_grad_(False)
+  model,report['teacher_adapter']=load_fast_model(a.source/'data/esmfold2_fast')
   report['parameter_dtypes']=sorted({str(p.dtype) for p in model.parameters()})
   if report['parameter_dtypes']!=['torch.float32']:raise ValueError('model did not load entirely in FP32')
   report['parameters']=sum(p.numel() for p in model.parameters());report['gpu']=torch.cuda.get_device_name(0)
@@ -54,7 +53,7 @@ def main():
    # Repeat the exact sampled calculation, no implicit best-of-three rendering.
    control_records=[min(records,key=lambda r:len(r['sequence'])),max(records,key=lambda r:len(r['sequence']))]
    for r in control_records:
-    features=prepare_protein_features(r['sequence'],device='cuda');index=backbone_indices(features,len(r['sequence']));coordinates=[]
+    features=fast_features(r['sequence'],device='cuda');index=backbone_indices(features,len(r['sequence']));coordinates=[]
     for repeat in range(2):
      torch.manual_seed(71);output=model.fold(**features,num_loops=3,num_sampling_steps=50,num_diffusion_samples=3)
      coordinates.append(output.sample_atom_coords.float().cpu().numpy()[:,index, :][:,:,1,:]);del output
@@ -66,7 +65,7 @@ def main():
     seed=int.from_bytes(hashlib.sha256(('esmfold2:'+r['id']).encode()).digest()[:8],'little')%(2**63-1)
     torch.manual_seed(seed);torch.cuda.synchronize();begin=time.monotonic();nvtx=f'collect::esmfold2::{i}'
     torch.cuda.nvtx.range_push(nvtx)
-    features=prepare_protein_features(r['sequence'],device='cuda');index=backbone_indices(features,len(r['sequence']))
+    features=fast_features(r['sequence'],device='cuda');index=backbone_indices(features,len(r['sequence']))
     output=model.fold(**features,num_loops=3,num_sampling_steps=50,num_diffusion_samples=3)
     backbone=output.sample_atom_coords.float().cpu().numpy()[:,index,:]
     if backbone.shape!=(3,len(r['sequence']),4,3) or not np.isfinite(backbone).all():raise ValueError('invalid structure output')

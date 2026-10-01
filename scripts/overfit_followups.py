@@ -24,7 +24,9 @@ def tick():
     parent=byid[plan['label_job']]
     if parent['completion_action']!='summarize_overfit_labels':raise ValueError('invalid registered label parent')
     label_path=ROOT/f"runs/overfit_labels_{plan['label_job']}/manifest.json"
-    if not label_path.exists():write_json(state_path,state);return
+    if not label_path.exists():
+        if parent.get('state') in TERMINAL:finish('label_failed','Label job terminal without manifest');return
+        write_json(state_path,state);return
     label=json.loads(label_path.read_text())
     if label['status']=='failed':finish('label_failed',label.get('error'));return
     if label['status']!='complete':write_json(state_path,state);return
@@ -39,6 +41,7 @@ def tick():
     prefix=plan['purpose_prefix'];profile=[j for j in jobs if j['purpose']==prefix+' profile']
     if len(profile)>1:raise ValueError('duplicate capacity profile')
     if not profile:
+        if now+datetime.timedelta(minutes=12)>datetime.datetime.fromisoformat(plan['deadline_utc']):finish('insufficient_time','No room for bounded profile');return
         prepare([], 'runs/overfit_profile.json');state['profile_job']=submit('slurm/overfit_profile_h200.sbatch',prefix+' profile',10);state['status']='profile_submitted';write_json(state_path,state);return
     profile=profile[0];state['profile_job']=profile['id'];report=ROOT/f"reports/overfit_{profile['id']}.json"
     if not report.exists():
@@ -54,6 +57,7 @@ def tick():
         matches=[j for j in jobs if j['purpose']==prefix+' '+arm]
         if len(matches)>1:raise ValueError('duplicate training arm')
         if matches:state['training_jobs'][arm]=matches[0]['id'];continue
+        if now+datetime.timedelta(minutes=117)>datetime.datetime.fromisoformat(plan['deadline_utc']):finish('insufficient_time','No room for full declared training budget');return
         state['training_code_trees']=fingerprint;write_json(state_path,state)
         prepare(['--profile',str(report)],'runs/overfit.json')
         state['training_jobs'][arm]=submit(f'slurm/overfit_{arm}_h200.sbatch',prefix+' '+arm,115);state['status']='training_submissions';write_json(state_path,state);return

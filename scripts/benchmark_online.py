@@ -45,15 +45,18 @@ def main():
    esm=embedding([unique[n]['sequence'] for n in ordered],length)
    base=prediction_batch(requests,length,seed=config['seed'],decoder_scale=decoder.fm.scale_ref)
    return (esm[torch.tensor([index[r['id']] for r,_ in requests],device='cuda')],*base[1:])
+  def predict(requests,length):
+   conditioning_ids=[r['id'] for r,_ in requests] if config.get('reuse_sample_conditioning') else None
+   return infer(model,decoder,tensors(requests,length),cfg,conditioning_ids=conditioning_ids,**options)
   telemetry=Telemetry(a.output,True)
   # These controls include changes in ESMC batch size and padding, not just the head.
   with torch.no_grad():
    for length,requests in buckets.items():
     count=batches[length]
     chunk=requests[:count-3]+requests[-3:] if len(requests)>count else requests
-    _,ca,_=infer(model,decoder,tensors(chunk,length),cfg,**options);whole=ca.cpu().numpy();del ca
+    _,ca,_=predict(chunk,length);whole=ca.cpu().numpy();del ca
     for i in (0,len(chunk)-3):
-     r,k=chunk[i];n=len(r['sequence']);_,ca,_=infer(model,decoder,tensors([(r,k)],n),cfg,**options)
+     r,k=chunk[i];n=len(r['sequence']);_,ca,_=predict([(r,k)],n)
      metrics=ca_metrics(whole[i,:n],ca[0].cpu().numpy());delta=abs(ca_metrics(whole[i,:n],r['ca'].numpy())['ca_lddt']-ca_metrics(ca[0].cpu().numpy(),r['ca'].numpy())['ca_lddt'])
      control=dict(target_id=r['id'],bucket=length,batch=len(chunk),reference_ca_lddt_absolute_change=delta,**metrics);manifest['controls'].append(control);atomic_json(a.output/'manifest.json',manifest);print('online control',json.dumps(control),flush=True)
      del ca
@@ -66,7 +69,7 @@ def main():
       chunk=requests[offset:offset+batches[length]];torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic();nvtx=f'collect::online::{length}::{offset}'
       torch.cuda.nvtx.range_push(nvtx)
       try:
-       z,ca,backbone=infer(model,decoder,tensors(chunk,length),cfg,**options)
+       z,ca,backbone=predict(chunk,length)
        z,ca,backbone=[x.float().cpu().numpy() for x in (z,ca,backbone)]
        torch.cuda.synchronize();seconds=time.monotonic()-tick
       finally:torch.cuda.nvtx.range_pop()

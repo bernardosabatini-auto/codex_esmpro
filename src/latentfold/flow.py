@@ -120,22 +120,39 @@ def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, resid
 
 
 @torch.no_grad()
-def sample(net, esm, mask, config, *, noise, cache_condition=True):
+def sample(net, esm, mask, config, *, noise, cache_condition=True, conditioning_ids=None):
     """Deterministic Euler integration given explicit initial noise. No RNG inside."""
     validate_batch(esm, mask, noise)
     if net.training:
         raise ValueError("sampling requires net.eval()")
     if mask.shape[1] > net.pos.num_embeddings:
         raise ValueError("sequence exceeds checkpoint's position table")
-    kwargs = {"pair": net.compute_pair(esm, mask)} if hasattr(net, "compute_pair") else {}
+    static_esm,static_mask,inverse=esm,mask,None
+    if conditioning_ids is not None:
+        if not cache_condition or len(conditioning_ids)!=len(esm):
+            raise ValueError('conditioning reuse requires caching and one ID per prediction')
+        groups={};first=[];mapping=[]
+        for index,name in enumerate(conditioning_ids):
+            if name not in groups:groups[name]=len(first);first.append(index)
+            mapping.append(groups[name])
+        first=torch.tensor(first,device=esm.device);inverse=torch.tensor(mapping,device=esm.device)
+        static_esm=esm.index_select(0,first);static_mask=mask.index_select(0,first)
+        if not torch.equal(esm,static_esm.index_select(0,inverse)) or not torch.equal(mask,static_mask.index_select(0,inverse)):
+            raise ValueError('conditioning IDs merged different embeddings or masks')
+    kwargs = {"pair": net.compute_pair(static_esm, static_mask)} if hasattr(net, "compute_pair") else {}
     x, sc = noise.clone(), None
     ts = torch.linspace(0, 1, config.steps + 1, device=esm.device)
     drop = torch.ones(len(esm), dtype=torch.bool, device=esm.device)
     cond_kwargs, uncond_kwargs = kwargs, kwargs
     if cache_condition:
-        cond_kwargs = {"prepared": net.prepare_condition(esm, mask, **kwargs)}
+        def expand(value):
+            if inverse is None:return value
+            if isinstance(value,torch.Tensor):return value.index_select(0,inverse)
+            return tuple(expand(item) for item in value)
+        cond_kwargs = {"prepared": expand(net.prepare_condition(static_esm, static_mask, **kwargs))}
         if config.guidance != 1:
-            uncond_kwargs = {"prepared": net.prepare_condition(esm, mask, drop, **kwargs)}
+            static_drop=torch.ones(len(static_esm),dtype=torch.bool,device=esm.device)
+            uncond_kwargs = {"prepared": expand(net.prepare_condition(static_esm, static_mask, static_drop, **kwargs))}
         # Cached bias matrices replace the raw pair representation in the ODE loop.
         kwargs.clear()
     for i in range(config.steps):

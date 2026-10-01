@@ -38,6 +38,13 @@ if m['status']=='complete':
        speedup=sum(row['seconds'] for row in brm['batches'])/seconds,
        paired={metric:paired_comparison(means_by_target(brs['records'],'steps25_cfg2',metric),means_by_target(s['records'],'steps25_cfg2',metric),clusters=clusters) for metric in ('tm_fixed_reference','ca_lddt')})
    result['precision_comparison_scope']='Precision and batch capacity both differ from the full-FP32 baseline; the separate same-precision comparison isolates batch capacity.'
+  implementation_reference=m['config'].get('implementation_reference_run')
+  if implementation_reference:
+   ir=Path(implementation_reference);im=json.loads((ir/'manifest.json').read_text());iscores=json.loads((ir/'scores.json').read_text());validate_scores(im,iscores)
+   validate_online_pair(m,im,same_batches=True,same_precision=True)
+   if s['usalign']!=iscores['usalign']:raise ValueError('implementation comparison scorer changed')
+   result['implementation_comparison']=dict(reference_run=str(ir),speedup=sum(row['seconds'] for row in im['batches'])/seconds,
+       paired={metric:paired_comparison(means_by_target(iscores['records'],'steps25_cfg2',metric),means_by_target(s['records'],'steps25_cfg2',metric),clusters=clusters) for metric in ('tm_fixed_reference','ca_lddt')})
  lines+=['',m['timing_scope'],'','Final ESMC layer only, with three samples averaged per target. Embeddings are recomputed from input sequences. The external ESMFold2 run used one protein at a time, whereas this pipeline batches different proteins: these numbers are not a matched-batch latency or optimized-throughput speed ratio.','', '```json',json.dumps(result,indent=2),'```']
 else:lines+=['',m.get('error','Incomplete; no performance claim.')]
 a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')

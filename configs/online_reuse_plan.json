@@ -1,0 +1,10 @@
+{
+  "purpose": "Compute static folding-head conditioning once per unique protein and reuse it across the three independently sampled structures",
+  "prior_evidence": "FP16 final-layer ESMC plus the validated FP16 MLP head processes 2.034 proteins/s. Larger batches add only 1.24% throughput while increasing reserved memory from 66.58 to 93.04 GiB. Code inspection shows the static pair track and condition projection still process three duplicate rows per sequence.",
+  "only_change": "Deduplicate static sequence embeddings and masks by explicit target ID before pair-track and conditional/unconditional cache preparation; gather the prepared tensors back to prediction order. Verify that repeated IDs have exactly identical embeddings and masks. Flow noise, dynamic head passes, guidance, integration and decoder noise remain per sample.",
+  "reference": "FP16 run 49537668, identical 126/63/30/30 prediction batches, all checkpoints, precision, seeds, input sequences and scorer. Also compare full-pipeline throughput with FP32 run 49470256.",
+  "controls": "Nonzero-weight CPU parity tests for pair and pair-free, guidance one and two, distinct sample noise and mismatched-ID rejection. Require all eight unchanged actual-weight online batch/padding controls before full collection. Score all 626 targets and 1878 predictions.",
+  "gate": "Keep the 2x full-pipeline throughput versus FP32 goal, TM/CA lDDT lower confidence bounds at least -0.005 and geometry upper bounds at most +0.001. Record speed relative to the same-precision FP16 baseline separately.",
+  "resources": {"gpus": 1, "gpu_type": "H200", "walltime_minutes": 30},
+  "final_test": "Unscored; no earlier ESM layers or changes to running training snapshots"
+}

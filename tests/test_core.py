@@ -120,6 +120,25 @@ class CoreTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             sample(self.net().eval(), torch.zeros(1, 5, 12), torch.zeros(1, 5, dtype=torch.bool), SampleConfig(), noise=torch.zeros(1, 5, 8))
 
+    def test_conditioning_reuse_preserves_distinct_samples_and_rejects_wrong_groups(self):
+        for pair in (False,True):
+            net=self.net(pair).eval()
+            esm=torch.randn(2,8,12).repeat_interleave(3,0)
+            mask=(torch.arange(8)[None,:]<torch.tensor([5,8])[:,None]).repeat_interleave(3,0)
+            noise=torch.randn(6,8,8);ids=['a']*3+['b']*3
+            for guidance in (1.,2.):
+                cfg=SampleConfig(steps=5,guidance=guidance)
+                reference=sample(net,esm,mask,cfg,noise=noise)
+                if pair:
+                    with patch.object(net,'compute_pair',wraps=net.compute_pair) as compute:
+                        shared=sample(net,esm,mask,cfg,noise=noise,conditioning_ids=ids)
+                        self.assertEqual(compute.call_args.args[0].shape[0],2)
+                else:shared=sample(net,esm,mask,cfg,noise=noise,conditioning_ids=ids)
+                torch.testing.assert_close(reference,shared,rtol=2e-5,atol=2e-5)
+                self.assertFalse(torch.equal(shared[0],shared[1]))
+            with self.assertRaisesRegex(ValueError,'different embeddings'):
+                sample(net,esm,mask,cfg,noise=noise,conditioning_ids=['wrong']*6)
+
     def test_checkpoint_roundtrip_and_architecture_rejection(self):
         for pair in (False, True):
             net = self.net(pair)

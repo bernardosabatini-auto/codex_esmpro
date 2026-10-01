@@ -30,11 +30,11 @@ from score_comparison import score_batch, write_scores
 
 
 @torch.no_grad()
-def infer(model, decoder, tensors, cfg, *, flow_precision='bf16', decoder_precision='bf16'):
+def infer(model, decoder, tensors, cfg, *, flow_precision='bf16', decoder_precision='bf16', conditioning_ids=None):
     esm, mask, noise, dn = (x.to('cuda', non_blocking=True) for x in tensors)
     with inference_precision('fp32' if flow_precision in HYBRID_MODES else flow_precision):
         with hybrid_modules(model, flow_precision):
-            z = sample(model, esm, mask, cfg, noise=noise)
+            z = sample(model, esm, mask, cfg, noise=noise, conditioning_ids=conditioning_ids)
     with inference_precision(decoder_precision):
         ca, backbone = decoder(z.float(), mask, return_backbone=True, noise=dn)
     if not torch.isfinite(backbone).all():

@@ -18,6 +18,7 @@ def main():
     for name in ('source','config','output'):p.add_argument('--'+name,type=Path,required=True)
     a=p.parse_args();c=json.loads(a.config.read_text());path=Path(c['panel'])
     if hashlib.sha256(path.read_bytes()).hexdigest()!=c['panel_sha256']:raise ValueError('changed panel')
+    if c.get('solver_screen_manifest') and file_identity(Path(c['solver_screen_manifest']),hash_contents=True)['sha256']!=c['solver_screen_manifest_sha256']:raise ValueError('solver quality screen changed')
     primary=c.get('primary_guidance',2)
     if primary not in (1,2):raise ValueError('unsupported primary guidance')
     rows=json.loads(path.read_text())['development']

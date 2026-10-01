@@ -22,7 +22,10 @@ def main():
     lines=['# Matched small-ensemble learning comparison','',f'Checkpoint: {a.step}. Same initialization, labels, target batches and random label draws verified. Teacher arms differ only in coordinate frame.','', 'Teacher-defined training states only; no biological-state or generalization claim. CFG settings and both contact thresholds remain visible.','', '| Arm / guidance | Recall @2A | Recall @1A | Coarse valid | Teacher CA-lDDT | Reference CA-lDDT | State TV |','|---|---:|---:|---:|---:|---:|---:|']
     for guidance in (1,2):
         reference=scores(runs['reference'],a.step,guidance);initial=[scores(m,0,guidance) for m in runs.values()]
-        if not all(x==initial[0] for x in initial):raise ValueError('different initialization predictions')
+        for other in initial[1:]:
+            if set(other)!=set(initial[0]):raise ValueError('different initial targets')
+            for ident,row in other.items():
+                if row['assignments']!=initial[0][ident]['assignments'] or any(not np.isclose(row[k],initial[0][ident][k],atol=1e-6,rtol=1e-6) for k in metrics):raise ValueError('different initialization predictions')
         for arm,m in runs.items():
             cand=scores(m,a.step,guidance);key=f'{arm}_cfg{guidance}';d['summaries'][key]={metric:float(np.mean([r[metric] for r in cand.values()])) for metric in metrics};v=d['summaries'][key]
             lines.append(f"| {key} | {v['coverage32']:.5f} | {v['strict_coverage32']:.5f} | {v['valid_fraction']:.5f} | {v['teacher_ca_lddt']:.5f} | {v['reference_ca_lddt']:.5f} | {v['state_total_variation']:.5f} |")

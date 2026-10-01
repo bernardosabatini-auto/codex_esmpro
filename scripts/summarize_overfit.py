@@ -7,7 +7,7 @@ from summarize_comparison import hardware
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs='+',required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();run=a.runs[0];path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest');c=m.get('config',{});d=dict(status=m['status'],arm=c.get('arm'),profile_only=c.get('profile_only'),summaries={},paired={})
+    p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs='+',required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();run=a.runs[0];path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest');c=m.get('config',{});d=dict(status=m['status'],arm=c.get('arm'),profile_only=c.get('profile_only'),summaries={},paired={},latent_diagnostics={})
     if m['status']=='complete':
         if m['updates']!=c['updates']:raise ValueError('incomplete training')
         if not c.get('profile_only'):
@@ -18,6 +18,7 @@ def main():
                     rows=[r for r in m['scores'] if r['step']==step and r['guidance']==guidance]
                     if len(rows)!=32 or len({r['target_id'] for r in rows})!=32 or any(len(r['assignments'])!=32 for r in rows):raise ValueError('incomplete target/sample coverage')
                     key=f'{step}_cfg{guidance}';d['summaries'][key]={k:float(np.mean([r[k] for r in rows])) for k in ('valid_fraction','teacher_ca_lddt','reference_ca_lddt','teacher_feature_rmse','valid_teacher_hit_fraction','state_total_variation','teacher_sampling_expected_coverage32')};d['summaries'][key]['coverage32']=float(np.mean([r['coverage']['32'] for r in rows]));d['paired'][key]=paired_comparison({r['target_id']:r['coverage']['32'] for r in rows},baseline)
+                    d['latent_diagnostics'][key]={metric:float(np.mean([r['latent_diagnostic'][metric] for r in rows])) for metric in rows[0]['latent_diagnostic']}
         d['max_reserved_gib']=max(r['peak_reserved_bytes'] for r in m['batches'])/1024**3;d['training_seconds']=sum(r['seconds'] for r in m['batches'] if r['stage']=='training')
         try:d['hardware']=hardware(Path(str(run)+'_nsight.sqlite'),m['batches'])
         except Exception as e:d['hardware']=dict(status='unavailable',error=str(e))
@@ -25,6 +26,9 @@ def main():
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n')
     lines=['# Small-ensemble learnability diagnostic','',f"Status: {d['status']}; arm: {d['arm']}; profile only: {d['profile_only']}.",'','32 training proteins selected for teacher diversity. Teacher-defined contact modes are predictions, not measured biological states. Fresh32-sample ensembles at both CFG settings; all samples retained. Coverage requires feature RMSE<=2A, nearest-contact teacher CA-lDDT>=0.8 and coarse-valid geometry.','', '| Updates / guidance | Mode recall @32 | Coarse valid | Teacher CA-lDDT | Reference CA-lDDT | State TV (lower better) |','|---|---:|---:|---:|---:|---:|']
     for key,r in d['summaries'].items():lines.append(f"| {key} | {r['coverage32']:.5f} | {r['valid_fraction']:.5f} | {r['teacher_ca_lddt']:.5f} | {r['reference_ca_lddt']:.5f} | {r['state_total_variation']:.5f} |")
+    if d['latent_diagnostics']:
+        lines+=['','Latent diagnostics (nearest teacher RMSE): global reference fits below are evaluation-only and never alter predictions.','','| Updates / guidance | Sampled latent | Re-encoded backbone | Pose-aligned re-encoded backbone | Decoder/encoder RMSE |','|---|---:|---:|---:|---:|']
+        for key,r in d['latent_diagnostics'].items():lines.append(f"| {key} | {r['sampled_to_teacher_rmse']:.5f} | {r['reencoded_to_teacher_rmse']:.5f} | {r['pose_aligned_reencoded_to_teacher_rmse']:.5f} | {r['decoder_encoder_rmse']:.5f} |")
     if 'error' in d:lines+=['',d['error']]
     lines+=['','This is a training-capacity experiment. No model promotion or unseen-family accuracy claim is possible from these scores.']
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')

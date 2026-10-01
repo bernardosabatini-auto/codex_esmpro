@@ -1,0 +1,10 @@
+{
+  "purpose": "Measure whether fused AdamW reduces optimizer launch overhead while retaining the validated all-block activation recomputation policy",
+  "why": "The original training state used fused AdamW; the pilot uses single-tensor AdamW. The separate pair-only recomputation experiment failed its strict gradient gate and is not adopted.",
+  "arithmetic_control": "Four updates from identical real clipped FP16-training gradients and initial checkpoint weights; relative update L2 at most 0.02 and maximum parameter difference at most 2e-6. No training-trajectory equivalence claim.",
+  "profile": "Same 128/64/32/16 batches at lengths 128/256/384/512; single-tensor versus fused AdamW, actual moment and EMA storage/arithmetic, learning rate zero, always self-conditioned stress; warm-up then four timed repeats per case",
+  "followup": "Only if arithmetic controls pass and throughput improves at the unchanged batch size: run an actual matched short training trajectory before adopting the implementation in a new scientific experiment. Do not change the running recovery jobs.",
+  "resources": {"gpus": 1, "gpu_type": "H200", "walltime_minutes": 20},
+  "earlier_layer_work": "none",
+  "final_test": "unscored"
+}

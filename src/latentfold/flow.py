@@ -34,10 +34,13 @@ class SampleConfig:
     steps: int = 25
     guidance: float = 2.0
     project: bool = True
+    solver: str = 'euler'
 
     def __post_init__(self):
         if type(self.steps) is not int or self.steps < 1 or not math.isfinite(self.guidance):
             raise ValueError("invalid sampling settings")
+        if self.solver not in ('euler','midpoint'):
+            raise ValueError('unknown flow solver')
 
 
 def validate_batch(esm, mask, z=None):
@@ -143,7 +146,13 @@ def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, resid
 
 @torch.no_grad()
 def sample(net, esm, mask, config, *, noise, cache_condition=True, conditioning_ids=None):
-    """Deterministic Euler integration given explicit initial noise. No RNG inside."""
+    """Deterministic integration given explicit noise; no RNG inside.
+
+    Midpoint uses two vector-field evaluations per interval. Self-conditioning
+    advances at each evaluation, using its estimated endpoint. Formal second
+    order accuracy only applies to an ordinary field without this learned
+    history; actual checkpoints require empirical quality/validity controls.
+    """
     validate_batch(esm, mask, noise)
     if net.training:
         raise ValueError("sampling requires net.eval()")
@@ -183,6 +192,18 @@ def sample(net, esm, mask, config, *, noise, cache_condition=True, conditioning_
         if config.guidance != 1:
             uncond = net(x, t, esm, mask, drop, sc, **uncond_kwargs)
             v = uncond + config.guidance * (v - uncond)
+        if config.solver == 'midpoint':
+            dt=ts[i+1]-ts[i];middle=(ts[i]+ts[i+1])*.5
+            middle_sc=x+(1-ts[i])*v if net.self_cond else None
+            middle_x=x+.5*dt*v
+            middle_t=middle.expand(len(esm))
+            middle_v=net(middle_x,middle_t,esm,mask,None,middle_sc,**cond_kwargs)
+            if config.guidance != 1:
+                uncond=net(middle_x,middle_t,esm,mask,drop,middle_sc,**uncond_kwargs)
+                middle_v=uncond+config.guidance*(middle_v-uncond)
+            if net.self_cond:sc=middle_x+(1-middle)*middle_v
+            x=x+dt*middle_v
+            continue
         if net.self_cond:
             sc = x + (1 - ts[i]) * v
         x = x + v * (ts[i + 1] - ts[i])

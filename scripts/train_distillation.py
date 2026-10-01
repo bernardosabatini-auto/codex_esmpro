@@ -22,7 +22,10 @@ def main():
     torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85);start=time.monotonic()
     m=dict(status='running',config=c,updates=0,training=[],batches=[],scores=[],controls=[],scope='Matched full flow-head training; AFDB reference and teacher labels. ProteinAE frozen. No confirmation/test scoring.');telemetry=None;atomic_json(a.output/'manifest.json',m)
     try:
-        if c['arm'] not in ('raw_reference','reference','empirical','balanced'):raise ValueError('invalid distribution')
+        if c['arm'] not in ('raw_reference','reference','empirical','balanced','cached_reference','cached_aligned_empirical'):raise ValueError('invalid distribution')
+        frame=c.get('latent_frame','first_residue_N_CA_C')
+        if (c['arm'] in ('cached_reference','cached_aligned_empirical')) != (frame=='teacher_CA_aligned_to_cached_reference'):raise ValueError('arm/frame mismatch')
+        if frame not in ('first_residue_N_CA_C','teacher_CA_aligned_to_cached_reference'):raise ValueError('unknown label frame')
         if c['updates']<1 or c['evaluation_steps'][-1]!=c['updates']:raise ValueError('invalid update protocol')
         if not c.get('profile_only'):
             audit=Path(c['audit_result'])
@@ -41,7 +44,7 @@ def main():
             path=Path(shard['manifest'])
             if hashlib.sha256(path.read_bytes()).hexdigest()!=shard['manifest_sha256']:raise ValueError('label manifest changed')
             metadata=json.loads(path.read_text())
-            if metadata['status']!='complete' or metadata['config']['latent_frame']!='first_residue_N_CA_C' or metadata['config']['selection_sha256']!=c['selection_sha256']:raise ValueError('label provenance mismatch')
+            if metadata['status']!='complete' or metadata['config']['latent_frame']!=c.get('latent_frame','first_residue_N_CA_C') or metadata['config']['selection_sha256']!=c['selection_sha256']:raise ValueError('label provenance mismatch')
             for kind in ('native_reconstruction','teacher_reconstruction'):
                 if np.mean([r[kind]['ca_lddt'] for r in metadata['records']])<.98:raise ValueError('canonical label reconstruction gate failed')
             label_path=path.parent/'labels.h5'
@@ -122,7 +125,7 @@ def main():
                                 if not ema[key].is_floating_point():ema[key].copy_(values[key])
                         m['updates']=step+1
                         if step%25==0 or step+1==end:
-                            m['training'].append(dict(step=step+1,length=length,batch=count,reference_draw_probability=1. if c['arm'] in ('reference','raw_reference') else .5,flow_loss=float(loss.detach()),gradient_norm=float(norm),learning_rate=lr,ids_sha256=hashlib.sha256('\n'.join(ids).encode()).hexdigest()));atomic_json(a.output/'manifest.json',m)
+                            m['training'].append(dict(step=step+1,length=length,batch=count,reference_draw_probability=1. if c['arm'] in ('reference','raw_reference','cached_reference') else .5,flow_loss=float(loss.detach()),gradient_norm=float(norm),learning_rate=lr,ids_sha256=hashlib.sha256('\n'.join(ids).encode()).hexdigest()));atomic_json(a.output/'manifest.json',m)
                         del mask,z,esm,loss
                     torch.cuda.synchronize();seconds=time.monotonic()-tick
                 finally:torch.cuda.nvtx.range_pop()

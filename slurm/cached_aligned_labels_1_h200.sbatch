@@ -16,6 +16,6 @@ PYTHON=/n/home08/bsabatini/.conda/envs/proteinae/bin/python
 NSYS=/n/sw/helmod-rocky8/apps/Core/cuda/13.3.1-fasrc01/cuda/bin/nsys
 RUN="runs/distill_data_${SLURM_JOB_ID}"
 exec "$NSYS" profile --trace=nvtx --sample=none --cpuctxsw=none \
- --gpu-metrics-devices=cuda-visible --gpu-metrics-frequency=100 --export=sqlite --output="${RUN}_nsight" \
+ --gpu-metrics-devices=cuda-visible --gpu-metrics-frequency=1000 --export=sqlite --output="${RUN}_nsight" \
  "$PYTHON" -u scripts/realign_teacher_labels.py --source /n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae \
  --config runs/cached_aligned_labels_1.json --output "$RUN"

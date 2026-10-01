@@ -30,6 +30,10 @@ Empirical teacher training improves MD W1 over initialization by 0.02718 [0.0120
 
 On 64 separate tuning families, empirical CA lDDT rises from 0.78384 to 0.78694; the gain interval includes zero. Optimized fixed-correspondence TM is effectively unchanged: 0.68488 to 0.68409, difference interval [-0.00708,0.00588]. The larger drop in the Kabsch-based TM diagnostic is alignment-sensitive and must not be presented as an equivalent optimized-TM loss. Teacher labels help relative to the weaker canonical-reference control, but do not establish an improvement over the starting model.
 
+## Subsequent provenance correction
+
+The original inherited cache already used PCA canonicalization before encoding. Fresh raw-file reference labels did not preserve that convention; this was missed in the initial interpretation. Both raw-file and first-residue-frame retraining changed the cached target convention. The corrected follow-up will preserve cached reference latents exactly and align teacher conformations to cached reference coordinates. See [the rotation verdict](rotation_verdict_20261001.md). The measured results above remain unchanged.
+
 ## Why the next experiment must change
 
 ProteinAE latents depend strongly on arbitrary rigid rotation. Canonicalization removes this nuisance but changes the target convention of the inherited head. A useful next control is teacher structures rigidly aligned to their own training reference before encoding, retaining the raw reference latents. A proper-rotation alignment helper is implemented and CPU-tested; that new training experiment has not been launched.

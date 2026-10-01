@@ -1,0 +1,9 @@
+{
+  "purpose": "Locate the dominant training kernels before more engine changes",
+  "evidence": "Actual recovery training has 95-97% SM activity but roughly 41% instruction issue. Fused AdamW improved step speed less than 1%; changing checkpoint policy failed its strict gradient control. Existing traces recorded GPU counters but not CUDA kernel launches.",
+  "measurement": "Unchanged all-block activation recomputation, FP16 forward, current controlled backward/clip, standard single-tensor AdamW and real EMA storage. Zero LR fixes weights. Profile lengths 128/256/384/512 at validated batches 128/64/32/16, with self conditioning absent and present. Warm up each case, then trace two steps with CUDA and NVTX.",
+  "analysis": "Report top CUDA kernels and summed durations, stage fractions for forward/backward+clip/optimizer/EMA, instruction issue and memory. Attribute by host launch time within explicit stages; show missing attribution. Tracing overhead prevents a speed-promotion claim.",
+  "followup": "Choose a narrowly targeted optimization from measured dominant work, then numerical/gradient controls and a separate untraced throughput test before adoption. Do not change the running training snapshots.",
+  "resources": {"gpus": 1, "gpu_type": "H200", "walltime_minutes": 15},
+  "final_test": "Unscored; no earlier-layer ESM computation"
+}

@@ -1,0 +1,14 @@
+{
+  "declared_before_training": true,
+  "primary_guidance": 1,
+  "guidance_sensitivity": 2,
+  "primary_contact_threshold_angstrom": 2,
+  "strict_contact_threshold_angstrom": 1,
+  "capacity_evidence": "Aligned or PCA teacher supervision improves training-mode recall versus initialization and reference-only control with positive paired95% family lower bound; mean gain at least0.10 versus reference, valid fraction no more than0.01 below initialization. Report strict-threshold sensitivity and all settings. This is evidence to test generalization, not promotion.",
+  "frame_evidence": "Matched aligned-versus-PCA comparison with identical labels, seeds and budgets. Report intervals; no causal conclusion from aligned-versus-reference alone.",
+  "if_capacity_learned": "Evaluate held-out development/native tuning before broader training. A successful small-panel fit is not expected to improve generalization directly. Carry successful recipe to broader frozen training data only with matched control and reconstruction checks.",
+  "if_capacity_not_learned": "Inspect loss, actual flow time/noise schedule, conditioning and latent-mode recall before decoded validity. Test targeted intervention or longer optimization only if measurements identify a plausible cause; stop repeated blind sweeps.",
+  "if_geometry_is_limiting": "Separate teacher roundtrip, predicted-latent geometry and mode assignment. Test a small decoded-geometry correction/loss against a matched control, with structural-displacement accounting and no native-assisted inference.",
+  "deadline_utc": "2026-10-02T15:00:00+00:00",
+  "protected": "Original34 and reserved17 held out; no test access to pick experiments. Eight project GPUs total pending+running."
+}

@@ -1,19 +1,26 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ESM–ProteinAE experiment results</title><style>body{max-width:1050px;margin:40px auto;padding:0 24px;font:16px/1.5 system-ui;color:#17212b}table{border-collapse:collapse;width:100%}td,th{text-align:left;border-bottom:1px solid #ccc;padding:8px}small{color:#52616e}a{color:#2059a1}</style>
 <h1>ESM → ProteinAE: current evidence</h1>
-<small>Generated from recorded artifacts at 2026-10-01T02:29:58+00:00. This is a saved snapshot.</small>
+<small>Generated from recorded artifacts at 2026-10-01T03:29:04+00:00. This is a saved snapshot.</small>
 <p>Earlier-layer ESM work is deferred, with no GPU allocation. Current work tests the causes of continued-training regression, saved-checkpoint choice, reference-free sample selection and GPU efficiency.</p>
 <h2>Autonomous recovery and selection round</h2>
 <p>Authorized window: 2026-10-01T01:30:07Z through 2026-10-01T13:30:07Z. At most eight project GPUs pending or running; only registered project jobs are inspected. Earlier-layer ESM allocation remains zero.</p>
-<p>Scheduler snapshot from the project watcher: 2026-10-01T02:29:39.053449+00:00; watcher status ok. Pending requests are not running GPU computation.</p>
+<p>Scheduler snapshot from the project watcher: 2026-10-01T03:28:27.760837+00:00; watcher status ok. Pending requests are not running GPU computation.</p>
 <table><tr><th>Job</th><th>Question</th><th>Task states at snapshot</th></tr>
-<tr><td>49523242</td><td>Single-factor recovery screens: AdamW beta2 and residue loss reduction; seed 7919, 500 updates, existing matched control</td><td>49523242_0: PENDING, 49523242_1: PENDING</td></tr>
-<tr><td>49524706</td><td>Fixed-protocol comparison of training-selected best EMA and final unaveraged weights against the final EMA reference</td><td>49524706_0: PENDING, 49524706_1: PENDING</td></tr>
-<tr><td>49526215</td><td>Single-factor data-diversity recovery screen: 16384 cached proteins, seed 7919, 500 updates, unchanged latent loss and optimizer</td><td>49526215: PENDING</td></tr>
-<tr><td>49526739</td><td>Bounded FP16 gradient-equivalence and throughput profile: all-block versus pair-only activation recomputation at unchanged batch shapes</td><td>49526739: PENDING</td></tr>
-<tr><td>49528311</td><td>Two independent inference-noise replications of the frozen three-sample consensus rule after a +0.00543 TM CPU screen; untouched checkpoint, all 626 development targets</td><td>49528311_0: PENDING, 49528311_1: PENDING</td></tr>
+<tr><td>49523242</td><td>Single-factor recovery screens: AdamW beta2 and residue loss reduction; seed 7919, 500 updates, existing matched control</td><td>49523242_0: COMPLETED, 49523242_1: RUNNING</td></tr>
+<tr><td>49524706</td><td>Fixed-protocol comparison of training-selected best EMA and final unaveraged weights against the final EMA reference</td><td>49524706_0: COMPLETED, 49524706_1: COMPLETED</td></tr>
+<tr><td>49526215</td><td>Single-factor data-diversity recovery screen: 16384 cached proteins, seed 7919, 500 updates, unchanged latent loss and optimizer</td><td>49526215: RUNNING</td></tr>
+<tr><td>49526739</td><td>Bounded FP16 gradient-equivalence and throughput profile: all-block versus pair-only activation recomputation at unchanged batch shapes</td><td>49526739: FAILED</td></tr>
+<tr><td>49528311</td><td>Two independent inference-noise replications of the frozen three-sample consensus rule after a +0.00543 TM CPU screen; untouched checkpoint, all 626 development targets</td><td>49528311_0: COMPLETED, 49528311_1: COMPLETED</td></tr>
+<tr><td>49537668</td><td>Bounded full-sequence speed candidate: FP16 final-layer ESMC plus validated FP16 feed-forward head, strict decoder; unchanged controls and all 626 targets against FP32 online baseline</td><td>49537668: COMPLETED</td></tr>
+<tr><td>49538855</td><td>Bounded fused AdamW arithmetic and real forward-backward throughput comparison with validated all-block recomputation and unchanged batch sizes</td><td>49538855: RUNNING</td></tr>
 </table><p>The recovery screens change optimizer beta2, loss reduction, or training-pool size separately. Checkpoint diagnostics compare the training-selected epoch-22 EMA and final raw weights with final EMA. The efficiency profile measures all-block versus pair-only activation recomputation before any training-policy change.</p>
-<p><strong>Reference-free selection screen:</strong> choosing the most mutually consistent of three predictions raised TM from 0.56824 to 0.57367; change +0.00543, 95% cluster interval [+0.00358, +0.00734]. lDDT and aggregate geometry also improved. Choices were frozen before reading native scores. This falls below the +0.01 practical accuracy target and requires two new inference-noise replications.</p>
+<p><strong>Reference-free selection screen:</strong> choosing the most mutually consistent of three predictions raised TM from 0.56824 to 0.57367; change +0.00543, 95% cluster interval [+0.00358, +0.00734]. lDDT and aggregate geometry also improved. Choices were frozen before reading native scores. This falls below the +0.01 practical accuracy target.</p>
+<p><strong>Two inference-noise replications completed:</strong> pooled TM gain +0.00360, interval [+0.00219, +0.00507], excluding the initial screen. Both new seeds improved. These remain reused development targets, not independent-test or training-seed confirmation.</p>
+<p>Checkpoint training_selected_best_ema_epoch22: TM 0.56767, change versus final EMA -0.00057, interval [-0.00249, +0.00131]. Retain final EMA.</p>
+<p>Checkpoint final_unaveraged_epoch30: TM 0.56465, change versus final EMA -0.00359, interval [-0.00539, -0.00182]. Retain final EMA.</p>
+<p>Pair-only activation recomputation failed its gradient-equivalence gate before timing. No policy change is adopted. A separate fused-AdamW profile retains all-block recomputation.</p>
+<p><strong>FP16 complete pipeline:</strong> 2.03 proteins/s with three structures per protein, 66.6 GiB reserved, 65.0% instruction issue. Speedup versus matched FP32: 1.71x; development noninferiority: True. Below the 2x speed gate. A single larger-batch test uses the measured memory headroom. SM issue is not percent of peak FLOPs.</p>
 <p><strong>Pair-free selection:</strong> the same frozen rule gives TM 0.56230, versus 0.57367 for selected pair; difference -0.01137, 95% cluster interval [-0.01515, -0.00763]. It fails development noninferiority; no GPU follow-up is assigned to this branch.</p>
 <h2>Structure accuracy</h2><p>All 626 development proteins and three samples per protein; every sample retained. Fixed residue correspondence, optimized TM-score and CA lDDT. These are reused development data.</p>
 <table><tr><th>Model</th><th>Mean TM</th><th>CA lDDT</th><th>Coverage</th></tr>

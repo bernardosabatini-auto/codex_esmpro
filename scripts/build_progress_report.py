@@ -30,7 +30,23 @@ def current_round():
     d=read('reports/consensus_final_ema.json')
     if d:
         s=d['pairs']['tm_fixed_reference']['sample_mean'];ci=s['ci95']
-        lines.append(f'<p><strong>Reference-free selection screen:</strong> choosing the most mutually consistent of three predictions raised TM from {s["ours"]:.5f} to {s["theirs"]:.5f}; change {s["theirs_minus_ours"]:+.5f}, 95% cluster interval [{ci[0]:+.5f}, {ci[1]:+.5f}]. lDDT and aggregate geometry also improved. Choices were frozen before reading native scores. This falls below the +0.01 practical accuracy target and requires two new inference-noise replications.</p>')
+        lines.append(f'<p><strong>Reference-free selection screen:</strong> choosing the most mutually consistent of three predictions raised TM from {s["ours"]:.5f} to {s["theirs"]:.5f}; change {s["theirs_minus_ours"]:+.5f}, 95% cluster interval [{ci[0]:+.5f}, {ci[1]:+.5f}]. lDDT and aggregate geometry also improved. Choices were frozen before reading native scores. This falls below the +0.01 practical accuracy target.</p>')
+    d=read('reports/consensus_49528311.json')
+    if d and d.get('replications_only_paired'):
+        s=d['replications_only_paired']['tm_fixed_reference'];ci=s['ci95']
+        lines.append(f'<p><strong>Two inference-noise replications completed:</strong> pooled TM gain {s["theirs_minus_ours"]:+.5f}, interval [{ci[0]:+.5f}, {ci[1]:+.5f}], excluding the initial screen. Both new seeds improved. These remain reused development targets, not independent-test or training-seed confirmation.</p>')
+    d=read('reports/checkpoint_49524706.json')
+    if d:
+        for row in d.get('runs',{}).values():
+            s=row['paired']['tm_fixed_reference'];ci=s['ci95']
+            lines.append(f'<p>Checkpoint {esc(row["probe"]["name"])}: TM {s["theirs"]:.5f}, change versus final EMA {s["theirs_minus_ours"]:+.5f}, interval [{ci[0]:+.5f}, {ci[1]:+.5f}]. Retain final EMA.</p>')
+    d=read('reports/efficiency_49526739.json')
+    if d and d.get('status')=='failed':
+        lines.append('<p>Pair-only activation recomputation failed its gradient-equivalence gate before timing. No policy change is adopted. A separate fused-AdamW profile retains all-block recomputation.</p>')
+    d=read('reports/online_49537668.json')
+    if d and d.get('status')=='complete':
+        h=d['hardware']['collection_mean_percent']
+        lines.append(f'<p><strong>FP16 complete pipeline:</strong> {d["proteins_per_second"]:.2f} proteins/s with three structures per protein, {d["peak_reserved_gib"]:.1f} GiB reserved, {h["SM Issue [Throughput %]"]:.1f}% instruction issue. Speedup versus matched FP32: {d["speedup_vs_full_precision"]:.2f}x; development noninferiority: {d["full_precision_noninferiority_passed"]}. Below the 2x speed gate. A single larger-batch test uses the measured memory headroom. SM issue is not percent of peak FLOPs.</p>')
     d=read('reports/consensus_pairfree_vs_pair.json')
     if d:
         s=d['paired']['tm_fixed_reference'];ci=s['ci95']

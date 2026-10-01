@@ -64,14 +64,26 @@ prevents claiming an exact replay of the inherited run.
 A CPU-only [reference-free selection screen](reports/consensus_final_ema.md)
 raised TM from 0.56824 to 0.57367 by choosing the most mutually consistent of
 three predictions. The selector sees predicted coordinates only. This is a
-development result below the +0.01 promotion threshold. Two fixed new inference
-seeds are queued for replication; no independent-test structures have been scored.
+development result below the +0.01 promotion threshold. The
+[two new inference-noise replications](reports/consensus_49528311.md) give
+TM gains of +0.00352 and +0.00368. Their pooled gain, excluding the initial
+screen, is +0.00360 [95% cluster interval +0.00219, +0.00507]. This is a
+consistent modest benefit on reused targets, not independent-target or
+training-seed confirmation. No independent-test structures have been scored.
 The [existing length/continuity strata](reports/consensus_strata_final_ema.md)
 show a smaller, uncertain selection benefit for the longest chains.
 The same rule improves pair-free to 0.56230 TM, but it remains
 [0.01137 below selected pair](reports/consensus_pairfree_vs_pair.md)
 (95% cluster interval −0.01515 to −0.00763). No GPU follow-up is assigned to
 that branch: it fails development noninferiority despite its within-model gain.
+
+The [checkpoint diagnostic](reports/checkpoint_49524706.md) supports retaining
+final EMA: training-selected epoch-22 EMA changes TM by −0.00057 (uncertain),
+and final raw weights by −0.00359 (interval entirely negative). Its geometry
+report was corrected to use only the matching 25-step/CFG-2 reference rows;
+TM and lDDT were already filtered correctly. The
+[pair-only recomputation attempt](reports/efficiency_49526739.md) failed the
+predeclared gradient-equivalence control before timing and is not adopted.
 
 The current autonomous window ends at 2026-10-01 13:30 UTC (09:30 EDT).
 New requests receive a Slurm completion deadline. A one-shot project timer
@@ -87,6 +99,15 @@ activity and 75.1% instruction issue. Accuracy and coarse geometry pass the
 development noninferiority checks against cached inference. These are inherited
 development sequences, which can omit unresolved residues. The ESMFold2 timing
 used a different batch regime, so no matched-throughput speed ratio is claimed.
+
+The [FP16 ESMC and feed-forward-head candidate](reports/online_49537668.md)
+passes the unchanged online numerical and development noninferiority checks:
+TM 0.56784, 2.03 proteins/s, 66.6 GiB reserved, and 65.0% instruction issue
+during collection. It is 1.71x faster than the matched full-FP32 online run,
+below the predeclared 2x speed gate. A single
+[larger-batch test](configs/online_batch_plan.json) uses that measured memory
+headroom. A separate [AdamW implementation profile](configs/optimizer_profile_plan.json)
+tests optimizer overhead with the validated all-block recomputation policy.
 
 This is a minimal research core, extracted from the original project with
 [symbol-level provenance](PROVENANCE.json). It retains both flow architectures

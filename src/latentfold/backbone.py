@@ -4,6 +4,38 @@ import numpy as np
 import torch
 
 
+def align_backbone_to_reference(backbone, reference, alignment_mask):
+    """Fit a proper CA rotation on a shared core and transform every atom.
+
+    Backbone is [B,L,4,3], reference is [L,4,3], mask is boolean [L].
+    The caller must define core eligibility before examining model outcomes.
+    This helper neither filters samples nor supplies references at inference.
+    """
+    if (backbone.ndim != 4 or backbone.shape[2:] != (4, 3) or
+            reference.shape != backbone.shape[1:] or
+            alignment_mask.shape != backbone.shape[1:2] or alignment_mask.dtype != torch.bool or
+            not backbone.is_floating_point() or not reference.is_floating_point()):
+        raise ValueError('expected complete backbone batch, matching reference and shared boolean core')
+    if (backbone.device != reference.device or backbone.device != alignment_mask.device or
+            not torch.isfinite(backbone).all() or not torch.isfinite(reference).all() or
+            alignment_mask.sum() < 3):
+        raise ValueError('invalid alignment coordinates, devices or core')
+    source = backbone[:, alignment_mask, 1].double()
+    target = reference[alignment_mask, 1].double()
+    origin = source.mean(1, keepdim=True)
+    destination = target.mean(0, keepdim=True)
+    source = source - origin
+    target = target - destination
+    u, singular, vh = torch.linalg.svd(source.transpose(1, 2) @ target)
+    if (singular[:, 1] < 1e-8).any():
+        raise ValueError('collinear or degenerate alignment core')
+    correction = torch.ones(len(backbone), 3, device=backbone.device, dtype=torch.float64)
+    correction[:, -1] = torch.where(torch.linalg.det(u @ vh) < 0, -1., 1.)
+    rotation = (u * correction[:, None, :]) @ vh
+    aligned = torch.einsum('bnai,bij->bnaj', backbone.double() - origin[:, :, None], rotation)
+    return (aligned + destination[None, :, None]).to(backbone.dtype)
+
+
 def canonical_backbone_frame(backbone):
     """Fix rigid pose using the first residue's complete N/CA/C frame.
 

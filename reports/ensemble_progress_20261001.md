@@ -1,6 +1,6 @@
 # Ensemble research: evidence and next experiments
 
-The student has useful latent-driven diversity, but no new training intervention has yet demonstrated a statistically supported improvement. The strongest actionable finding is that ProteinAE latents depend strongly on rigid rotation. We are testing whether removing that nuisance variation makes sequence-conditioned learning easier.
+The agreed campaign is complete. No trained intervention passes the state-coverage promotion gate. See [the final assessment](ensemble_campaign_final_20261001.md) for the consolidated decision; the sections below retain detailed experiment evidence.
 
 ## Results
 
@@ -65,4 +65,20 @@ Training-label sensitivity shows that 238/512 proteins have sixteen singleton RM
 
 The ATLAS metadata-only audit finds 63 eligible, current-panel-disjoint candidates but zero inherited-data-disjoint families. This can support a stronger intervention-held-out MD assay if needed, but cannot repair the inherited-training generalization limitation. No additional confirmation predictions were generated.
 
-The full matched intermediate analysis also shows a global-accuracy loss: TM after Kabsch falls by 0.0165–0.0239 across the four 500-update arms, with paired family intervals entirely below zero. This is a fixed-correspondence diagnostic, not optimized TM-align. The teacher-supervised arms outperform the canonical-reference control but do not recover the inherited baseline's global accuracy. Local CA lDDT alone would conceal this tradeoff.
+The full matched intermediate analysis also shows a global-accuracy loss: TM after Kabsch falls by 0.0165–0.0239 across the four 500-update arms, with paired family intervals entirely below zero. This is a fixed-correspondence diagnostic, not optimized TM-align. The teacher-supervised arms outperform the canonical-reference control but do not recover the inherited baseline's global accuracy. Local CA lDDT alone conceals this alignment-sensitive diagnostic; the optimized TM check below is needed before interpreting it as fold-accuracy loss.
+
+## Final training checkpoints
+
+All four arms completed 2,000 updates and the full 64-family, three-seed tuning evaluation. Empirical-teacher CA lDDT is 0.78694 versus initial 0.78384, gain 0.00310 with interval [-0.00165, 0.00851]; balanced-teacher CA lDDT is 0.78632. Teacher supervision improves local accuracy relative to the matched canonical-reference control (empirical +0.00769, interval [0.00462, 0.01100]), but does not establish improvement over initialization.
+
+Global TM after Kabsch is 0.52900 for empirical and 0.52568 for balanced, versus initial 0.54529. Their changes are -0.01629 [-0.03086, -0.00211] and -0.01961 [-0.03468, -0.00501]. Coarse validity is 0.96354 for both versus initial 0.97917. Raw-reference-only ends at 0.78027 CA lDDT, 0.53287 TM after Kabsch and 0.97917 validity; canonical-reference-only ends at 0.77925, 0.52040 and 0.96354. The full final-checkpoint ensemble evaluations remain required and are being submitted by the fixed continuation controller.
+
+Each completed run reserved approximately 63.65 GiB at peak. Raw-reference and empirical runs sustained SM instruction issue of 59.93% and 59.82% across their full profiler captures, and 60.58% and 60.33% during training. These exceed the 50% instruction-issue target but are not claims of 60% peak FLOP efficiency. Canonical-reference counters failed coverage validation and are reported unavailable rather than extrapolated.
+
+The teacher's 32-to-128 sample benefit survives the exact-sequence sensitivity check: among thirteen cases without construct substitutions, coverage rises from 0.57692 to 0.73077, paired gain 0.15385 with 95% family interval [0.03846, 0.26923]. All four improving cases are exact-sequence cases. This secondary analysis leaves the original sixteen-case primary result unchanged.
+
+Optimized fixed-correspondence USalign TM scoring is complete for all 2,304 tuning predictions (all four arms at 0/500/2000). Its verified binary hash matches the earlier benchmark executable. Initial TM is 0.684877. Final raw-reference/canonical-reference/empirical/balanced scores are 0.683610/0.678033/0.684086/0.682821. Empirical versus initialization is -0.000791, family interval [-0.00708, 0.00588]; balanced is -0.002056 [-0.00794, 0.00406]. Thus the much larger Kabsch-score losses must not be presented as equivalent optimized-TM losses. Neither optimized-TM gain nor strict noninferiority at the -0.005 confidence bound is established. Teacher supervision does improve over the canonical-reference control: empirical +0.00606 [0.00194, 0.01053], balanced +0.00479 [0.00104, 0.00865]. This leaves the state-coverage and validity decision unchanged.
+
+Balanced training also has valid utilization counters: 59.64% SM instruction issue across the whole capture and 60.34% during training, peak reserved memory 63.65 GiB. All four training jobs completed in approximately 69 minutes each; no GPU jobs remain after the predeclared final ensemble generations. Final CPU ensemble scoring is complete.
+
+All final ensemble scores are complete: raw-reference/canonical-reference/empirical/balanced coverage is 0.40625/0.43750/0.43750/0.43750. Empirical MD W1 improves by 0.02718 [0.01206,0.04378] versus initialization, but the difference versus canonical-reference retraining is uncertain. Neither teacher arm passes the predeclared state-coverage gate; no replication or confirmation scoring is warranted. All registered campaign GPU jobs and CPU scoring are complete.

@@ -6,7 +6,10 @@ from summarize_comparison import hardware
 def main():
     p=argparse.ArgumentParser();p.add_argument('--runs',nargs='+',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
     if len(a.runs)!=1:raise ValueError('one profile required')
-    run=a.runs[0];d=json.loads((run/'profile.json').read_text());lines=['# Activation recomputation profile','',d['scope'],'',f"Status: {d['status']}",'',
+    run=a.runs[0];path=run/'profile.json'
+    d=json.loads(path.read_text()) if path.exists() else dict(status='failed',controls=[],rows=[],
+        scope='No GPU profiling result was produced.',error='The registered job ended before profile.json was written; consult its scheduler exit state in the watcher record.')
+    lines=['# Activation recomputation profile','',d['scope'],'',f"Status: {d['status']}",'',
         '| Padded length | Policy | Batch | Proteins/s | Reserved GiB | SM issue % |', '|---:|---|---:|---:|---:|---:|']
     for row in d['rows']:
         if row['status']!='complete':lines.append(f"| {row['length']} | {row['policy']} | {row['batch']} | out of memory | — | — |");continue

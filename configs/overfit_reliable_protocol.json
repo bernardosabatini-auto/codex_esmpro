@@ -1,0 +1,38 @@
+{
+  "purpose": "Can a conditioned flow memorize a small teacher ensemble, and does independent PCA prevent it?",
+  "deadline_utc": "2026-10-02T15:00:00+00:00",
+  "selection": "32 training-only proteins with mean teacher pLDDT>=0.8, at least max(32,ceil(L/2)) confident residues,2..8 contact states and mean contact-feature distance<=6A. Five length128 and nine each256/384/512, highest mean confidence then ID within bucket. Revised before any student training after extreme-diversity selection failed reconstruction.",
+  "state_definition": "Shared mean-confidence >=0.7 core; all residues if fewer than max(32,ceil(L/2)); separation>3, teacher distance range>=2A and min<=12A; deterministic lexicographic subsample at most4096 contacts. Connected components at feature RMSD<=1A; only coarse-valid source teachers define states.",
+  "evaluation": "Fresh flow seeds;32 samples per training protein at0/500/2000; CFG1 and CFG2 both reported. Valid state hit requires featureRMSE<=2A, nearest-contact teacher CA-lDDT>=0.8, coarse-valid geometry. No native filtering of generated samples. This measures teacher-mode recall, not biological-state coverage.",
+  "arms": [
+    "reference",
+    "aligned_teacher",
+    "pca_teacher"
+  ],
+  "teacher_distribution": "Uniform over the same valid teacher conformations, no reference mixture. Reference control draws only bitwise cached labels. Pure-teacher supervision deliberately tests capacity before repeating mixed-data optimization.",
+  "batching": "Same32/16/8/8 production batches, permutation cycles with independent sample noise;5/9/9/9 unique targets in four buckets",
+  "updates": 2000,
+  "evaluation_steps": [
+    500,
+    2000
+  ],
+  "learning_rate": 3e-05,
+  "ema_decay": 0.99,
+  "warmup_updates": 100,
+  "seed": 2026100161,
+  "evaluation_seed": 2026100162,
+  "precision": "strict FP32",
+  "decision": "First test training-set valid mode recall versus initialization and reference control. If it improves, test generalization before promotion; otherwise diagnose optimization, conditioning and decoded geometry. All settings retained, no test scoring.",
+  "panel": "confident_multistate",
+  "selection_counts": {
+    "128": 5,
+    "256": 9,
+    "384": 9,
+    "512": 9
+  },
+  "previous_selection": "runs/overfit_selection.json",
+  "previous_audits": [
+    "49690071",
+    "49691755"
+  ]
+}

@@ -48,7 +48,7 @@ def main():
         torch.manual_seed(c['seed']);ema={k:v.detach().clone() for k,v in model.state_dict().items()};optimizer=torch.optim.AdamW(model.parameters(),lr=c['learning_rate'],betas=(.9,.95),weight_decay=.01,foreach=False)
         order=np.random.default_rng(c['seed']);labels_rng=np.random.default_rng(c['seed']+1);rng=torch.Generator(device='cuda').manual_seed(c['seed']);queues={k:[] for k in buckets};telemetry=Telemetry(a.output,True)
         def evaluate(step):
-            model.eval();raw={k:v.detach().cpu().clone() for k,v in model.state_dict().items()};model.load_state_dict(ema);state_cpu=torch.get_rng_state();state_gpu=torch.cuda.get_rng_state()
+            model.eval();raw={k:v.detach().cpu().clone() for k,v in model.state_dict().items()};model.load_state_dict(ema);state_cpu=torch.get_rng_state();state_gpu=torch.cuda.get_rng_state();evaluated_controls=set()
             with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/f'evaluation_{step}.h5','x') as out:
                 for index,(ident,r) in enumerate(records.items()):
                     n=r['length'];length=r['bucket'];esm=torch.zeros(1,length,2560,device='cuda');esm[0,:n]=r['esm'].cuda();mask=torch.arange(length,device='cuda')[None]<n
@@ -60,11 +60,11 @@ def main():
                         name=f'collect::overfit_eval::{step}::{index}::{guidance}';torch.cuda.synchronize();tick=time.monotonic();torch.cuda.reset_peak_memory_stats();torch.cuda.nvtx.range_push(name)
                         try:
                             z=sample(model,esm.repeat(32,1,1),mask.repeat(32,1),SampleConfig(steps=25,guidance=guidance),noise=noise,conditioning_ids=[ident]*32);_,bb=decoder(z,mask.repeat(32,1),noise=dn,return_backbone=True);bb=bb[:,:n];scored,values,teacher=score_ensemble(bb,r)
-                            if step==0 and index%8==0:
+                            if step==0 and (length,guidance) not in evaluated_controls:
                                 single=sample(model,esm[:,:n],mask[:,:n],SampleConfig(steps=25,guidance=guidance),noise=noise[:1,:n]);alone=decoder(single,mask[:,:n],noise=dn[:1,:4*n])[0].cpu().numpy();control=ca_metrics(bb[0,:,1].cpu().numpy(),alone)
                                 cpu=ca_metrics(bb[0,:,1].cpu().numpy(),teacher[0,:,1].cpu().numpy());valid=backbone_geometry(bb.cpu().numpy())['coarse_valid']
                                 if control['ca_rmsd']>.2 or control['ca_lddt']<.99 or abs(cpu['ca_lddt']-values['ca_lddt'][0].item())>1e-5 or not np.array_equal(valid,values['coarse_valid'].cpu().numpy()):raise ValueError('batch/metric control failed')
-                                m['controls'].append(dict(bucket=length,guidance=guidance,**control))
+                                m['controls'].append(dict(bucket=length,guidance=guidance,**control));evaluated_controls.add((length,guidance))
                             g=out.require_group(ident).create_group(f'cfg{guidance}');g.create_dataset('backbone',data=bb.cpu().numpy());g.create_dataset('z',data=z[:,:n].cpu().numpy());m['scores'].append(dict(step=step,target_id=ident,guidance=guidance,**scored));torch.cuda.synchronize();seconds=time.monotonic()-tick
                         finally:torch.cuda.nvtx.range_pop()
                         m['batches'].append(dict(nvtx_range=name,stage='evaluation',seconds=seconds,peak_reserved_bytes=torch.cuda.max_memory_reserved()))

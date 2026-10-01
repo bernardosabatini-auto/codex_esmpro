@@ -66,6 +66,14 @@ raised TM from 0.56824 to 0.57367 by choosing the most mutually consistent of
 three predictions. The selector sees predicted coordinates only. This is a
 development result below the +0.01 promotion threshold. Two fixed new inference
 seeds are queued for replication; no independent-test structures have been scored.
+The [existing length/continuity strata](reports/consensus_strata_final_ema.md)
+show a smaller, uncertain selection benefit for the longest chains.
+
+The current autonomous window ends at 2026-10-01 13:30 UTC (09:30 EDT).
+New requests receive a Slurm completion deadline. A one-shot project timer
+also cancels any unfinished requests from this window at its end, covering
+the jobs submitted before that scheduler deadline was added. Its ownership
+filter uses only this project's registry and submission timestamps.
 
 The [complete sequence-to-backbone pipeline](reports/online_49470256.md) now
 includes fresh final-layer ESMC extraction, with all components in strict FP32.
@@ -130,7 +138,7 @@ final-layer ESMC; the validated configuration is in `configs/validated_inference
 
 ## Scope and limits
 
-- Tested: 41 CPU contract tests; exact forward parity of small pair and pair-free
+- Tested: 42 CPU contract tests; exact forward parity of small pair and pair-free
   models against isolated original definitions; a real pretrained ProteinAE
   decoder on one validation target; the full 626-target artifact/data audit.
 - H200 job 49346371 completed 50 throughput/memory configurations of the actual

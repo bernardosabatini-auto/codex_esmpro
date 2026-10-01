@@ -29,7 +29,7 @@ def main():
         except Exception as error:result['hardware']=dict(status='unavailable',error=str(error))
     else:result['error']=m.get('error','Incomplete run')
     a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n')
-    lines=['# Teacher seed and integration-step diagnostic','',f"Status: {result['status']}.",'',result['scope'],'','Full-fold controls include the confidence head; production sampling timing excludes it. Thirty-two samples per target/setting, collected in fixed groups of eight.','', '| Steps | Mean pairwise CA RMSD (A) | Peptide outlier fraction | Structure sampling seconds |','|---|---:|---:|---:|']
+    lines=['# Teacher seed and integration-step diagnostic','',f"Status: {result['status']}.",'',result['scope'],'',m.get('timing_scope',''),'',f"Thirty-two samples per target/setting; batch {m.get('config',{}).get('sample_batch','unknown')}, trunk realizations {m.get('config',{}).get('trunk_replicates',1)}.",'', '| Steps | Mean pairwise CA RMSD (A) | Peptide outlier fraction | Measured sampling seconds |','|---|---:|---:|---:|']
     for s,r in result.get('summaries',{}).items():lines.append(f"| {s} | {r['pairwise_ca_rmsd']:.4f} | {r['peptide_outlier_fraction']:.4f} | {result['sampling_seconds'][s]:.2f} |")
     if 'error' in result:lines+=['',result['error']]
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')

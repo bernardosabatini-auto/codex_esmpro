@@ -8,6 +8,7 @@ from summarize_comparison import hardware
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs='+',required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();run=a.runs[0];path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest');c=m.get('config',{});d=dict(status=m['status'],arm=c.get('arm'),profile_only=c.get('profile_only'),summaries={},paired={},latent_diagnostics={})
+    d['target_estimator']=c.get('target_estimator','sampled')
     if m['status']=='complete':
         if m['updates']!=c['updates']:raise ValueError('incomplete training')
         if not c.get('profile_only'):
@@ -20,6 +21,8 @@ def main():
                     key=f'{step}_cfg{guidance}';d['summaries'][key]={k:float(np.mean([r[k] for r in rows])) for k in ('valid_fraction','teacher_ca_lddt','reference_ca_lddt','teacher_feature_rmse','valid_teacher_hit_fraction','state_total_variation','teacher_sampling_expected_coverage32')};d['summaries'][key]['coverage32']=float(np.mean([r['coverage']['32'] for r in rows]));d['paired'][key]=paired_change({r['target_id']:r['coverage']['32'] for r in rows},baseline)
                     d['latent_diagnostics'][key]={metric:float(np.mean([r['latent_diagnostic'][metric] for r in rows])) for metric in rows[0]['latent_diagnostic']}
         d['max_reserved_gib']=max(r['peak_reserved_bytes'] for r in m['batches'])/1024**3;d['training_seconds']=sum(r['seconds'] for r in m['batches'] if r['stage']=='training')
+        if d['target_estimator']=='posterior':
+            rows=m['training'];d['logged_posterior_variance_mean']=float(np.mean([r['posterior_variance'] for r in rows]));d['logged_posterior_floor_fraction']=float(np.mean([r['posterior_variance']/r['flow_loss'] for r in rows]))
         try:d['hardware']=hardware(Path(str(run)+'_nsight.sqlite'),m['batches'])
         except Exception as e:d['hardware']=dict(status='unavailable',error=str(e))
     else:d['error']=m.get('error','Incomplete run')
@@ -30,6 +33,8 @@ def main():
         lines+=['','Latent diagnostics (nearest teacher RMSE): global reference fits below are evaluation-only and never alter predictions.','','| Updates / guidance | Sampled latent | Re-encoded backbone | Pose-aligned re-encoded backbone | Decoder/encoder RMSE |','|---|---:|---:|---:|---:|']
         for key,r in d['latent_diagnostics'].items():lines.append(f"| {key} | {r['sampled_to_teacher_rmse']:.5f} | {r['reencoded_to_teacher_rmse']:.5f} | {r['pose_aligned_reencoded_to_teacher_rmse']:.5f} | {r['decoder_encoder_rmse']:.5f} |")
     if 'error' in d:lines+=['',d['error']]
+    if d['target_estimator']=='posterior':
+        lines+=['',f"Target estimator: posterior mean plus detached conditional variance. Logged mean variance: {d.get('logged_posterior_variance_mean')}; logged mean variance/loss fraction: {d.get('logged_posterior_floor_fraction')}. These sparse logs are diagnostic, not an estimate of gradient-variance reduction. Time-bin errors still use sampled-label targets."]
     lines+=['','This is a training-capacity experiment. No model promotion or unseen-family accuracy claim is possible from these scores.']
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 

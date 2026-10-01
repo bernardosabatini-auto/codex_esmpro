@@ -1,0 +1,13 @@
+{
+  "purpose": "Determine whether rare states from the 16-label training atlas recur with fresh teacher randomness before interpreting improved training recall as robust generative diversity.",
+  "panel": "The unchanged reliable32 training proteins; original contact features, state definitions, teacher labels and all current student scores stay frozen.",
+  "teacher": "Pinned local ESMFold2-Fast adapter, explicit no-MSA path, strict FP32, three trunk loops, 50 diffusion steps, batches of16 samples. Frozen original model artifacts must match their recorded hashes.",
+  "original_control": "Recreate the original per-protein teacher seed and compare all16 original backbones by rigid-invariant CA metrics. Require CA RMSD<=0.01A and CA-lDDT>=0.999. Capture the original trunk inputs to the structure sampler and verify RNG-restored sampler replay against the full fold.",
+  "fixed_trunk": "Generate32 fresh samples as two16-sample chunks with the captured original trunk. Record every seed; none may reproduce the original sampler RNG state intentionally.",
+  "new_trunk": "Use one new per-protein full-fold seed to capture another stochastic trunk realization. Generate32 samples using the same two diffusion seeds as the fixed-trunk condition. Validate full-fold/sampler replay here too.",
+  "seed": 2026100173,
+  "measurements": "Assign every fresh sample to the frozen teacher atlas with the existing contact/CA-lDDT/coarse-valid rule. Report atlas hit fraction, geometry, recall, empirical state TV, and singleton-state recurrence for both trunk conditions. Unassigned samples remain in denominators and may represent atlas incompleteness or poor structure; do not silently call them invalid biology.",
+  "limits": "These are predicted teacher states, not measured biological populations. One additional trunk draw cannot characterize all teacher uncertainty. No state or protein is dropped based on these outcomes, and no training-prior change is made silently.",
+  "resources": "One H200,25-minute walltime,1380-second work cap. Prior measured128-target label generation took679seconds including decoder work; trunk reuse and explicit timing will bound this diagnostic. Keep project running-plus-pending GPU total<=8.",
+  "protected": "No original34 or reserved17 scoring. This recurrence check is descriptive training-data validation, not a new model-promotion gate chosen after student outcomes."
+}

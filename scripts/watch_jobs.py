@@ -212,6 +212,9 @@ def tick(root, config, query=scheduler_states, analyze=followup):
                 entry.update(attempts=attempts, analysis_error=str(error), retry_after=time.time()+min(900, 60*2**min(attempts, 4)))
                 notify(root, state, f'{jid}:analysis_failed', f'ESM project {jid}: analysis failed; see runs/watch/analysis_{jid}.log; automatic retries enabled.', config)
     state['outstanding_local_units']=tick_local(root,state,config)
+    from overfit_checkpoint_analysis import tick as checkpoint_tick
+    for key,message in checkpoint_tick(root,state,registry,config):
+        notify(root,state,key,message,config)
     state.update(last_successful_check=stamp(), host=socket.gethostname(),
                  outstanding_jobs=[j['id'] for j in pending if not state['jobs'].get(j['id'], {}).get('handled')])
     write_json(state_path, state)

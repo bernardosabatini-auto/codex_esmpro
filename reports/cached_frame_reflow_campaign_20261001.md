@@ -46,3 +46,9 @@ Preserved decoded quality and valid-state coverage must accompany at least a two
 All GPU submissions use exact project job registration, immutable code/configuration snapshots, completion handlers and an eight-GPU running-plus-pending cap. Data, weights and raw results remain excluded from Git.
 
 Documentation clarification: the frozen cached-frame protocol retained the phrase “raw reference” in its distribution description. Its operative reference-label rule, generated configurations, bitwise audit and executed code all use inherited cached reference latents; raw-file latents are not used in either new arm. The frozen protocol was not rewritten after execution.
+
+## Short-sampler 500-update screen
+
+All four 500-update short samplers fail native validity. Paired 10-step CA-lDDT is 0.79019 versus initialization 0.78384, but validity falls from 0.97917 to 0.94792. Independent 10-step validity is 0.92188. Five-step validity is 0.77083 (paired) and 0.61458 (independent). See [the full tuning comparison](reflow_training_500.md).
+
+Resource decision, made before 2,000-update outcomes: skip ensemble generation for these failed 500-update samplers. Both training arms still complete the planned budget and both final sampler settings receive full native evaluation. Final ensemble submissions now require the same existing native noninferiority and validity margins (CA-lDDT lower 95% family bound above −0.005; mean validity loss no greater than 0.01). This refines the initially broad ensemble follow-up plan to avoid spending GPU time on candidates that cannot qualify. The guarded timer records every failed screen instead of silently retrying or discarding it. Cached-frame 500/2,000 ensemble comparisons remain unchanged.

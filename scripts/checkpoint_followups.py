@@ -2,6 +2,7 @@
 import argparse,fcntl,json,os,subprocess
 from pathlib import Path
 from watch_jobs import TERMINAL,write_json,stamp
+from reflow_quality import native_screen
 
 
 def tick(root, *, dry_run=False):
@@ -32,6 +33,10 @@ def tick(root, *, dry_run=False):
                 result['nodes'].append(dict(parent=parent,status='failed_predecessor' if state in TERMINAL else 'waiting'));continue
             manifest=json.loads((root/f'runs/{prefix}_{parent}/manifest.json').read_text())
             if manifest['status']!='complete' or manifest['config']['arm']!=node['arm'] or manifest['updates']!=2000:raise ValueError('predecessor result mismatch')
+            if reflow:
+                screen=native_screen(manifest,2000,node['sampling_steps'])
+                if not screen['passed']:
+                    result['nodes'].append(dict(parent=parent,sampling_steps=node['sampling_steps'],status='screen_failed',native_quality_screen=screen));continue
             result['nodes'].append(dict(parent=parent,status='eligible'))
             if dry_run or result['submitted'] is not None:continue
             env=dict(os.environ,CUDA_VISIBLE_DEVICES='',OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',PYTHONPATH=str(root/'src'))
@@ -46,9 +51,9 @@ def tick(root, *, dry_run=False):
                 result['nodes'][-1].update(status='retry',error=str(error.stderr or error)[-2000:]);break
             # One submission per tick keeps GPU-capacity decisions and heartbeat checks fresh.
         if dry_run:return result
-        result['status']='all_submitted' if all(n['status']=='submitted' for n in result['nodes']) else 'active'
+        result['status']='all_submitted' if all(n['status']=='submitted' for n in result['nodes']) else ('all_resolved' if all(n['status'] in ('submitted','screen_failed') for n in result['nodes']) else 'active')
         write_json(root/'runs/checkpoint_followups_state.json',result)
-        if result['status']=='all_submitted':subprocess.run(['systemctl','--user','stop','esm-proae-reboot-checkpoint-followups.timer'],check=True,timeout=10)
+        if result['status'] in ('all_submitted','all_resolved'):subprocess.run(['systemctl','--user','stop','esm-proae-reboot-checkpoint-followups.timer'],check=True,timeout=10)
 
         return result
 

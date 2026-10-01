@@ -1,4 +1,4 @@
-"""Verify full AFDB backbones for the preselected 512 teacher-training families."""
+"""Verify AFDB full backbones for a frozen training or tuning split."""
 import argparse,hashlib,json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -13,9 +13,10 @@ from profile_gpu import atomic_json
 def main():
     p=argparse.ArgumentParser()
     for name in ('selection','existing','output'):p.add_argument('--'+name,type=Path,required=True)
-    a=p.parse_args();selection=json.loads(a.selection.read_text());rows=selection['train']
-    if len(rows)!=512:raise ValueError('expected frozen 512 training families')
-    a.output.mkdir(parents=True,exist_ok=False);raw=a.output/'source_pdb';raw.mkdir();m=dict(status='running',records=[],selection_sha256=hashlib.sha256(a.selection.read_bytes()).hexdigest(),scope='AFDB predicted source structures, not experimental native conformations');atomic_json(a.output/'manifest.json',m)
+    p.add_argument('--split',choices=('train','tuning'),default='train')
+    a=p.parse_args();selection=json.loads(a.selection.read_text());rows=selection[a.split];expected=512 if a.split=='train' else 64
+    if len(rows)!=expected:raise ValueError('wrong number of frozen families')
+    a.output.mkdir(parents=True,exist_ok=False);raw=a.output/'source_pdb';raw.mkdir();m=dict(status='running',split=a.split,expected=expected,records=[],selection_sha256=hashlib.sha256(a.selection.read_bytes()).hexdigest(),scope='AFDB predicted source structures, not experimental native conformations');atomic_json(a.output/'manifest.json',m)
     def fetch(row):
         ident=row['id']
         if not ident.startswith('AF-') or '/' in ident:raise ValueError('expected safe AFDB identifier')

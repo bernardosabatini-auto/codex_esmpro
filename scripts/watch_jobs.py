@@ -1,7 +1,8 @@
 """One bounded watcher tick: inspect only registered jobs and run fixed CPU follow-ups.
 
-Run every minute via the project systemd timer. Does not submit/cancel jobs,
-start agents, type into tmux, or modify the job registry.
+Run every minute via the project systemd timer. Does not submit/cancel GPU jobs,
+start agents, type into tmux, or modify the GPU job registry. Completed ensembles
+start explicitly registered, bounded CPU state scorers.
 """
 import argparse
 from datetime import datetime, timezone
@@ -117,6 +118,9 @@ def followup(root, job, config):
     with (root/'runs/watch'/f"analysis_{job['id']}.log").open('a') as log:
         subprocess.run(command, cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT,
                        timeout=240, check=True)
+    if action in ('summarize_ensemble','summarize_teacher_ensemble') and json.loads(report.with_suffix('.json').read_text()).get('status')=='complete':
+        from start_state_scoring import start
+        start(root,job['id'])
     return str(report.with_suffix('.md'))
 
 

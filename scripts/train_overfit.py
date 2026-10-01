@@ -83,7 +83,7 @@ def main():
                         for k,ident in enumerate(ids):
                             r=records[ident];n=r['length'];choice=int(r['valid_indices'][int(labels_rng.random()*len(r['valid_indices']))]);choices.append(choice);esm[k,:n]=r['esm'].cuda();target=r['reference_z'] if c['arm']=='reference' else r['teacher_z_aligned' if c['arm']=='aligned_teacher' else 'teacher_z_pca'][choice];z[k,:n]=target.cuda()
                         progress=step/max(c['updates']-1,1);lr=c['learning_rate']*min((step+1)/c['warmup_updates'],1)*(.1+.9*.5*(1+math.cos(math.pi*progress)));optimizer.param_groups[0]['lr']=lr;optimizer.zero_grad(set_to_none=True)
-                        loss,_=flow_loss(model,z,esm,mask,FlowConfig(),generator=rng)
+                        loss,info=flow_loss(model,z,esm,mask,FlowConfig(),generator=rng,return_state=True)
                         if not torch.isfinite(loss):raise FloatingPointError('nonfinite loss')
                         loss.backward();norm=torch.nn.utils.clip_grad_norm_(model.parameters(),1.,error_if_nonfinite=True)
                         if norm<=0:raise FloatingPointError('zero gradient')
@@ -94,8 +94,10 @@ def main():
                                 if not ema[key].is_floating_point():ema[key].copy_(values[key])
                         m['updates']=step+1
                         if step%25==0 or step+1==end:
-                            m['training'].append(dict(step=step+1,length=length,batch=count,flow_loss=float(loss.detach()),gradient_norm=float(norm),learning_rate=lr,ids_sha256=hashlib.sha256('\n'.join(ids).encode()).hexdigest(),label_choices_sha256=hashlib.sha256(np.asarray(choices,dtype='int64').tobytes()).hexdigest()));atomic_json(a.output/'manifest.json',m)
-                        del mask,z,esm,loss
+                            state=info['state'];times=state['t'].detach();target_velocity=(z-state['x'].detach())/(1-times[:,None,None]);per_protein=(((state['velocity'].detach()-target_velocity)**2).mean(-1)*mask).sum(1)/mask.sum(1)
+                            bins={f'{lo}_{hi}':dict(count=int(((times>=lo)&(times<hi)).sum()),mse=float(per_protein[(times>=lo)&(times<hi)].mean()) if ((times>=lo)&(times<hi)).any() else None) for lo,hi in ((0.,.1),(.1,.25),(.25,.5),(.5,.75),(.75,.9),(.9,1.))}
+                            m['training'].append(dict(time_bins=bins,step=step+1,length=length,batch=count,flow_loss=float(loss.detach()),gradient_norm=float(norm),learning_rate=lr,ids_sha256=hashlib.sha256('\n'.join(ids).encode()).hexdigest(),label_choices_sha256=hashlib.sha256(np.asarray(choices,dtype='int64').tobytes()).hexdigest()));atomic_json(a.output/'manifest.json',m)
+                        del mask,z,esm,loss,info
                     torch.cuda.synchronize();seconds=time.monotonic()-tick
                 finally:torch.cuda.nvtx.range_pop()
                 m['batches'].append(dict(nvtx_range=name,stage='training',seconds=seconds,updates=end-begin,peak_reserved_bytes=torch.cuda.max_memory_reserved()))

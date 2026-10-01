@@ -10,7 +10,7 @@ def digest(path):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--run',type=Path,required=True);p.add_argument('--step',type=int,choices=(500,2000),required=True);p.add_argument('--sampling-steps',type=int,choices=(5,10),required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();path=a.run/'manifest.json';m=json.loads(path.read_text());c=m['config']
+    p=argparse.ArgumentParser();p.add_argument('--run',type=Path,required=True);p.add_argument('--step',type=int,choices=(500,2000),required=True);p.add_argument('--sampling-steps',type=int,choices=(5,10,15,20),required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();path=a.run/'manifest.json';m=json.loads(path.read_text());c=m['config']
     if c['arm'] not in ('reflow_paired','reflow_independent'):raise ValueError('unexpected sampler arm')
     if m['status'] not in ('running','complete') or m['updates']<a.step or c.get('profile_only'):raise ValueError('checkpoint not eligible')
     selection=json.loads(Path(c['selection']).read_text());expected={r['id'] for r in selection['tuning']}

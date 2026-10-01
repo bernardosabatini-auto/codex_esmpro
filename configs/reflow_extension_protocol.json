@@ -1,0 +1,14 @@
+{
+  "purpose": "Distinguish short-step integration error from a learned-distribution failure without more training",
+  "trigger": "Only if neither 2000-update 10-step arm passes the native quality/validity screen",
+  "sampling_steps": [15, 20],
+  "guidance": 1,
+  "decoder_steps": 3,
+  "training_updates": 0,
+  "weights": "The existing paired and independent 2000-update checkpoints",
+  "evaluation": "Same 64 tuning families and three noise seeds, with a freshly checked unchanged 25-step CFG2 baseline and batching controls",
+  "native_gate": "CA-lDDT lower 95% family bound above -0.005; mean coarse-validity loss no greater than 0.01",
+  "followup": "Only qualifying settings may receive frozen ensemble evaluation; all settings and failed gates remain reported",
+  "speed": "Require measured K32 speedup of at least twofold over the inherited student, with sequence embedding and decoder included",
+  "test": "No reserved confirmation or original independent-test predictions"
+}

@@ -80,6 +80,8 @@ def main():
                     z[i,:n]=r['endpoint'][choice].cuda();initial[i,:n]=r['noise'][choice].cuda()
             return esm,mask,z,initial
         def evaluate_at(step,sampling_steps):
+            if c.get('evaluation_only'):
+                name=f'collect::reflow_eval::{step}::{sampling_steps}';torch.cuda.synchronize();tick=time.monotonic();torch.cuda.reset_peak_memory_stats();torch.cuda.nvtx.range_push(name)
             model.eval()
             raw={k:v.detach().cpu().clone() for k,v in model.state_dict().items()};model.load_state_dict(ema)
             with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/f'evaluation_{step}_{sampling_steps}.h5','x') as out:
@@ -101,10 +103,25 @@ def main():
                             r=records[ident];pred=bb[3*i:3*i+3,:r['length']];out.create_dataset(ident,data=pred);geometry=backbone_geometry(pred)
                             for k,x in enumerate(pred):m['scores'].append(dict(step=step,sampling_steps=sampling_steps,target_id=ident,sample=k,**ca_metrics(x[:,1],r['ca']),**{key:float(value[k]) for key,value in geometry.items()}))
             model.load_state_dict(raw);model.train();del raw
+            if c.get('evaluation_only'):
+                torch.cuda.synchronize();m['batches'].append(dict(nvtx_range=name,step=step,sampling_steps=sampling_steps,seconds=time.monotonic()-tick,peak_reserved_bytes=torch.cuda.max_memory_reserved()));torch.cuda.nvtx.range_pop()
             atomic_json(a.output/'manifest.json',m);print('evaluated',step,sampling_steps,flush=True)
         def evaluate(step):
-            for sampling_steps in ([25] if step==0 else [5,10]):evaluate_at(step,sampling_steps)
+            for sampling_steps in ([25] if step==0 else c.get('sampling_steps',[5,10])):evaluate_at(step,sampling_steps)
         if not c.get('profile_only'):evaluate(0)
+        if c.get('evaluation_only'):
+            protocol=Path(c['evaluation_protocol'])
+            if file_identity(protocol,hash_contents=True)['sha256']!=c['evaluation_protocol_sha256'] or c['sampling_steps']!=[15,20]:raise ValueError('extension protocol mismatch')
+            parent=Path(c['training_manifest']);checkpoint=Path(c['evaluation_checkpoint'])
+            if file_identity(parent,hash_contents=True)['sha256']!=c['training_manifest_sha256'] or file_identity(checkpoint,hash_contents=True)['sha256']!=c['evaluation_checkpoint_sha256']:raise ValueError('trained source changed')
+            parent_result=json.loads(parent.read_text())
+            if parent_result['status']!='complete' or parent_result['updates']!=2000 or parent_result['config']['arm']!=c['arm'] or checkpoint.resolve()!=(parent.parent/'ema_2000.ckpt').resolve():raise ValueError('extension checkpoint does not match its training run')
+            trained,_=load_legacy(checkpoint,trusted_pickle=True);model.load_state_dict(trained.state_dict());del trained
+            ema={k:v.detach().clone() for k,v in model.state_dict().items()}
+            m.update(updates=2000,training_updates_executed=0,scope='Inference-only 15/20-step evaluation of existing 2000-update sampler weights; no additional training.')
+            (a.output/'ema_2000.ckpt').symlink_to(checkpoint.resolve());evaluate(2000)
+            if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('inference extension work cap')
+            m['status']='complete';return
         with inference_precision('fp32'):
             for begin,end in zip([0]+c['evaluation_steps'][:-1],c['evaluation_steps']):
                 name=f'collect::distill_train::{begin}::{end}';torch.cuda.synchronize();tick=time.monotonic();torch.cuda.reset_peak_memory_stats();torch.cuda.nvtx.range_push(name)

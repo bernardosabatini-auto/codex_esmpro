@@ -3,7 +3,7 @@ import argparse,hashlib,json,time
 from pathlib import Path
 import h5py,numpy as np,torch
 from latentfold.teacher import fast_features,load_fast_model
-from latentfold.backbone import encode_backbone
+from latentfold.backbone import encode_backbone,canonical_backbone_frame
 from latentfold.decoder import load_proteinae
 from latentfold.ensemble_metrics import backbone_geometry
 from latentfold.flow import target_noise
@@ -31,6 +31,7 @@ def main():
     a=p.parse_args();c=json.loads(a.config.read_text())
     for key in ('selection','native_manifest','native_backbones','teacher_scores','student_scores','roundtrip_report'):
         if hashlib.sha256(Path(c[key]).read_bytes()).hexdigest()!=c[key+'_sha256']:raise ValueError('changed input '+key)
+    if c.get('latent_frame')!='first_residue_N_CA_C':raise ValueError('canonical latent frame required')
     selection=json.loads(Path(c['selection']).read_text());native=json.loads(Path(c['native_manifest']).read_text());rt=json.loads(Path(c['roundtrip_report']).read_text())
     if native['status']!='complete' or len(native['records'])!=512 or native['selection_sha256']!=c['selection_sha256'] or rt['summaries']['3']['nearest_state_retained']<.95:raise ValueError('native verification/reconstruction gate closed')
     def coverage(key,setting):
@@ -58,12 +59,12 @@ def main():
                     features=fast_features(row['sequence']);atom_index=backbone_indices(features,n);prediction=model.fold(**features,num_loops=3,num_sampling_steps=50,num_diffusion_samples=16)
                     teacher=prediction.sample_atom_coords[:,torch.as_tensor(atom_index,device='cuda'),:].float();confidence=prediction.plddt.float().cpu().numpy();del prediction,features
                     if teacher.shape!=(16,n,4,3) or not torch.isfinite(teacher).all():raise ValueError('invalid teacher backbone')
-                    reference=torch.from_numpy(natives[ident]['backbone'][:]).cuda();mask=torch.ones(17,n,device='cuda',dtype=torch.bool);encoded=encode_backbone(decoder,torch.cat((reference[None],teacher)),mask)
+                    reference=torch.from_numpy(natives[ident]['backbone'][:]).cuda();mask=torch.ones(17,n,device='cuda',dtype=torch.bool);coordinates=torch.cat((reference[None],teacher));encoded=encode_backbone(decoder,canonical_backbone_frame(coordinates),mask);raw_reference_z=encode_backbone(decoder,reference[None],mask[:1])[0].cpu().numpy()
                     noise=target_noise([ident],[4*n],3,seed=c['seed'],stream='reconstruction',device='cuda')*decoder.fm.scale_ref
                     rebuilt=decoder(encoded[:2],mask[:2],noise=noise.repeat(2,1,1)).cpu().numpy();teacher=teacher.cpu().numpy();reference=reference.cpu().numpy();encoded=encoded.cpu().numpy();torch.cuda.synchronize();seconds=time.monotonic()-tick
                 finally:torch.cuda.nvtx.range_pop()
                 geometry=backbone_geometry(teacher);labels=clusters(teacher,geometry['coarse_valid']);g=output.create_group(ident);g.attrs['sequence_sha256']=row['sequence_sha256'];g.attrs['seed']=seed
-                for key,value in dict(reference_backbone=reference,teacher_backbone=teacher,reference_z=encoded[0],teacher_z=encoded[1:],teacher_plddt=confidence,coarse_valid=geometry['coarse_valid'],cluster=labels).items():g.create_dataset(key,data=value)
+                for key,value in dict(reference_backbone=reference,teacher_backbone=teacher,reference_z=encoded[0],raw_reference_z=raw_reference_z,teacher_z=encoded[1:],teacher_plddt=confidence,coarse_valid=geometry['coarse_valid'],cluster=labels).items():g.create_dataset(key,data=value)
                 native_error=ca_metrics(rebuilt[0],reference[:,1]);teacher_error=ca_metrics(rebuilt[1],teacher[0,:,1])
                 m['records'].append(dict(id=ident,family=row['family'],length=n,valid_samples=int(geometry['coarse_valid'].sum()),teacher_clusters=len(set(labels)-{-1}),native_reconstruction=native_error,teacher_reconstruction=teacher_error,native_cached_latent_rmse=float(np.sqrt(np.mean((encoded[0]-inherited['train'][ident]['z'][:])**2)))))
                 m['batches'].append(dict(nvtx_range=name,seconds=seconds,length=n,batch=16,peak_reserved_bytes=torch.cuda.max_memory_reserved()));output.flush();atomic_json(a.output/'manifest.json',m);print('teacher labels',index+1,'of',len(rows),flush=True)

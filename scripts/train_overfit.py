@@ -30,6 +30,8 @@ def main():
     a=p.parse_args();c=json.loads(a.config.read_text());path=Path(c['label_manifest']);source=json.loads(path.read_text())
     if sha(path)!=c['label_manifest_sha256'] or source['status']!='complete' or not source['training_gate_passed'] or sha(path.parent/'labels.h5')!=source['labels_sha256']:raise ValueError('label gate/provenance failed')
     if c['arm'] not in ('reference','aligned_teacher','pca_teacher'):raise ValueError('invalid arm')
+    estimator=c.get('target_estimator','sampled')
+    if estimator not in ('sampled','posterior') or (estimator=='posterior' and c['arm']=='reference'):raise ValueError('invalid target estimator')
     if c['evaluation_steps'][-1]!=c['updates']:raise ValueError('invalid budget')
     if not c.get('profile_only'):
         profile=json.loads(Path(c['profile_report']).read_text())
@@ -89,8 +91,15 @@ def main():
                         ids=queues[length][:count];del queues[length][:count];esm=torch.zeros(count,length,2560,device='cuda');z=torch.zeros(count,length,8,device='cuda');mask=torch.arange(length,device='cuda')[None]<torch.tensor([records[i]['length'] for i in ids],device='cuda')[:,None];choices=[]
                         for k,ident in enumerate(ids):
                             r=records[ident];n=r['length'];choice=int(r['valid_indices'][int(labels_rng.random()*len(r['valid_indices']))]);choices.append(choice);esm[k,:n]=r['esm'].cuda();target=r['reference_z'] if c['arm']=='reference' else r['teacher_z_aligned' if c['arm']=='aligned_teacher' else 'teacher_z_pca'][choice];z[k,:n]=target.cuda()
+                        posterior_args={}
+                        if estimator=='posterior':
+                            key='teacher_z_aligned' if c['arm']=='aligned_teacher' else 'teacher_z_pca';teachers=max(len(records[i]['valid_indices']) for i in ids)
+                            bank=torch.zeros(count,teachers,length,8,device='cuda');valid=torch.zeros(count,teachers,device='cuda',dtype=torch.bool)
+                            for k,ident in enumerate(ids):
+                                r=records[ident];indices=r['valid_indices'];bank[k,:len(indices),:r['length']]=r[key][indices].cuda();valid[k,:len(indices)]=True
+                            posterior_args=dict(teacher_bank=bank,teacher_valid=valid)
                         progress=step/max(c['updates']-1,1);lr=c['learning_rate']*min((step+1)/c['warmup_updates'],1)*(.1+.9*.5*(1+math.cos(math.pi*progress)));optimizer.param_groups[0]['lr']=lr;optimizer.zero_grad(set_to_none=True)
-                        loss,info=flow_loss(model,z,esm,mask,FlowConfig(),generator=rng,return_state=True)
+                        loss,info=flow_loss(model,z,esm,mask,FlowConfig(),generator=rng,return_state=True,**posterior_args)
                         if not torch.isfinite(loss):raise FloatingPointError('nonfinite loss')
                         loss.backward();norm=torch.nn.utils.clip_grad_norm_(model.parameters(),1.,error_if_nonfinite=True)
                         if norm<=0:raise FloatingPointError('zero gradient')
@@ -104,8 +113,12 @@ def main():
                             state=info['state'];times=state['t'].detach();target_velocity=(z-state['x'].detach())/(1-times[:,None,None]);per_protein=(((state['velocity'].detach()-target_velocity)**2).mean(-1)*mask).sum(1)/mask.sum(1)
                             bins={f'{lo}_{hi}':dict(count=int(((times>=lo)&(times<hi)).sum()),mse=float(per_protein[(times>=lo)&(times<hi)].mean()) if ((times>=lo)&(times<hi)).any() else None) for lo,hi in ((0.,.1),(.1,.25),(.25,.5),(.5,.75),(.75,.9),(.9,1.))}
                             m['training'].append(dict(time_bins=bins,step=step+1,length=length,batch=count,flow_loss=float(loss.detach()),gradient_norm=float(norm),learning_rate=lr,ids_sha256=hashlib.sha256('\n'.join(ids).encode()).hexdigest(),label_choices_sha256=hashlib.sha256(np.asarray(choices,dtype='int64').tobytes()).hexdigest()));atomic_json(a.output/'manifest.json',m)
+                            if estimator=='posterior':
+                                m['training'][-1]['posterior_variance']=float(info['posterior_variance'].mean());atomic_json(a.output/'manifest.json',m)
                             del state,times,target_velocity,per_protein,bins
                         del mask,z,esm,loss,info
+                        if estimator=='posterior':del bank,valid
+                        del posterior_args
                     torch.cuda.synchronize();seconds=time.monotonic()-tick
                 finally:torch.cuda.nvtx.range_pop()
                 m['batches'].append(dict(nvtx_range=name,stage='training',seconds=seconds,updates=end-begin,peak_reserved_bytes=torch.cuda.max_memory_reserved()))

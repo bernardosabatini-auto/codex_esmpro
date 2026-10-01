@@ -70,7 +70,7 @@ def target_noise(ids, lengths, width, *, seed, sample_index=0, stream="flow", de
     return out.to(device)
 
 
-def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, residue_weights=None, initial_noise=None):
+def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, residue_weights=None, initial_noise=None, teacher_bank=None, teacher_valid=None):
     """One loss, with the effective sample count returned for logging.
 
     Protein weighting is the new default, matching the evaluation's unit of analysis.
@@ -78,6 +78,13 @@ def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, resid
     not an established accuracy improvement. Pair features are computed once.
     """
     validate_batch(esm, mask, z)
+    if (teacher_bank is None) != (teacher_valid is None):
+        raise ValueError('provide both empirical teacher bank and validity mask')
+    if teacher_bank is not None:
+        if initial_noise is not None:
+            raise ValueError('empirical posterior requires independent Gaussian noise')
+        teacher_bank = teacher_bank.repeat_interleave(config.repeats, 0)
+        teacher_valid = teacher_valid.repeat_interleave(config.repeats, 0)
     if initial_noise is not None:
         if initial_noise.requires_grad or initial_noise.device != z.device or initial_noise.dtype != z.dtype:
             raise ValueError('paired noise must be fixed and match latent device/dtype')
@@ -112,7 +119,12 @@ def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, resid
             v0 = net(x, t, esm, mask, drop, None, **{k: v.detach() for k, v in kwargs.items()})
             sc = (x + (1 - tt) * v0).detach()
     pred = net(x, t, esm, mask, drop, sc, **kwargs)
-    errors = ((pred - (z - x0)) ** 2).mean(-1) * mask
+    if teacher_bank is None:
+        errors = ((pred - (z - x0)) ** 2).mean(-1) * mask
+    else:
+        from .posterior_targets import empirical_velocity
+        target, variance = empirical_velocity(z, x0, t, teacher_bank, mask, teacher_valid)
+        errors = ((pred-target).square()+variance).mean(-1)*mask
     if residue_weights is not None:
         errors = errors * residue_weights
     if config.reduction == "protein":
@@ -122,6 +134,8 @@ def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, resid
     if not torch.isfinite(loss):
         raise FloatingPointError("nonfinite flow loss")
     info = {"proteins": b // config.repeats, "noisy_copies": b, "repeats": config.repeats}
+    if teacher_bank is not None:
+        info['posterior_variance'] = (variance.mean(-1)*mask).sum(1)/mask.sum(1)
     if return_state:
         info["state"] = dict(velocity=pred, x=x, t=t, dropped=drop, mask=mask)
     return loss, info

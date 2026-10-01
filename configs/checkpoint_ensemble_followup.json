@@ -1,0 +1,12 @@
+{
+  "purpose": "Measure generative learning curves rather than choose solely by single-reference accuracy",
+  "decision_time": "2026-10-01, before any500-update tuning result: largest update count401",
+  "supersedes": "Native-accuracy-only checkpoint selection in distillation_protocol.json",
+  "checkpoints": [500, 2000],
+  "arms": ["raw_reference", "reference", "empirical", "balanced"],
+  "panel": "Frozen48 development families;32 latent seeds, fixed decoder noise, existing noise-source controls",
+  "sampling": "StrictFP32, final ESMC layer, flow25 CFG2 decoder3; unchanged guidance controls on8 preselected targets",
+  "promotion": "Compare against inherited baseline and matched reference-only arm; require at least0.10 coverage gain, positive paired family interval, native-accuracy noninferiority and validity margin. Replicate eligible effects across training seeds before confirmation.",
+  "selection": "Development comparisons may guide candidate selection; report both endpoints and all arms. Reserved17 ensemble confirmation and original34 test remain unscored.",
+  "resources": "At most four training jobs plus four checkpoint ensemble jobs simultaneously; queued jobs count toward the eight-GPU cap"
+}

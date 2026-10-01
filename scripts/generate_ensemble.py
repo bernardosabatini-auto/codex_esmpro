@@ -18,6 +18,8 @@ def main():
     for name in ('source','config','output'):p.add_argument('--'+name,type=Path,required=True)
     a=p.parse_args();c=json.loads(a.config.read_text());path=Path(c['panel'])
     if hashlib.sha256(path.read_bytes()).hexdigest()!=c['panel_sha256']:raise ValueError('changed panel')
+    primary=c.get('primary_guidance',2)
+    if primary not in (1,2):raise ValueError('unsupported primary guidance')
     rows=json.loads(path.read_text())['development']
     if len(rows)!=48 or len({r['family'] for r in rows})!=48:raise ValueError('expected 48 distinct development families')
     a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
@@ -77,7 +79,7 @@ def main():
                     noise[k,:n]=target_noise([ident],[n],8,seed=c['seed'],sample_index=k,device='cuda')[0]
                     dn[k,:4*n]=target_noise([ident],[4*n],3,seed=c['seed'],sample_index=k,stream='decoder',device='cuda')[0]*decoder.fm.scale_ref
                 target=output.create_group(ident);target.attrs['family']=row['family'];target.attrs['sequence_sha256']=hashlib.sha256(row['sequence'].encode()).hexdigest()
-                for guidance in ([2,1] if ident in c['guidance_controls'] else [2]):
+                for guidance in ([primary,3-primary] if ident in c['guidance_controls'] else [primary]):
                     cfg=SampleConfig(steps=c.get('flow_steps',25),guidance=guidance);g=target.create_group(f'cfg{guidance}')
                     name=f'collect::latent::{index}::{guidance}';torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic();torch.cuda.nvtx.range_push(name)
                     try:

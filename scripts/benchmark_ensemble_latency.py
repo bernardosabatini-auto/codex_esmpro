@@ -48,7 +48,7 @@ def main():
                             for k in range(count):
                                 noise[k,:n]=target_noise([ident],[n],8,seed=c['seed'],sample_index=k,device='cuda')[0]
                                 dn[k,:4*n]=target_noise([ident],[4*n],3,seed=c['seed'],sample_index=0,stream='decoder',device='cuda')[0]*decoder.fm.scale_ref
-                            z=sample(model,esm.repeat(count,1,1),mask.repeat(count,1),SampleConfig(steps=c['candidate_steps'] if kind=='candidate' else 25,guidance=1 if kind=='candidate' else 2),noise=noise,conditioning_ids=[ident]*count)
+                            z=sample(model,esm.repeat(count,1,1),mask.repeat(count,1),SampleConfig(steps=c['candidate_steps'] if kind=='candidate' else 25,guidance=c.get('candidate_guidance',1) if kind=='candidate' else 2,solver=c.get('candidate_solver','euler') if kind=='candidate' else 'euler'),noise=noise,conditioning_ids=[ident]*count)
                             _,bb=decoder(z,mask.repeat(count,1),noise=dn,return_backbone=True)
                             return bb[:,:n].cpu().numpy()
                         features=fast_features(row['sequence']);indices=backbone_indices(features,n);captured={};chunk=min(count,16)
@@ -66,7 +66,7 @@ def main():
                     # Warm both capacity regimes; retain an exact teacher full-fold control.
                     warm=predict(1);predict(32)
                     if kind in ('student','candidate'):
-                        with h5py.File(c['candidate_reference'] if kind=='candidate' else c['student_reference']) as reference:expected=reference[ident]['cfg1/latent/backbone' if kind=='candidate' else 'cfg2/latent/backbone'][0]
+                        with h5py.File(c['candidate_reference'] if kind=='candidate' else c['student_reference']) as reference:expected=reference[ident][f"cfg{c.get('candidate_guidance',1)}/latent/backbone" if kind=='candidate' else 'cfg2/latent/backbone'][0]
                         control=ca_metrics(warm[0,:,1],expected[:,1]);m['controls'].append(dict(model=kind,target_id=ident,**control))
                         if control['ca_rmsd']>.2 or control['ca_lddt']<.99:raise ValueError('student sequence-to-ensemble parity failed')
                     if kind=='teacher':

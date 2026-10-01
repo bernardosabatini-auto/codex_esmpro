@@ -80,7 +80,7 @@ def main():
                     dn[k,:4*n]=target_noise([ident],[4*n],3,seed=c['seed'],sample_index=k,stream='decoder',device='cuda')[0]*decoder.fm.scale_ref
                 target=output.create_group(ident);target.attrs['family']=row['family'];target.attrs['sequence_sha256']=hashlib.sha256(row['sequence'].encode()).hexdigest()
                 for guidance in ([primary,3-primary] if ident in c['guidance_controls'] else [primary]):
-                    cfg=SampleConfig(steps=c.get('flow_steps',25),guidance=guidance);g=target.create_group(f'cfg{guidance}')
+                    cfg=SampleConfig(steps=c.get('flow_steps',25),guidance=guidance,solver=c.get('flow_solver','euler'));g=target.create_group(f'cfg{guidance}')
                     name=f'collect::latent::{index}::{guidance}';torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic();torch.cuda.nvtx.range_push(name)
                     try:
                         z=sample(model,esm.repeat(32,1,1),mask.repeat(32,1),cfg,noise=noise,conditioning_ids=[ident]*32);torch.cuda.synchronize();seconds=time.monotonic()-tick

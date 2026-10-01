@@ -23,7 +23,15 @@ At 500 updates on 64 tuning families with three samples each:
 
 Aligned teacher supervision exceeds the matched reference control by 0.00871 [0.00433, 0.01315], but improvement over initialization remains uncertain. Validity does not improve. These are development results from one training seed and AFDB predicted references, not an independent accuracy claim. Full [500-update results](cached_frame_training_500.md) include validity and the Kabsch-based TM diagnostic; optimized fixed-correspondence TM will be reported separately.
 
-Both predeclared checkpoints receive frozen 48-protein ensemble evaluation. The 500-update jobs are 49660833 and 49660888. Final-checkpoint jobs have registered, deduplicated timer follow-ups. Completion scoring is automatic; the watcher does not resume conversation reasoning.
+Both predeclared checkpoints receive frozen 48-protein ensemble evaluation. The 500-update jobs are 49660833 and 49660888. The 500-update ensemble scores are complete:
+
+| Model | State coverage at 32 | Nearest-reference CA-lDDT | Coarse validity | MD W1 (lower is better) |
+|---|---:|---:|---:|---:|
+| Inherited baseline | 0.43750 | 0.86794 | 0.99414 | 0.48850 |
+| Cached reference, 500 | 0.46875 | 0.86266 | 0.98763 | 0.48682 |
+| Aligned teacher, 500 | 0.46875 | 0.86631 | 0.99284 | 0.47598 |
+
+Teacher versus reference-only state coverage is identical for every family. Teacher-supervised MD W1 is lower by 0.01084 [0.00178, 0.02192], a secondary distributional improvement; nearest-reference quality is higher by 0.00365 [0.00128, 0.00634]. Relative to initialization, teacher-supervised quality decreases by 0.00163 but stays within the 0.005 margin. Neither arm passes the primary training-diversity promotion gate. See comparisons against [baseline](cached_aligned_500_vs_baseline.md) and [matched control](cached_aligned_500_vs_reference.md). Final-checkpoint jobs have registered, deduplicated timer follow-ups. Completion scoring is automatic; the watcher does not resume conversation reasoning.
 
 ## Separate shorter-sampler experiment
 
@@ -36,3 +44,5 @@ All 8,192 pairs are complete. Full paired and independent training jobs are 4966
 Preserved decoded quality and valid-state coverage must accompany at least a twofold measured K=32 speedup over the inherited student before a sampler can qualify. Timing includes sequence embedding and decoding on the same GPU, with the direct teacher reported too. Fewer steps alone are not evidence of useful speed.
 
 All GPU submissions use exact project job registration, immutable code/configuration snapshots, completion handlers and an eight-GPU running-plus-pending cap. Data, weights and raw results remain excluded from Git.
+
+Documentation clarification: the frozen cached-frame protocol retained the phrase “raw reference” in its distribution description. Its operative reference-label rule, generated configurations, bitwise audit and executed code all use inherited cached reference latents; raw-file latents are not used in either new arm. The frozen protocol was not rewritten after execution.

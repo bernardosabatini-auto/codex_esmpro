@@ -19,9 +19,10 @@ def main():
                 if set(g)!={f'steps{s}' for s in c['steps']}:raise ValueError('step coverage mismatch')
                 for steps in c['steps']:
                     bb=g[f'steps{steps}']['backbone'][:]
-                    if len(bb)!=32 or not np.isfinite(bb).all():raise ValueError('sample coverage mismatch')
+                    count=c['samples']
+                    if len(bb)!=count or not np.isfinite(bb).all():raise ValueError('sample coverage mismatch')
                     ca=bb[:,:,1];peptide=np.linalg.norm(bb[:,:-1,2]-bb[:,1:,0],axis=-1)
-                    result['rows'].append(dict(target_id=ident,steps=steps,pairwise_ca_rmsd=float(np.mean([rmsd(ca[i],ca[j]) for i in range(32) for j in range(i)])),peptide_outlier_fraction=float(np.mean((peptide<1.1)|(peptide>1.6)))))
+                    result['rows'].append(dict(target_id=ident,steps=steps,pairwise_ca_rmsd=float(np.mean([rmsd(ca[i],ca[j]) for i in range(count) for j in range(i)])),peptide_outlier_fraction=float(np.mean((peptide<1.1)|(peptide>1.6)))))
         result['summaries']={str(s):{k:float(np.mean([r[k] for r in result['rows'] if r['steps']==s])) for k in ('pairwise_ca_rmsd','peptide_outlier_fraction')} for s in c['steps']}
         result['sampling_seconds']={str(s):sum(r['seconds'] for r in m['batches'] if r['steps']==s) for s in c['steps']}
         result['max_reserved_gib']=max(r['peak_reserved_bytes'] for r in m['batches'])/1024**3
@@ -29,7 +30,7 @@ def main():
         except Exception as error:result['hardware']=dict(status='unavailable',error=str(error))
     else:result['error']=m.get('error','Incomplete run')
     a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n')
-    lines=['# Teacher seed and integration-step diagnostic','',f"Status: {result['status']}.",'',result['scope'],'',m.get('timing_scope',''),'',f"Thirty-two samples per target/setting; batch {m.get('config',{}).get('sample_batch','unknown')}, trunk realizations {m.get('config',{}).get('trunk_replicates',1)}.",'', '| Steps | Mean pairwise CA RMSD (A) | Peptide outlier fraction | Measured sampling seconds |','|---|---:|---:|---:|']
+    lines=['# Teacher seed and integration-step diagnostic','',f"Status: {result['status']}.",'',result['scope'],'',m.get('timing_scope',''),'',f"{m.get('config',{}).get('samples',32)} samples per target/setting; batch {m.get('config',{}).get('sample_batch','unknown')}, trunk realizations {m.get('config',{}).get('trunk_replicates',1)}.",'', '| Steps | Mean pairwise CA RMSD (A) | Peptide outlier fraction | Measured sampling seconds |','|---|---:|---:|---:|']
     for s,r in result.get('summaries',{}).items():lines.append(f"| {s} | {r['pairwise_ca_rmsd']:.4f} | {r['peptide_outlier_fraction']:.4f} | {result['sampling_seconds'][s]:.2f} |")
     if 'error' in result:lines+=['',result['error']]
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')

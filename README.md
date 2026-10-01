@@ -18,12 +18,12 @@ policy failed the pair model's shape controls and is rejected. See
 [the validated inference settings](configs/validated_inference.json); these are
 development-set results and exclude ESMC extraction time.
 
-The earlier [ESMFold2-Fast benchmark](reports/external_49461971.md) is invalidated
-as a teacher baseline: the installed HF port executed an MSA encoder whose
-weights are absent from the Fast checkpoint. See the
-[adapter audit](reports/teacher_adapter_audit_20261001.md). Its reported TM
-0.59977 must not support accuracy comparisons or model selection. Corrected
-ensemble diagnostics explicitly disable that path and guard its execution.
+The [corrected ESMFold2-Fast benchmark](reports/external_49626106.md) gives
+TM 0.59983 versus 0.56824 for the unchanged pair head on 626 development proteins.
+This replaces the earlier benchmark, whose HF port executed a disabled MSA
+encoder with missing weights. The rerun confirms essentially the same accuracy
+gap while fixing that invalid execution path; see the
+[adapter audit](reports/teacher_adapter_audit_20261001.md).
 
 The accuracy work now includes an actual continued-training loop, a
 [structural-gradient diagnostic](reports/geometry_49453471.md),

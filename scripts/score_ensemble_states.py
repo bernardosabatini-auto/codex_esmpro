@@ -46,31 +46,36 @@ def main():
                 key=row['id'];reference=references[key];result['definitions'][ident]=dict(reference_samples=len(reference),projection_dimensions=reference.shape[-1])
             settings=[(setting,g[setting]['backbone'][:]) for setting in g] if teacher else [(cfg+'/'+arm,g[cfg][arm]['backbone'][:]) for cfg in g for arm in ('latent','decoder','factorial')]
             for setting,bb in settings:
-                if bb.shape!=(32,row['length'],4,3):raise ValueError('unexpected ensemble size')
+                count=c['samples'] if teacher else 32;ks=[k for k in (1,4,16,32,128) if k<=count]
+                if bb.shape!=(count,row['length'],4,3):raise ValueError('unexpected ensemble size')
                 geometry=backbone_geometry(bb);entry=dict(target_id=ident,family=row['family'],category=category,setting=setting,coarse_valid_fraction=float(geometry['coarse_valid'].mean()),mean_peptide_outlier_fraction=float(geometry['peptide_outlier_fraction'].mean()))
                 if category=='md':
-                    projection=project_md(bb[:,:,1],means[key],transforms[key]);entry['projection_wasserstein']={str(k):sliced_wasserstein_2d(projection[:k],reference) for k in (1,4,16,32)}
+                    projection=project_md(bb[:,:,1],means[key],transforms[key]);entry['projection_wasserstein']={str(k):sliced_wasserstein_2d(projection[:k],reference) for k in ks}
                 else:
                     ca=bb[:,positions,1];quality=np.array([[ca_metrics(x,y)['ca_lddt'] for y in refs] for x in ca]);entry['oracle_nearest_reference_ca_lddt_mean']=float(quality.max(1).mean())
                     if category=='multistate' and len(i) and len(set(labels))>1:
-                        features=np.linalg.norm(ca[:,i]-ca[:,j],axis=-1);errors=np.sqrt(np.mean((features[:,None,:]-ref_features[None,:,:])**2,axis=-1));nearest=errors.argmin(1);best=errors[np.arange(32),nearest]
+                        features=np.linalg.norm(ca[:,i]-ca[:,j],axis=-1);errors=np.sqrt(np.mean((features[:,None,:]-ref_features[None,:,:])**2,axis=-1));nearest=errors.argmin(1);best=errors[np.arange(count),nearest]
                         entry['contact_state_count']=len(set(labels));entry['coverage']={}
                         for threshold in (1.,2.,3.):
                             good=(best<=threshold)&(quality.max(1)>=.8)&geometry['coarse_valid'];assignments=[labels[n] if ok else None for n,ok in zip(nearest,good)]
-                            entry['coverage'][str(threshold)]={str(k):len({x for x in assignments[:k] if x is not None})/len(set(labels)) for k in (1,4,16,32)}
+                            entry['coverage'][str(threshold)]={str(k):len({x for x in assignments[:k] if x is not None})/len(set(labels)) for k in ks}
                         entry['minimum_feature_rmse']=float(best.min());entry['mean_feature_rmse']=float(best.mean())
                     elif category=='multistate':entry['coverage_exclusion']='Fewer than two reference-distinguishable contact states'
                     else:
-                        entry['generated_pairwise_rmsd']=float(np.mean([rmsd(ca[x],ca[y]) for x in range(32) for y in range(x)]));entry['reference_pairwise_rmsd']=row['mean_pairwise_ca_rmsd']
+                        entry['generated_pairwise_rmsd']=float(np.mean([rmsd(ca[x],ca[y]) for x in range(count) for y in range(x)]));entry['reference_pairwise_rmsd']=row['mean_pairwise_ca_rmsd']
                 result['rows'].append(entry)
             print('scored',ident,flush=True)
     result['status']='complete';result['summaries']={}
     for setting in sorted({r['setting'] for r in result['rows']}):
         selected=[r for r in result['rows'] if r['setting']==setting];multi=[r for r in selected if 'coverage' in r];mdrows=[r for r in selected if r['category']=='md'];qualities=[r['oracle_nearest_reference_ca_lddt_mean'] for r in selected if 'oracle_nearest_reference_ca_lddt_mean' in r]
         result['summaries'][setting]=dict(targets=len(selected),eligible_multistate_targets=len(multi),coarse_valid_fraction=float(np.mean([r['coarse_valid_fraction'] for r in selected])),contact_state_coverage_at_32=float(np.mean([r['coverage']['2.0']['32'] for r in multi])) if multi else None,oracle_nearest_reference_ca_lddt_mean=float(np.mean(qualities)) if qualities else None,md_projection_wasserstein_at_32=float(np.mean([r['projection_wasserstein']['32'] for r in mdrows])) if mdrows else None)
+    if teacher and c['samples']==128:
+        result['coverage_at_128']={setting:float(np.mean([r['coverage']['2.0']['128'] for r in result['rows'] if r['setting']==setting and 'coverage' in r])) for setting in result['summaries']}
+        result['extension_evidence']=dict(scores=c['extension_scores'],sha256=c['extension_scores_sha256'],prefix_control='GPU job validates the previous 32 samples before accepting extension')
     a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n')
     lines=['# Ensemble state and distribution diagnostics','',f"Run: {a.run.name}.",'',result['scope']+'.','', 'Contact features are selected only from experimental references. Coverage requires a close reference contact state, CA lDDT at least 0.8, and the predeclared coarse geometry filter. All samples remain in denominators. The geometry filter does not certify physical validity. Nearest-reference quality is an oracle diagnostic.','', '| Setting | Targets | State-eligible targets | Coarse valid | State coverage @32 | Oracle CA lDDT | MD projected W1 @32 |','|---|---:|---:|---:|---:|---:|---:|']
     for setting,r in result['summaries'].items():lines.append('| '+setting+' | '+' | '.join('NA' if x is None else f'{x:.4f}' if isinstance(x,float) else str(x) for x in r.values())+' |')
+    for setting,value in result.get('coverage_at_128',{}).items():lines+=['',f'{setting}: contact-state coverage at 128 samples = {value:.4f}. Extension was triggered by increasing teacher coverage from 16 to 32 samples.']
     lines+=['','MD distances are in the published projection space, not Angstroms. NMR model counts are never treated as populations. Confirmation and original locked test targets remain unscored.']
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 

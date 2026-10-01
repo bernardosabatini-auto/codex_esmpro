@@ -17,7 +17,15 @@ def main():
     if hashlib.sha256(path.read_bytes()).hexdigest()!=c['panel_sha256']:raise ValueError('changed panel')
     allrows={r['query_id']:r for r in json.loads(path.read_text())['development']};rows=[allrows[k] for k in c['target_ids']]
     batch=c['sample_batch']
-    if len(rows)!=len(set(c['target_ids'])) or batch not in (8,16) or c['samples']!=32:raise ValueError('unexpected pilot sampling protocol')
+    samples=c['samples']
+    if len(rows)!=len(set(c['target_ids'])) or batch not in (8,16) or samples not in (32,128):raise ValueError('unexpected pilot sampling protocol')
+    if samples==128:
+        reference=Path(c['prefix_reference'])
+        if hashlib.sha256(reference.read_bytes()).hexdigest()!=c['prefix_reference_sha256']:raise ValueError('changed prefix reference')
+        score_path=Path(c['extension_scores'])
+        if hashlib.sha256(score_path.read_bytes()).hexdigest()!=c['extension_scores_sha256']:raise ValueError('changed extension evidence')
+        score_rows=[r for r in json.loads(score_path.read_text())['rows'] if 'coverage' in r and r['setting']=='steps50']
+        if not score_rows or np.mean([r['coverage']['2.0']['32']-r['coverage']['2.0']['16'] for r in score_rows])<=0:raise ValueError('teacher coverage did not increase; extension gate closed')
     a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
     start=time.monotonic();m=dict(status='running',config=c,batches=[],controls=[],targets=[],precision='strict FP32',timing_scope='Structure-only sampling reuses trunk, excludes confidence head. Full fold controls include confidence. Do not compare structure-only timing against full-fold timing as an end-to-end speedup.');telemetry=None
     atomic_json(a.output/'manifest.json',m)
@@ -43,8 +51,9 @@ def main():
                 if any(r['ca_rmsd']>.01 or r['ca_lddt']<.999 for r in controls):raise ValueError('trunk-reuse control failed')
                 target=output.create_group(ident);target.attrs['sequence_sha256']=hashlib.sha256(row['sequence'].encode()).hexdigest()
                 for steps in c['steps']:
-                    sg=target.create_group(f'steps{steps}');samples=[];seeds=[]
-                    for offset in range(0,32,batch):
+                    sg=target.create_group(f'steps{steps}')
+                    collected=[];seeds=[]
+                    for offset in range(0,samples,batch):
                         if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('experiment work cap')
                         # Same chunk seed across integration-step settings; trajectories still differ.
                         seed=int.from_bytes(hashlib.sha256(f"{c['seed']}:{ident}:chunk:{offset}".encode()).digest()[:8],'little')%(2**63-1);torch.manual_seed(seed)
@@ -54,8 +63,14 @@ def main():
                             bb=sampler(**kwargs).float().cpu().numpy()[:,atom_index,:];torch.cuda.synchronize();seconds=time.monotonic()-tick
                         finally:torch.cuda.nvtx.range_pop()
                         if bb.shape!=(batch,n,4,3) or not np.isfinite(bb).all():raise ValueError('invalid teacher backbone')
-                        samples.append(bb);seeds.append(seed);m['batches'].append(dict(nvtx_range=name,seconds=seconds,length=n,batch=batch,steps=steps,peak_reserved_bytes=torch.cuda.max_memory_reserved()))
-                    sg.create_dataset('backbone',data=np.concatenate(samples));sg.create_dataset('chunk_seeds',data=np.asarray(seeds,dtype=np.int64))
+                        collected.append(bb);seeds.append(seed);m['batches'].append(dict(nvtx_range=name,seconds=seconds,length=n,batch=batch,steps=steps,peak_reserved_bytes=torch.cuda.max_memory_reserved()))
+                    combined=np.concatenate(collected)
+                    if c['samples']==128:
+                        with h5py.File(c['prefix_reference']) as previous:prefix=previous[ident][f'steps{steps}']['backbone'][:]
+                        checks=[ca_metrics(x[:,1],y[:,1]) for x,y in zip(combined[:32],prefix)]
+                        if len(prefix)!=32 or any(r['ca_rmsd']>.01 or r['ca_lddt']<.999 for r in checks):raise ValueError('extension changed existing seed prefix')
+                        m.setdefault('prefix_controls',[]).append(dict(target_id=ident,max_ca_rmsd=max(r['ca_rmsd'] for r in checks)))
+                    sg.create_dataset('backbone',data=combined);sg.create_dataset('chunk_seeds',data=np.asarray(seeds,dtype=np.int64))
                 m['targets'].append(dict(id=ident,length=n));output.flush();atomic_json(a.output/'manifest.json',m);print('teacher ensemble',i+1,'of',len(rows),flush=True)
                 del captured,features,kwargs
         m['status']='complete'

@@ -26,3 +26,10 @@ The checkpoint also enables per-loop LM dropout during evaluation. Trunk reuse
 therefore conditions on one stochastic trunk draw. The diversity experiment must
 separate fixed-trunk diffusion seeds from multiple trunk seeds, and report their
 different compute costs. Integration steps are not physical trajectory frames.
+
+The corrected rerun `49626106` completed all 1,878 predictions on the same 626
+development proteins. Mean fixed-correspondence TM is 0.599825 versus the
+unchanged pair model's 0.568238. The earlier invalid-path result was 0.599770:
+the correction had little effect on aggregate accuracy, but the new run is the
+eligible baseline. The mean teacher advantage is 0.03159, with a family-bootstrap
+95% interval of 0.02481–0.03863. No independent-test structures were scored.

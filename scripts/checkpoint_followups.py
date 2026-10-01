@@ -1,4 +1,4 @@
-"""Submit only the four predeclared final-checkpoint ensemble follow-ups."""
+"""Submit only the predeclared final-checkpoint ensemble follow-ups."""
 import argparse,fcntl,json,os,subprocess
 from pathlib import Path
 from watch_jobs import TERMINAL,write_json,stamp
@@ -14,8 +14,11 @@ def tick(root, *, dry_run=False):
         jobs=json.loads((root/'runs/jobs.json').read_text())['jobs'];byid={j['id']:j for j in jobs};watch=json.loads((root/'runs/watch/state.json').read_text())['jobs'];result=dict(checked_at=stamp(),nodes=[],submitted=None)
         for node in plan['nodes']:
             parent=node['parent'];source=byid.get(parent)
-            if source is None or source.get('completion_action')!='summarize_distillation':raise ValueError('unregistered training predecessor')
-            checkpoint=str(root/f'runs/distillation_{parent}/ema_2000.ckpt');existing=[]
+            if source is None or source.get('completion_action') not in ('summarize_distillation','summarize_reflow'):raise ValueError('unregistered training predecessor')
+            reflow=source['completion_action']=='summarize_reflow'
+            prefix='reflow' if reflow else 'distillation'
+            if reflow and node.get('sampling_steps') not in (5,10):raise ValueError('missing predeclared sampler steps')
+            checkpoint=str(root/f'runs/{prefix}_{parent}/ema_2000.ckpt');existing=[]
             for job in jobs:
                 if job.get('script')!=node['script']:continue
                 config=json.loads((Path(job['code_snapshot'])/'entry_configs/0.json').read_text())
@@ -27,12 +30,13 @@ def tick(root, *, dry_run=False):
             state=terminal.get('state')
             if state!='COMPLETED' or terminal.get('exit_code')!='0:0':
                 result['nodes'].append(dict(parent=parent,status='failed_predecessor' if state in TERMINAL else 'waiting'));continue
-            manifest=json.loads((root/f'runs/distillation_{parent}/manifest.json').read_text())
+            manifest=json.loads((root/f'runs/{prefix}_{parent}/manifest.json').read_text())
             if manifest['status']!='complete' or manifest['config']['arm']!=node['arm'] or manifest['updates']!=2000:raise ValueError('predecessor result mismatch')
             result['nodes'].append(dict(parent=parent,status='eligible'))
             if dry_run or result['submitted'] is not None:continue
             env=dict(os.environ,CUDA_VISIBLE_DEVICES='',OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',PYTHONPATH=str(root/'src'))
-            prepare=[python,'scripts/prepare_trained_ensemble.py','--run',f'runs/distillation_{parent}','--step','2000','--output',node['config']]
+            prepare=[python,'scripts/prepare_reflow_ensemble.py' if reflow else 'scripts/prepare_trained_ensemble.py','--run',f'runs/{prefix}_{parent}','--step','2000','--output',node['config']]
+            if reflow:prepare+=['--sampling-steps',str(node['sampling_steps'])]
             try:
                 subprocess.run(prepare,cwd=root,env=env,capture_output=True,text=True,check=True,timeout=90)
                 env.pop('CUDA_VISIBLE_DEVICES',None)

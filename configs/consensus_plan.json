@@ -1,0 +1,15 @@
+{
+  "status": "Exploratory CPU diagnostic frozen before computing sample choices or comparing native scores",
+  "policy": "ca_lddt_medoid_v1",
+  "checkpoint": "untouched final EMA pair model",
+  "setting": "steps25_cfg2",
+  "samples": 3,
+  "selector": "Largest mean symmetric pairwise CA lDDT to the other two samples; 15 A neighborhoods; errors strictly below 0.5, 1, 2, 4 A; first sample wins exact ties",
+  "inputs": "Predicted CA coordinates only. No native coordinates, model-native scores, or fitted coefficients enter selection.",
+  "evaluation": "All 626 development targets; paired sequence-cluster bootstrap against both fixed first sample and mean across samples, with CA lDDT and geometry reported separately",
+  "oracle": "Native-TM best-of-three is a diagnostic upper bound only, never a deployable policy",
+  "followup_gate": "Consider a second untouched checkpoint or independent inference-noise replication only if mean TM gain over random-sample expectation is at least 0.002, its 95% sequence-cluster interval is above zero, and first-sample TM and mean CA lDDT do not regress",
+  "cost": "No GPU allocation and no new structures. This policy requires generating three samples; compare its full inference cost with a single-sample pipeline before adoption.",
+  "limitations": "CA lDDT is insensitive to chirality and does not guarantee native correctness; agreement among three correlated errors can select a wrong structure. Selection and geometry must be reported without oracle substitution.",
+  "final_test": "Keep the 34 locked targets unscored. This diagnostic does not replace the accuracy-promotion gate."
+}

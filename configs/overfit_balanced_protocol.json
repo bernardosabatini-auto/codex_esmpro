@@ -1,0 +1,16 @@
+{
+  "reason": "At 500 updates, empirical aligned-teacher training improves teacher CA-lDDT and state-frequency agreement but reduces recall. Only 21 of 51 singleton teacher states are hit; all majority states are hit. Neither teacher arm passes the original capacity criterion.",
+  "scope": "Same frozen reliable32 training proteins and contact-state definitions. No development or locked-test selection.",
+  "distribution": "Equal mass per teacher-defined contact state, then uniform over valid teacher conformations within that state. No reference mixture. This intentionally changes the empirical teacher prior and does not estimate biological populations.",
+  "arms": ["aligned_teacher", "pca_teacher"],
+  "matched_controls": ["49704255", "49704413", "49704029"],
+  "updates": 2000,
+  "evaluation_steps": [500, 2000],
+  "initialization": "Same original 459M EMA checkpoint as controls; no warm start from a selected checkpoint.",
+  "unchanged": "Learning rate, optimizer, target order, batch sizes32/16/8/8, precision, EMA, Gaussian/time/dropout streams, evaluator and seeds. Exactly one label uniform draw per example; frame arms map that draw to the same teacher index.",
+  "evaluation": "Retain CFG1 primary and CFG2 sensitivity, both contact thresholds, all samples and geometry failures. Original empirical-teacher state TV remains reported; also report TV against the balanced target prior and singleton-state hits.",
+  "success": "Apply the original capacity criterion versus initialization and reference. Separately compare balanced versus empirical within each frame with paired family intervals. No promotion from training-set results. A decline in teacher-frequency agreement must remain visible.",
+  "next": "Broader/generalization testing only after credible capacity evidence; otherwise examine final curves and target-time behavior. Posterior-target full training is deferred because its measured conditional variance accounts for only a few percent of the objective.",
+  "deadline_utc": "2026-10-02T15:00:00+00:00",
+  "gpu_limit": 8
+}

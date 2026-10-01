@@ -8,6 +8,7 @@ from latentfold.decoder import load_proteinae
 from latentfold.flow import FlowConfig,SampleConfig,flow_loss,sample,target_noise
 from latentfold.precision import inference_precision
 from latentfold.metrics import ca_metrics
+from latentfold.teacher_states import draw_teacher
 from latentfold.ensemble_metrics import backbone_geometry
 from audit_distill_labels import metrics
 from prepare_overfit import sha
@@ -32,6 +33,9 @@ def main():
     if c['arm'] not in ('reference','aligned_teacher','pca_teacher'):raise ValueError('invalid arm')
     estimator=c.get('target_estimator','sampled')
     if estimator not in ('sampled','posterior') or (estimator=='posterior' and c['arm']=='reference'):raise ValueError('invalid target estimator')
+    distribution=c.get('label_distribution','empirical')
+    if distribution not in ('empirical','balanced') or (distribution=='balanced' and (c['arm']=='reference' or estimator=='posterior')):raise ValueError('unsupported label distribution/estimator')
+    if distribution=='balanced' and sha(c['followup_protocol'])!=c['followup_protocol_sha256']:raise ValueError('balanced protocol changed')
     if c['evaluation_steps'][-1]!=c['updates']:raise ValueError('invalid budget')
     if not c.get('profile_only'):
         profile=json.loads(Path(c['profile_report']).read_text())
@@ -90,7 +94,7 @@ def main():
                         while len(queues[length])<count:queues[length].extend(order.permutation(buckets[length]).tolist())
                         ids=queues[length][:count];del queues[length][:count];esm=torch.zeros(count,length,2560,device='cuda');z=torch.zeros(count,length,8,device='cuda');mask=torch.arange(length,device='cuda')[None]<torch.tensor([records[i]['length'] for i in ids],device='cuda')[:,None];choices=[]
                         for k,ident in enumerate(ids):
-                            r=records[ident];n=r['length'];choice=int(r['valid_indices'][int(labels_rng.random()*len(r['valid_indices']))]);choices.append(choice);esm[k,:n]=r['esm'].cuda();target=r['reference_z'] if c['arm']=='reference' else r['teacher_z_aligned' if c['arm']=='aligned_teacher' else 'teacher_z_pca'][choice];z[k,:n]=target.cuda()
+                            r=records[ident];n=r['length'];choice=draw_teacher(r['valid_indices'],r['state'],labels_rng.random(),distribution);choices.append(choice);esm[k,:n]=r['esm'].cuda();target=r['reference_z'] if c['arm']=='reference' else r['teacher_z_aligned' if c['arm']=='aligned_teacher' else 'teacher_z_pca'][choice];z[k,:n]=target.cuda()
                         posterior_args={}
                         if estimator=='posterior':
                             key='teacher_z_aligned' if c['arm']=='aligned_teacher' else 'teacher_z_pca';teachers=max(len(records[i]['valid_indices']) for i in ids)

@@ -32,6 +32,23 @@ def contact_assignments(backbone, state, valid):
     return nearest,errors,clusters
 
 
+def draw_teacher(valid_indices, state, uniform, distribution='empirical'):
+    """One uniform draw in either arm; balanced means equal contact-state mass."""
+    indices=np.asarray(valid_indices,dtype=int)
+    if indices.ndim!=1 or not len(indices) or not np.isfinite(uniform) or not 0<=uniform<1:
+        raise ValueError('invalid teacher draw')
+    if distribution=='empirical':return int(indices[int(uniform*len(indices))])
+    if distribution!='balanced':raise ValueError('unknown teacher distribution')
+    if not np.array_equal(indices,np.asarray(state['teacher_indices'])):
+        raise ValueError('state definitions and valid teachers disagree')
+    clusters=np.asarray(state['clusters'],dtype=int)
+    if clusters.shape!=indices.shape or (clusters<0).any():raise ValueError('invalid teacher states')
+    counts=np.bincount(clusters)
+    probability=1/(np.count_nonzero(counts)*counts[clusters])
+    cdf=np.cumsum(probability);cdf[-1]=1.
+    return int(indices[np.searchsorted(cdf,uniform,side='right')])
+
+
 def paired_change(candidate, reference, *, families=None):
     """Positive values always mean candidate minus comparator."""
     from .metrics import paired_comparison

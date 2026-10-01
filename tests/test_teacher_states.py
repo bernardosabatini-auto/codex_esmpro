@@ -13,6 +13,17 @@ def test_rigid_pose_does_not_change_contact_assignment():
     _,_,invalid=contact_assignments(bb,state,np.zeros(4,dtype=bool));assert (invalid==-1).all()
 
 
+def test_balancing_preserves_one_draw_and_equal_state_mass():
+    from latentfold.teacher_states import draw_teacher
+    indices=np.array([2,4,5,7]);state=dict(teacher_indices=indices.tolist(),clusters=[0,0,0,1])
+    draws=(np.arange(1200)+.5)/1200
+    empirical=np.array([draw_teacher(indices,state,u) for u in draws])
+    balanced=np.array([draw_teacher(indices,state,u,'balanced') for u in draws])
+    assert np.array_equal(empirical,indices[(draws*4).astype(int)])
+    assert (balanced==7).sum()==600
+    for i in [2,4,5]:assert (balanced==i).sum()==200
+
+
 def test_identical_teachers_do_not_make_distinct_states():
     bb=np.random.default_rng(2).normal(size=(1,40,4,3)).repeat(4,0)
     assert definition(bb,np.ones(4,dtype=bool),np.ones((4,40))) is None

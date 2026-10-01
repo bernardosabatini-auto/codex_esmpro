@@ -3,6 +3,7 @@ import argparse,hashlib,json,math,time
 from pathlib import Path
 import h5py,numpy as np,torch
 from latentfold.checkpoints import load_legacy
+from latentfold.backbone import align_backbone_to_reference,encode_backbone
 from latentfold.decoder import load_proteinae
 from latentfold.flow import FlowConfig,SampleConfig,flow_loss,sample,target_noise
 from latentfold.precision import inference_precision
@@ -60,6 +61,12 @@ def main():
                         name=f'collect::overfit_eval::{step}::{index}::{guidance}';torch.cuda.synchronize();tick=time.monotonic();torch.cuda.reset_peak_memory_stats();torch.cuda.nvtx.range_push(name)
                         try:
                             z=sample(model,esm.repeat(32,1,1),mask.repeat(32,1),SampleConfig(steps=25,guidance=guidance),noise=noise,conditioning_ids=[ident]*32);_,bb=decoder(z,mask.repeat(32,1),noise=dn,return_backbone=True);bb=bb[:,:n];scored,values,teacher=score_ensemble(bb,r)
+                            # Diagnostic only: reference alignment never changes generated samples.
+                            aligned=align_backbone_to_reference(bb,r['reference_backbone'].cuda(),torch.ones(n,dtype=torch.bool,device='cuda'))
+                            latent_mask=torch.ones(32,n,dtype=torch.bool,device='cuda');reencoded=encode_backbone(decoder,bb,latent_mask);aligned_z=encode_backbone(decoder,aligned,latent_mask);teacher_z=r['teacher_z_aligned'][r['valid_indices']].cuda()
+                            def nearest_rmse(values):return ((values[:,None]-teacher_z[None]).square().mean((2,3))).sqrt().min(1).values.mean().item()
+                            scored['latent_diagnostic']=dict(sampled_to_teacher_rmse=nearest_rmse(z[:,:n]),reencoded_to_teacher_rmse=nearest_rmse(reencoded),pose_aligned_reencoded_to_teacher_rmse=nearest_rmse(aligned_z),decoder_encoder_rmse=(reencoded-z[:,:n]).square().mean().sqrt().item())
+                            del aligned,latent_mask,reencoded,aligned_z,teacher_z
                             if step==0 and (length,guidance) not in evaluated_controls:
                                 single=sample(model,esm[:,:n],mask[:,:n],SampleConfig(steps=25,guidance=guidance),noise=noise[:1,:n]);alone=decoder(single,mask[:,:n],noise=dn[:1,:4*n])[0].cpu().numpy();control=ca_metrics(bb[0,:,1].cpu().numpy(),alone)
                                 cpu=ca_metrics(bb[0,:,1].cpu().numpy(),teacher[0,:,1].cpu().numpy());valid=backbone_geometry(bb.cpu().numpy())['coarse_valid']

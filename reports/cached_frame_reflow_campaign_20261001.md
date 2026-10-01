@@ -29,7 +29,9 @@ Both predeclared checkpoints receive frozen 48-protein ensemble evaluation. The 
 
 The inherited 25-step CFG2 student supplies 16 recorded Gaussian-seed/latent-endpoint pairs for each of the same 512 training families. These labels preserve the existing student distribution; they add no biological-state supervision. Paired-noise reflow will be compared with fresh independent noise on identical endpoint draws. Both arms use the same initialization, data order, time/dropout random streams, 2,000 updates and CFG1 inference. Evaluate 5 and 10 steps at 500 and 2,000 updates.
 
-Data jobs: 49655628, 49657893, 49658005 and 49658117. The first shard passed all four length-bucket batching controls, using 15.2 GiB peak reserved memory. Measured SM issue was 56.0% over the full capture and 69.6% during sampling. The 40-update training profile, 49657719, passed at 65.0 GiB: 59.7% SM issue during training, 33.2% over its short capture including startup. Full-run utilization remains to be measured.
+Data jobs: 49655628, 49657893, 49658005 and 49658117. The first shard passed all four length-bucket batching controls, using 15.2 GiB peak reserved memory. Measured SM issue was 56.0% over the full capture and 69.6% during sampling. The 40-update training profile, 49657719, passed at 65.0 GiB: 59.7% SM issue during training, 33.2% over its short capture including startup. Full-run utilization remains to be measured. The other two shards with valid counter coverage measured 57.7% and 56.3% whole-capture SM issue. Shard 49657893 had incomplete counter coverage and supplies no utilization estimate.
+
+All 8,192 pairs are complete. Full paired and independent training jobs are 49662855 and 49662912, each one H200 with a 100-minute limit; final 5/10-step ensemble follow-ups are predeclared in the guarded timer.
 
 Preserved decoded quality and valid-state coverage must accompany at least a twofold measured K=32 speedup over the inherited student before a sampler can qualify. Timing includes sequence embedding and decoding on the same GPU, with the direct teacher reported too. Fewer steps alone are not evidence of useful speed.
 

@@ -1,13 +1,23 @@
 """Provenance checks for precision and explicit batch-capacity comparisons."""
+import math
 
 
-def validate_online_pair(candidate, reference, *, same_batches=True, same_precision=False):
+def sampling_parameters(config):
+    if len(config['flow_steps'])!=1 or len(config['guidance'])!=1 or config['samples']!=3:
+        raise ValueError('online benchmark requires one sampling setting and three samples')
+    steps=config['flow_steps'][0];guidance=config['guidance'][0]
+    if type(steps) is not int or steps<1 or type(guidance) not in (int,float) or not math.isfinite(guidance):
+        raise ValueError('invalid online sampling setting')
+    return steps,guidance,f'steps{steps}_cfg{guidance:g}'
+
+
+def validate_online_pair(candidate, reference, *, same_batches=True, same_precision=False, same_steps=True):
     for key in ('checkpoint', 'decoder_checkpoint', 'dataset', 'embedding_artifacts',
                 'resident_parameters', 'timing_scope'):
         if candidate[key] != reference[key]:
             raise ValueError('online comparison changed '+key)
-    keys = ('seed', 'samples', 'target_ids', 'flow_steps', 'guidance')
-    for key in keys + (('batches',) if same_batches else ()):
+    keys = ('seed', 'samples', 'target_ids', 'guidance')
+    for key in keys + (('batches',) if same_batches else ()) + (('flow_steps',) if same_steps else ()):
         if candidate['config'][key] != reference['config'][key]:
             raise ValueError('online comparison changed '+key)
     if same_precision and candidate['precision'] != reference['precision']:

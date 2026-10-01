@@ -1,0 +1,10 @@
+{
+  "purpose": "One bounded intermediate step-count test for a useful full-pipeline speed/accuracy tradeoff",
+  "evidence": "The cached strict-FP32 pair sweep scored TM/CA lDDT 0.56324/0.66282 at 10 steps, 0.56824/0.67450 at 25, and 0.56841/0.67705 at 50, all CFG 2. Ten steps loses too much local accuracy. FP16 ESMC and MLP inference at 25 steps is 1.71x faster than full FP32, below the 2x goal.",
+  "only_change_from_fp16_reference": "Reduce Euler integration from 25 to 20 steps. Keep the smaller validated batches 126/63/30/30, precision, all checkpoints, CFG 2, three per-target noise seeds and strict FP32 decoder. Do not combine with the separately tested cross-sample conditioning reuse.",
+  "controls": "Use the actual 20-step sampler for all eight unchanged production-batch versus unpadded-single controls. Require full 626-target/1878-prediction coverage, with the actual step count in output keys and scoring metadata.",
+  "comparisons": "Compare directly with the same-precision 25-step run 49537668 to isolate sampling steps. Also report the complete speed/accuracy tradeoff against full-FP32 25-step run 49470256; precision and steps both differ in that comparison.",
+  "gate": "At least 2x full-pipeline throughput versus FP32, paired TM and CA lDDT lower confidence bounds at least -0.005 and geometry upper bounds at most +0.001. Failure is retained; no tolerance changes or automatic intermediate-step sweep.",
+  "resources": {"gpus": 1, "gpu_type": "H200", "walltime_minutes": 30},
+  "final_test": "Unscored; no earlier ESM layers"
+}

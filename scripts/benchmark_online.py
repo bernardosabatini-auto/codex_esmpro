@@ -14,6 +14,7 @@ from collect_comparison import infer,write_batch
 from predict import file_identity
 from profile_gpu import atomic_json,Telemetry
 from score_comparison import score_batch,write_scores
+from online_analysis import sampling_parameters
 
 
 def main():
@@ -21,6 +22,7 @@ def main():
  p.add_argument('--config',type=Path,required=True);p.add_argument('--output',type=Path,required=True)
  p.add_argument('--usalign',type=Path,required=True);a=p.parse_args()
  config=json.loads(a.config.read_text());ids=Path(config['target_manifest']).read_text().splitlines()
+ steps,guidance,setting=sampling_parameters(config)
  if len(ids)!=626 or len(set(ids))!=626:raise ValueError('expected exact 626-target benchmark')
  a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0)
  torch.cuda.set_per_process_memory_fraction(.85);start=time.monotonic()
@@ -38,7 +40,7 @@ def main():
   decoder=load_proteinae(a.source/'ProteinAE_v1',ae).cuda();embedding=FinalESMC(a.source/'data/esmc6b',precision=config.get('embedding_precision','bf16'))
   manifest['embedding_artifacts']=[file_identity(p,hash_contents=True) for p in sorted((a.source/'data/esmc6b').glob('*')) if p.is_file() and p.suffix in ('.json','.safetensors')]
   manifest['resident_parameters']=sum(p.numel() for m in (model,decoder,embedding.model) for p in m.parameters())
-  cfg=SampleConfig(steps=25,guidance=2);batches={int(k):v for k,v in config['batches'].items()};buckets=requests_by_bucket(records,batches,3)
+  cfg=SampleConfig(steps=steps,guidance=guidance);batches={int(k):v for k,v in config['batches'].items()};buckets=requests_by_bucket(records,batches,3)
   options=dict(flow_precision=config.get('flow_precision','fp16_mlp'),decoder_precision='fp32')
   def tensors(requests,length):
    unique={r['id']:r for r,_ in requests};ordered=list(unique);index={name:i for i,name in enumerate(ordered)}
@@ -73,8 +75,8 @@ def main():
        z,ca,backbone=[x.float().cpu().numpy() for x in (z,ca,backbone)]
        torch.cuda.synchronize();seconds=time.monotonic()-tick
       finally:torch.cuda.nvtx.range_pop()
-      futures.append(scorers.submit(score_batch,[('steps25_cfg2',r['id'],k,ca[i,:len(r['sequence'])],r['ca'].numpy(),backbone[i,:len(r['sequence'])],str(a.usalign.resolve())) for i,(r,k) in enumerate(chunk)]))
-      write_batch(output,'steps25_cfg2',chunk,z,ca,backbone)
+      futures.append(scorers.submit(score_batch,[(setting,r['id'],k,ca[i,:len(r['sequence'])],r['ca'].numpy(),backbone[i,:len(r['sequence'])],str(a.usalign.resolve())) for i,(r,k) in enumerate(chunk)]))
+      write_batch(output,setting,chunk,z,ca,backbone)
       manifest['completed_predictions']+=len(chunk);manifest['batches'].append(dict(nvtx_range=nvtx,length=length,batch=len(chunk),proteins=len(chunk)//3,seconds=seconds,peak_allocated_bytes=torch.cuda.max_memory_allocated(),peak_reserved_bytes=torch.cuda.max_memory_reserved()))
       atomic_json(a.output/'manifest.json',manifest);print('online predictions',manifest['completed_predictions'],flush=True)
    rows=[r for f in futures for r in f.result()]

@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'scripts'))
-from online_analysis import validate_online_pair
+from online_analysis import validate_online_pair,sampling_parameters
 from summarize_pilot import geometry_by_target
 
 
@@ -19,6 +19,12 @@ class OnlineAnalysisTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'batches'):
             validate_online_pair(candidate, reference)
         validate_online_pair(candidate, reference, same_batches=False, same_precision=True)
+        changed_steps=copy.deepcopy(reference);changed_steps['config']['flow_steps']=[20]
+        with self.assertRaisesRegex(ValueError,'flow_steps'):validate_online_pair(changed_steps,reference)
+        validate_online_pair(changed_steps,reference,same_steps=False,same_precision=True)
+        self.assertEqual(sampling_parameters(changed_steps['config']),(20,2,'steps20_cfg2'))
+        changed_steps['config']['guidance']=[1]
+        with self.assertRaisesRegex(ValueError,'guidance'):validate_online_pair(changed_steps,reference,same_steps=False)
         for scope, key in [('config', 'seed'), ('config', 'samples'), ('config', 'target_ids'),
                            (None, 'dataset'), (None, 'checkpoint'), (None, 'precision')]:
             broken = copy.deepcopy(candidate)

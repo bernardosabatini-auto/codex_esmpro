@@ -1,8 +1,19 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ESM–ProteinAE experiment results</title><style>body{max-width:1050px;margin:40px auto;padding:0 24px;font:16px/1.5 system-ui;color:#17212b}table{border-collapse:collapse;width:100%}td,th{text-align:left;border-bottom:1px solid #ccc;padding:8px}small{color:#52616e}a{color:#2059a1}</style>
 <h1>ESM → ProteinAE: current evidence</h1>
-<small>Generated from recorded artifacts at 2026-09-30T20:39:06+00:00. This is a saved snapshot.</small>
-<p>Earlier-layer ESM work is deferred, with no GPU allocation. Current tests change the training objective or source-confidence weights while retaining the same folding head.</p>
+<small>Generated from recorded artifacts at 2026-10-01T02:11:18+00:00. This is a saved snapshot.</small>
+<p>Earlier-layer ESM work is deferred, with no GPU allocation. Current work tests the causes of continued-training regression, saved-checkpoint choice, reference-free sample selection and GPU efficiency.</p>
+<h2>Autonomous recovery and selection round</h2>
+<p>Authorized window: 2026-10-01T01:30:07Z through 2026-10-01T13:30:07Z. At most eight project GPUs pending or running; only registered project jobs are inspected. Earlier-layer ESM allocation remains zero.</p>
+<p>Scheduler snapshot from the project watcher: 2026-10-01T02:10:50.190816+00:00; watcher status ok. Pending requests are not running GPU computation.</p>
+<table><tr><th>Job</th><th>Question</th><th>Task states at snapshot</th></tr>
+<tr><td>49523242</td><td>Single-factor recovery screens: AdamW beta2 and residue loss reduction; seed 7919, 500 updates, existing matched control</td><td>49523242_0: PENDING, 49523242_1: PENDING</td></tr>
+<tr><td>49524706</td><td>Fixed-protocol comparison of training-selected best EMA and final unaveraged weights against the final EMA reference</td><td>49524706_0: PENDING, 49524706_1: PENDING</td></tr>
+<tr><td>49526215</td><td>Single-factor data-diversity recovery screen: 16384 cached proteins, seed 7919, 500 updates, unchanged latent loss and optimizer</td><td>49526215: PENDING</td></tr>
+<tr><td>49526739</td><td>Bounded FP16 gradient-equivalence and throughput profile: all-block versus pair-only activation recomputation at unchanged batch shapes</td><td>49526739: PENDING</td></tr>
+<tr><td>49528311</td><td>Two independent inference-noise replications of the frozen three-sample consensus rule after a +0.00543 TM CPU screen; untouched checkpoint, all 626 development targets</td><td>49528311_0: PENDING, 49528311_1: PENDING</td></tr>
+</table><p>The recovery screens change optimizer beta2, loss reduction, or training-pool size separately. Checkpoint diagnostics compare the training-selected epoch-22 EMA and final raw weights with final EMA. The efficiency profile measures all-block versus pair-only activation recomputation before any training-policy change.</p>
+<p><strong>Reference-free selection screen:</strong> choosing the most mutually consistent of three predictions raised TM from 0.56824 to 0.57367; change +0.00543, 95% cluster interval [+0.00358, +0.00734]. lDDT and aggregate geometry also improved. Choices were frozen before reading native scores. This falls below the +0.01 practical accuracy target and requires two new inference-noise replications.</p>
 <h2>Structure accuracy</h2><p>All 626 development proteins and three samples per protein; every sample retained. Fixed residue correspondence, optimized TM-score and CA lDDT. These are reused development data.</p>
 <table><tr><th>Model</th><th>Mean TM</th><th>CA lDDT</th><th>Coverage</th></tr>
 <tr><td>Untouched pair</td><td>0.56824</td><td>0.67450</td><td>1878/1878</td></tr>
@@ -31,7 +42,7 @@
 <p>Independence from the frozen ESMC, ProteinAE and comparator pretraining sets is unknown.</p>
 <h2>Hardware and scope</h2><p>The validated training batches are 128/64/32/16 proteins at padded lengths 128/256/384/512. Training uses an FP16 head with checked parameter gradients and a strict FP32 decoder. Actual training measured approximately 96–97% SM activity but only 41% instruction issue where full counters were available; peak reserved memory was approximately 84–99 GiB. SM activity and instruction issue are not percent of peak FLOPs.</p>
 <p>External-model inference measured 81.1% SM activity during collection and 74.6% over the capture. Its timing includes sequence conditioning; the cached pair-head timing excludes ESMC. No end-to-end speed ratio is claimed.</p>
-<p>This execution used 7.305 H200 GPU-hours across 17 registered tasks, including failed jobs and setup time. Peak simultaneous allocation: 7 GPUs, below the authorized limit of eight.</p>
+<p>The prior objective/confidence/online-comparison round used 7.305 H200 GPU-hours across 17 registered tasks, including failed jobs and setup time. Peak simultaneous allocation: 7 GPUs. This excludes the new autonomous recovery round.</p>
 <p>Measured complete-pipeline throughput: 1.19 proteins/s, three structures each, with 78.4 GiB reserved. Computation: 95.1% SM activity and 75.1% instruction issue. Development accuracy/geometry noninferiority passed: True.</p>
 <h2>Evidence and reproducibility</h2><ul>
 <li><a href="comparison_49414524.md">comparison_49414524.md</a></li>
@@ -46,4 +57,7 @@
 <li><a href="online_49468214.md">online_49468214.md</a></li>
 <li><a href="online_49470256.md">online_49470256.md</a></li>
 <li><a href="holdout_expanded_20260930.md">holdout_expanded_20260930.md</a></li>
+<li><a href="recovery_data_16384.md">recovery_data_16384.md</a></li>
+<li><a href="training_state_audit.md">training_state_audit.md</a></li>
+<li><a href="consensus_final_ema.md">consensus_final_ema.md</a></li>
 </ul><p>Code and aggregate reports are synchronized to GitHub. Datasets, weights, target manifests, predictions and profiler traces remain local and ignored by Git.</p></html>

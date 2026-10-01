@@ -79,6 +79,14 @@ class WatcherTests(unittest.TestCase):
             state = watch.tick(self.root, {}, query, analyze)
         self.assertEqual(state['jobs']['123']['outcome'], 'analyzed')
 
+    def test_failed_consensus_replication_still_gets_failure_report(self):
+        self.job['completion_action'] = 'summarize_consensus'
+        (self.root/'runs/jobs.json').write_text(json.dumps({'jobs': [self.job]}))
+        analyze = Mock(return_value='failure_report.md')
+        state = watch.tick(self.root, {}, Mock(return_value=self.rows('FAILED', '1:0')), analyze)
+        self.assertEqual(state['jobs']['123']['outcome'], 'analyzed')
+        self.assertEqual(analyze.call_count, 1)
+
     def test_score_coverage_rejects_duplicates_and_missing(self):
         manifest = dict(status='complete', completed_predictions=2,
                         config=dict(flow_steps=[25], guidance=[2], target_ids=['a'], samples=2))

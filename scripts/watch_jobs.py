@@ -194,7 +194,7 @@ def tick(root, config, query=scheduler_states, analyze=followup):
         if not all(rows[i]['state'] in TERMINAL for i in ids):
             continue
         success = all(rows[i]['state'] == 'COMPLETED' and rows[i]['exit_code'] == '0:0' for i in ids)
-        if not success and job.get('completion_action') not in ('summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout', 'summarize_pilot', 'summarize_external', 'summarize_quality', 'summarize_online', 'summarize_recovery','summarize_checkpoint','summarize_efficiency'):
+        if not success and job.get('completion_action') not in ('summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout', 'summarize_pilot', 'summarize_external', 'summarize_quality', 'summarize_online', 'summarize_recovery','summarize_checkpoint','summarize_efficiency','summarize_consensus'):
             entry.update(handled=True, outcome='job_failed', handled_at=stamp())
         elif not job.get('completion_action'):
             entry.update(handled=True, outcome='completed', handled_at=stamp())

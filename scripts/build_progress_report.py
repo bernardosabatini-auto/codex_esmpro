@@ -12,13 +12,42 @@ def read(relative):
     return json.loads(path.read_text()) if path.exists() else None
 
 
+def current_round():
+    execution=read('runs/autonomous_20261001.json')
+    if not execution:return []
+    esc=html.escape
+    lines=['<h2>Autonomous recovery and selection round</h2>',
+        f'<p>Authorized window: {esc(execution["started"])} through {esc(execution["deadline"])}. At most eight project GPUs pending or running; only registered project jobs are inspected. Earlier-layer ESM allocation remains zero.</p>']
+    registry=read('runs/jobs.json');state=read('runs/watch/state.json') or {};beat=read('runs/watch/heartbeat.json') or {}
+    lines.append(f'<p>Scheduler snapshot from the project watcher: {esc(beat.get("checked_at","unavailable"))}; watcher status {esc(beat.get("status","unknown"))}. Pending requests are not running GPU computation.</p>')
+    lines.append('<table><tr><th>Job</th><th>Question</th><th>Task states at snapshot</th></tr>')
+    for job in (registry or {}).get('jobs',[]):
+        if job.get('submitted','') < execution['started']:continue
+        tasks=state.get('jobs',{}).get(job['id'],{}).get('tasks',{})
+        values=', '.join(f'{name}: {row["state"]}' for name,row in tasks.items()) or job['state']
+        lines.append(f'<tr><td>{esc(job["id"])}</td><td>{esc(job["purpose"])}</td><td>{esc(values)}</td></tr>')
+    lines.append('</table><p>The recovery screens change optimizer beta2, loss reduction, or training-pool size separately. Checkpoint diagnostics compare the training-selected epoch-22 EMA and final raw weights with final EMA. The efficiency profile measures all-block versus pair-only activation recomputation before any training-policy change.</p>')
+    d=read('reports/consensus_final_ema.json')
+    if d:
+        s=d['pairs']['tm_fixed_reference']['sample_mean'];ci=s['ci95']
+        lines.append(f'<p><strong>Reference-free selection screen:</strong> choosing the most mutually consistent of three predictions raised TM from {s["ours"]:.5f} to {s["theirs"]:.5f}; change {s["theirs_minus_ours"]:+.5f}, 95% cluster interval [{ci[0]:+.5f}, {ci[1]:+.5f}]. lDDT and aggregate geometry also improved. Choices were frozen before reading native scores. This falls below the +0.01 practical accuracy target and requires two new inference-noise replications.</p>')
+    for path in sorted((ROOT/'reports').glob('recovery_*.json')):
+        d=read(str(path.relative_to(ROOT)))
+        for row in d.get('runs',{}).values():
+            tm=row['paired']['tm_fixed_reference'];delta=row['vs_untouched']['tm_fixed_reference']['theirs_minus_ours']
+            lines.append(f'<p>Recovery {esc(row["task"]["name"])}: TM {tm["theirs"]:.5f}, change versus control {tm["theirs_minus_ours"]:+.5f}, versus untouched {delta:+.5f}; screen passed: {row["recovery_screen_passed"]}.</p>')
+        for failure in d.get('failures',[]):lines.append(f'<p>Recovery result unavailable: {esc(failure["error"])}.</p>')
+    return lines
+
+
 def main():
     stamp = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec='seconds')
     esc = html.escape
     lines = ['<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">',
         '<title>ESM–ProteinAE experiment results</title><style>body{max-width:1050px;margin:40px auto;padding:0 24px;font:16px/1.5 system-ui;color:#17212b}table{border-collapse:collapse;width:100%}td,th{text-align:left;border-bottom:1px solid #ccc;padding:8px}small{color:#52616e}a{color:#2059a1}</style>',
         '<h1>ESM → ProteinAE: current evidence</h1>',f'<small>Generated from recorded artifacts at {stamp}. This is a saved snapshot.</small>',
-        '<p>Earlier-layer ESM work is deferred, with no GPU allocation. Current tests change the training objective or source-confidence weights while retaining the same folding head.</p>',
+        '<p>Earlier-layer ESM work is deferred, with no GPU allocation. Current work tests the causes of continued-training regression, saved-checkpoint choice, reference-free sample selection and GPU efficiency.</p>',
+        *current_round(),
         '<h2>Structure accuracy</h2><p>All 626 development proteins and three samples per protein; every sample retained. Fixed residue correspondence, optimized TM-score and CA lDDT. These are reused development data.</p>',
         '<table><tr><th>Model</th><th>Mean TM</th><th>CA lDDT</th><th>Coverage</th></tr>']
     baseline = read('reports/comparison_49414524.json')
@@ -74,12 +103,12 @@ def main():
         '<h2>Evidence and reproducibility</h2><ul>']
     cost=read('runs/accuracy_execution_cost.json')
     if cost:
-        lines.insert(-1,f'<p>This execution used {cost["gpu_hours"]:.3f} H200 GPU-hours across {cost["tasks"]} registered tasks, including failed jobs and setup time. Peak simultaneous allocation: {cost["peak_allocated_gpus"]} GPUs, below the authorized limit of eight.</p>')
+        lines.insert(-1,f'<p>The prior objective/confidence/online-comparison round used {cost["gpu_hours"]:.3f} H200 GPU-hours across {cost["tasks"]} registered tasks, including failed jobs and setup time. Peak simultaneous allocation: {cost["peak_allocated_gpus"]} GPUs. This excludes the new autonomous recovery round.</p>')
     perf=read('reports/online_49470256.json')
     if perf and perf['status']=='complete':
         h=perf['hardware']['collection_mean_percent']
         lines.insert(-1,f'<p>Measured complete-pipeline throughput: {perf["proteins_per_second"]:.2f} proteins/s, three structures each, with {perf["peak_reserved_gib"]:.1f} GiB reserved. Computation: {h["SMs Active [Throughput %]"]:.1f}% SM activity and {h["SM Issue [Throughput %]"]:.1f}% instruction issue. Development accuracy/geometry noninferiority passed: {perf.get("development_noninferiority_passed", "pending")}.</p>')
-    for filename in ('comparison_49414524.md','external_49461971.md','external_strata_49461971.md','geometry_49453471.md','training_data_v1.md','canonical_frames_v1.md','training_profile_49459162.md','pilot_49461023.md','quality_49466461.md','online_49468214.md','online_49470256.md','holdout_expanded_20260930.md'):
+    for filename in ('comparison_49414524.md','external_49461971.md','external_strata_49461971.md','geometry_49453471.md','training_data_v1.md','canonical_frames_v1.md','training_profile_49459162.md','pilot_49461023.md','quality_49466461.md','online_49468214.md','online_49470256.md','holdout_expanded_20260930.md','recovery_data_16384.md','training_state_audit.md','consensus_final_ema.md'):
         if (ROOT/'reports'/filename).exists():lines.append(f'<li><a href="{filename}">{filename}</a></li>')
     lines += ['</ul><p>Code and aggregate reports are synchronized to GitHub. Datasets, weights, target manifests, predictions and profiler traces remain local and ignored by Git.</p></html>']
     (ROOT/'reports/progress.html').write_text('\n'.join(lines)+'\n')

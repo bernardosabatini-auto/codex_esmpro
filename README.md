@@ -54,6 +54,19 @@ they do not isolate why continued training regressed. The next accuracy experime
 should first separate the resume-policy and training-distribution effects before
 adding another objective. These null pilots do not establish an accuracy ceiling.
 
+The new [recovery protocol](configs/recovery_plan.json) isolates AdamW beta2,
+residue-versus-protein loss reduction, and a verified 16,384-protein training
+pool. Two saved-checkpoint comparisons and an activation-recomputation profile
+run alongside those screens. The [saved-state audit](reports/training_state_audit.md)
+validates all optimizer moments and parameter ordering; missing CUDA RNG state
+prevents claiming an exact replay of the inherited run.
+
+A CPU-only [reference-free selection screen](reports/consensus_final_ema.md)
+raised TM from 0.56824 to 0.57367 by choosing the most mutually consistent of
+three predictions. The selector sees predicted coordinates only. This is a
+development result below the +0.01 promotion threshold. Two fixed new inference
+seeds are queued for replication; no independent-test structures have been scored.
+
 The [complete sequence-to-backbone pipeline](reports/online_49470256.md) now
 includes fresh final-layer ESMC extraction, with all components in strict FP32.
 It scores 0.56767 TM and processes 1.19 proteins/s, returning three structures
@@ -117,7 +130,7 @@ final-layer ESMC; the validated configuration is in `configs/validated_inference
 
 ## Scope and limits
 
-- Tested: 33 CPU contract tests; exact forward parity of small pair and pair-free
+- Tested: 41 CPU contract tests; exact forward parity of small pair and pair-free
   models against isolated original definitions; a real pretrained ProteinAE
   decoder on one validation target; the full 626-target artifact/data audit.
 - H200 job 49346371 completed 50 throughput/memory configurations of the actual

@@ -52,3 +52,11 @@ Documentation clarification: the frozen cached-frame protocol retained the phras
 All four 500-update short samplers fail native validity. Paired 10-step CA-lDDT is 0.79019 versus initialization 0.78384, but validity falls from 0.97917 to 0.94792. Independent 10-step validity is 0.92188. Five-step validity is 0.77083 (paired) and 0.61458 (independent). See [the full tuning comparison](reflow_training_500.md).
 
 Resource decision, made before 2,000-update outcomes: skip ensemble generation for these failed 500-update samplers. Both training arms still complete the planned budget and both final sampler settings receive full native evaluation. Final ensemble submissions now require the same existing native noninferiority and validity margins (CA-lDDT lower 95% family bound above −0.005; mean validity loss no greater than 0.01). This refines the initially broad ensemble follow-up plan to avoid spending GPU time on candidates that cannot qualify. The guarded timer records every failed screen instead of silently retrying or discarding it. Cached-frame 500/2,000 ensemble comparisons remain unchanged.
+
+## Final cached-frame native evaluation
+
+Both 2,000-update runs are complete. Aligned teacher CA-lDDT is 0.78758, a change of +0.00374 [−0.00078, +0.00885] from initialization and +0.00984 [0.00600, 0.01385] from the matched reference control. Optimized fixed-correspondence TM is 0.68753 versus 0.68488 initially, a change of +0.00266 [−0.00316, +0.00876]. Native coarse validity falls from 0.97917 to 0.95833. These results do not establish an accuracy gain over initialization.
+
+Final ensemble jobs 49672152 and 49672377 are queued. Their requested limits were reduced, for these own jobs only, from 30 minutes/96 GiB host RAM to 15 minutes/16 GiB after the matching 500-update jobs completed in 7m13s and 7m18s with approximately 2.6 GiB host RSS. Scheduler adjustment records are retained locally. GPU memory limits and numerical settings are unchanged.
+
+The reference-control training run measured 58.05% allocation-normalized SM issue, 60.39% during training, and 63.65 GiB peak GPU memory. The aligned-teacher run's counter coverage failed validation, so no utilization figure is assigned to that run. See [allocation accounting](cached_frame_gpu_allocation.md).

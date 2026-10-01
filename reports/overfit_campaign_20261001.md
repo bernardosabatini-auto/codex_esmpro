@@ -73,3 +73,5 @@ A CPU simulation of 100,000 repeated experiments, each drawing 32 empirical teac
 ## Larger-batch throughput profile
 
 The measured 64.96 GiB peak of the ordinary profile leaves room within the existing 110 GiB capacity gate. A single-H200, 40-update profile will test batches64/32/16/12 at padded lengths128/256/384/512, versus32/16/8/8 previously. Its purpose is throughput and memory measurement only; changed batch sizes do not constitute a matched optimization experiment. Compare processed samples and padded residues per training second, not update time alone. Keep the three active training arms unchanged and use any accepted batching change consistently in future matched experiments.
+
+Larger-batch profile submitted as job49716889, one H200 with a 10-minute walltime. No new full training arm is submitted while the 500-update comparisons remain incomplete.

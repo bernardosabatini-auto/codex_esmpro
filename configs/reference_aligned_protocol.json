@@ -1,0 +1,19 @@
+{
+  "purpose": "Isolate teacher pose consistency without changing inherited reference latent targets",
+  "source_teacher_jobs": ["49634098", "49636690", "49636770", "49636855"],
+  "training_families": 512,
+  "samples_per_family": 16,
+  "latent_frame": "teacher_CA_aligned_to_raw_reference",
+  "alignment": "One proper CA Kabsch transform per teacher conformation, applied to every backbone atom; no domain-wise fitting or reflection",
+  "shared_core": "Mean teacher pLDDT >= 0.7 across coarse-valid samples; require at least max(32,ceil(0.5*length)) residues and nondegenerate geometry",
+  "fallback": "Use all CA residues if the shared core is insufficient or degenerate; record every fallback; do not reject or reweight samples",
+  "reference_labels": "Copy original raw_reference_z bit-for-bit; preserve every teacher sample, validity mask, cluster label and random draw policy",
+  "distribution": "50% raw reference, 50% uniformly chosen coarse-valid aligned teacher sample",
+  "training": "Same initial head, seed, target order, flow-noise stream, optimizer and 2000-update schedule as previous empirical arm",
+  "controls": "Existing matched raw-reference control and canonical empirical teacher arm; report both500/2000 endpoints",
+  "reconstruction_gate": "Audit all8192 teacher latents; mean CA lDDT >=0.98 and coarse-validity loss <=0.01",
+  "rotation_control": "Rotate/translate teacher coordinates, realign to the fixed reference, and verify recovered aligned coordinates and encoded latents",
+  "promotion": "Existing valid-state coverage, quality and validity gates; only eligible effects get three-seed replication",
+  "test": "No reserved confirmation or original independent-test scoring",
+  "speed_branch": "Separately test learned paired-noise reflow after this label pipeline is running; do not confound pose and sampler changes"
+}

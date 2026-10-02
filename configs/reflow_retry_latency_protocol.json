@@ -1,0 +1,20 @@
+{
+  "purpose": "Measure resident sequence-to-backbone cost of native/external-qualified reflow10 with bounded retries, compared with original/compact25 retry pipelines and raw direct teacher on one RTX.",
+  "external_protocol": "configs/reflow_retry_ensemble_protocol.json",
+  "external_protocol_sha256": "7cbc4a0f49f3e50e4080623962b3488d94d4903e16cce80377ea3eebaed9a540",
+  "quality_report": "reports/reflow_retry_ensemble_comparison_20261002.json",
+  "quality_report_sha256": "b0cf79f5967a91c261cb56a16109edf10fdce338d63a44af109bf2f0969f8681",
+  "pipelines": [
+    "original",
+    "compact500",
+    "reflow10",
+    "teacher"
+  ],
+  "panel": "The same eight development sequences as ensemble_latency_49774086; no new selection. K1/8/32, three repeats, rotate count order per repeat.",
+  "student_recipe": "Match each qualified external checkpoint, guidance, step count, FP32/AE3 and conditioning implementation exactly. Fresh ESM each prediction; latent logical index k+32*a and decoder0 even for K1/K8 prefixes, at most4 attempts, first coarse-valid accepted; exhausted slots return first draw. All timing includes Gaussian creation, CPU output transfer, geometry checks and every retry. Geometry thresholds unchanged.",
+  "teacher_recipe": "Same existing direct-teacher trunk3/diffusion50 with diffusion chunks<=16 and validated early exit before confidence heads. Seed mapping unchanged. No teacher geometry rejection; report as raw teacher, without equivalent-quality claims.",
+  "controls": "Warm all three sample counts. Each student output must match its qualified external selected prefix within0.2A/0.99 with exact selected indices and per-output coarse validity. Teacher warmK1 early-exit output must match full fold within0.01A/0.999. Timed repeated predictions must retain identical selection/attempt/fallback metadata and coordinates within0.01A. All controls outside timing.",
+  "analysis": "Average per-family three-repeat medians, paired-family bootstrap intervals for original/compact/teacher seconds divided by reflow10. Report peak memory, attempts and exhausted counts. Resident loading/warmup/controls/fileI/O excluded; no cold-start or maximum-throughput claim. Direct teacher and students need joint cost and quality interpretation.",
+  "decision": "Useful speed criterion fixed before timing: K32 ratio>=2 versus original and>=1.25 versus compact500. Report teacher ratio regardless. Native noninferiority to compact500 was not established; external quality passed but no diversity gain. Do not hide this tradeoff or generalize eight-sequence/device results.",
+  "resources": "One RTX30minute request/1680second work cap,96GiB host RAM (full resident ESM/model loading). Previous four-pipeline run~18minutes. Project <=8 own running+pending GPUs and15UTC deadline. Existing registered ensemble-latency completion action dispatches retry-specific full audit; no GPU followup from this timer."
+}

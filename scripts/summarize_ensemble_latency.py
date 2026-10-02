@@ -19,6 +19,9 @@ def speed_ratio(reference,candidate):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs='+',required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();run=a.runs[0]
     m=json.loads((run/'manifest.json').read_text()) if (run/'manifest.json').exists() else dict(status='failed',error='Missing manifest');d=dict(status=m['status'],scope=m.get('scope'),summaries={})
+    if m.get('config',{}).get('retry_heads'):
+        from summarize_retry_latency import summarize
+        summarize(m,a.output);return
     device=json.loads((run/'device_metadata.json').read_text()) if (run/'device_metadata.json').exists() else {}
     d['device_name']=m.get('device_name',device.get('cuda_device_name','unreported'))
     if m['status']=='complete':

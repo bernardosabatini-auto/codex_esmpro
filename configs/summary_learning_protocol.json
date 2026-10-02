@@ -1,0 +1,23 @@
+{
+  "scope": "Small matched training-capacity feasibility only, on the unchanged reliable32 balanced teacher ensembles. No native or external feature cache until capacity evidence.",
+  "hypothesis": "The teacher's frozen learned mixture supplies useful information beyond its equally sized projection of final ESMC layer80.",
+  "arms": ["projected_final", "teacher_summary"],
+  "profile": {"arm": "teacher_summary", "updates": 40, "maximum_reserved_gib": 80, "allocation_minutes": 15},
+  "first_seed": 2026100191,
+  "replication_seed": 2026100201,
+  "updates": 500,
+  "evaluation_steps": [500],
+  "evaluation_seed": 2026100162,
+  "adapter": {"width": 128, "bound": 0.1, "input_width": 256, "output_width": 2560, "learning_rate": 0.0003},
+  "flow_learning_rate": 0.00003,
+  "warmup_updates": 50,
+  "ema_decay": 0.99,
+  "batches": {"128": 32, "256": 16, "384": 8, "512": 8},
+  "initialization": "Original459M EMA plus zero-output residual adapter. Jointly train flow and adapter; same initial full state, target/label/noise/time/dropout draws and LR schedule across arms. The adapter's input alone differs. Frozen per-token normalization of256D input.",
+  "features": "Frozen teacher input normalization and256D projection applied to final80 for control; exact streamed frozen learned81-layer mixture for candidate. Preserve existing2560D final condition bitwise. Verify all32 fresh final embeddings against stored inputs, RMSE<=1e-4,maxabs<=1e-3; one full-hidden-state summary control in each bucket.",
+  "evaluation": "Same32 training families,32 samples each, CFG1 Euler25 AE3 FP32; fixed teacher-state definitions, all geometry failures retained. Paired family intervals; no inference from training to unseen families.",
+  "advance_to_replication": {"minimum_recall_gain_vs_projected_final": 0.05, "recall_gain_ci_lower_strictly_positive": true, "minimum_validity_delta_vs_projected_final": -0.01, "minimum_validity_delta_vs_initial": -0.01},
+  "next": "Only after matched capacity evidence replicate the two arms at the second declared seed. Native and external gates remain mandatory before any promotion. Failure closes this fixed feature-adaptation recipe; no retrospective bound or learning-rate grid.",
+  "gpu_cap": 8,
+  "deadline_utc": "2026-10-02T15:00:00+00:00"
+}

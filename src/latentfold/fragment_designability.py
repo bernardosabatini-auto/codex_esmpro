@@ -24,3 +24,10 @@ def same_refold_success(raw, refolds):
     legacy=[i for i,r in enumerate(refolds) if r['sc_tm']>.5 and r['coarse_valid'] and r['motif_drms']<=1]
     raw_ok=bool(raw['coarse_valid'] and raw['motif_drms']<=1 and raw['motif_ca_rmsd']<=1)
     return dict(raw_gate_passed=raw_ok,strict_joint_success=raw_ok and bool(same),successful_refold_indices=same,legacy_drms_joint_success=bool(raw['coarse_valid'] and raw['motif_drms']<=1 and legacy),valid_designable=bool(raw['coarse_valid'] and any(r['sc_tm']>.5 and r['coarse_valid'] for r in refolds)))
+
+
+def first_repaired_target(raw,refolds):
+    """A same-refold training label, distinct from raw motif retention success."""
+    outcome=same_refold_success(raw,refolds)
+    if not raw['coarse_valid'] or not outcome['successful_refold_indices']:return None
+    return outcome['successful_refold_indices'][0]

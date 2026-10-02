@@ -102,6 +102,16 @@ class WatcherTests(unittest.TestCase):
         self.assertEqual(state['jobs']['123']['outcome'], 'analyzed')
         self.assertEqual(analyze.call_count, 1)
 
+    def test_retry_pipeline_failure_is_analyzed_once(self):
+        self.job['completion_action'] = 'summarize_bounded_retry_native'
+        (self.root/'runs/jobs.json').write_text(json.dumps({'jobs': [self.job]}))
+        analyze = Mock(return_value='retry_failure_report.md')
+        query = Mock(return_value=self.rows('FAILED', '1:0'))
+        state = watch.tick(self.root, {}, query, analyze)
+        self.assertEqual(state['jobs']['123']['outcome'], 'analyzed')
+        watch.tick(self.root, {}, query, analyze)
+        self.assertEqual(analyze.call_count, 1)
+
     def test_score_coverage_rejects_duplicates_and_missing(self):
         manifest = dict(status='complete', completed_predictions=2,
                         config=dict(flow_steps=[25], guidance=[2], target_ids=['a'], samples=2))

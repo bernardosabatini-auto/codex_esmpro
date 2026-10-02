@@ -1,0 +1,11 @@
+{
+  "purpose": "Measure accuracy transfer of the matched empirical/balanced frame experiment after its successful500-update training-capacity screen.",
+  "panel": "Existing64 tuning families and all3 fixed evaluation seeds; disjoint from the32 capacity-training proteins. Original34 and reserved17 remain unscored. AFDB predicted references, not experimental native structures.",
+  "heads": ["original", "aligned_teacher_empirical", "pca_teacher_empirical", "aligned_teacher_balanced", "pca_teacher_balanced"],
+  "checkpoint": 500,
+  "sampling": "Euler25, CFG1 and CFG2 for every head, same flow and decoder noise, strict FP32, decoder3. Original CFG2 must reproduce the frozen baseline. Each head/guidance/bucket needs unpadded-single versus batch control.",
+  "analysis": "Report every head/guidance versus original CFG2 and versus original at matched guidance, plus balanced minus empirical within each frame/guidance. Paired64-family bootstrap intervals, unadjusted. Retain all geometry failures.",
+  "quality_gate": "Against original CFG2, CA-lDDT difference95% lower bound greater than-0.005 and coarse-validity mean loss at most0.01. These are the existing reference-quality margins, unchanged.",
+  "interpretation": "A small training-panel capacity pass is not a generalization claim. These results measure transfer and any accuracy cost. No checkpoint is promoted without separate ensemble development evaluation and training-seed replication. Both2000-update training endpoints still run; neither a positive nor a negative500-update transfer result changes their budgets.",
+  "resources": "One H200,20-minute cap,1080-second work cap; five heads share a resident decoder and cached ESM embeddings. CPU checkpoint hash preparation; total project running-plus-pending GPUs<=8."
+}

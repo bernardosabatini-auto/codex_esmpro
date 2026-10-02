@@ -41,6 +41,10 @@ def analyze(run):
         rows=m['motif_objective_updates']
         if len(rows)!=c['updates'] or [r['step'] for r in rows]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['motif_mse']) or r['aux_to_flow_ratio']>c['auxiliary_motif']['maximum_gradient_ratio']+1e-7 or r['flow_parameter_grad_norm']<=0 for r in rows):raise ValueError('Incomplete/unbounded motif gradients')
         if sum(r['motif_examples'] for r in rows)<c['updates'] or not any(r['aux_parameter_grad_norm']>0 for r in rows):raise ValueError('Insufficient motif objective exposure')
+    if c.get('rollout_pilot'):
+        if not c.get('rollout_motif') or c['profile_only'] or c['updates']!=500 or c['evaluation_steps']!=[500]:raise ValueError('Invalid pilot schedule')
+        for key in ('rollout_pilot_protocol','rollout_control_manifest'):
+            if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed pilot source')
     if c.get('rollout_motif'):
         if sha(c['rollout_protocol'])!=c['rollout_protocol_sha256'] or c['rollout_motif']!=json.loads(Path(c['rollout_protocol']).read_text())['auxiliary']:raise ValueError('Changed rollout provenance')
         controls=m['rollout_controls'];rows=m['rollout_objective_updates']

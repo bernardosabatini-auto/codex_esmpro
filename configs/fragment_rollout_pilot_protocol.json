@@ -1,0 +1,7 @@
+{
+  "purpose": "Resource-bounded500update feasibility stage after actual-rollout profile49955403 measured206.97seconds/40updates versus22.68seconds for plain flow. The original2000update proposal exceeds its150minute resource cap and is not launched.",
+  "profile": "All40matched primary draws, trained adapter initialization, exact GPU forward controls, finite bounded gradients,30.0GiB peak. Original full-trajectory protocol and failed cost gate are preserved.",
+  "schedule": "Start again from parent49929751EMA+adapter. Same primary seed2026100241 and first500updates of the unchanged2000step LR schedule. Actual50Euler/AE3 trajectory, up to2examples/update, auxiliary gradient ratio<=.5, no approximation or changed objective. Evaluate0and500; total exposure2500. No automatic continuation.",
+  "comparison": "Compare to local500checkpoint of plain continuation49939857, also2500cumulativeupdates. Audit all500primary draws and384initial samples. Score strict raw retention on original32training/16development families and unchanged matched288refold assays for BOTH endpoints.",
+  "interpretation": "This is a prospective shorter horizon chosen from measured cost, not a substitute for a completed2000update experiment. Geometry and motif loss do not establish designability. No locked tests, filtering or threshold changes."
+}

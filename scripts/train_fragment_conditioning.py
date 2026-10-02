@@ -60,6 +60,10 @@ def main():
     if c.get('rollout_motif'):
         if not warm or c.get('expanded_fragment_data') or c.get('auxiliary_motif') or sha(c['rollout_protocol'])!=c['rollout_protocol_sha256']:raise ValueError('Unqualified rollout objective')
         if c['rollout_motif']!=json.loads(Path(c['rollout_protocol']).read_text())['auxiliary']:raise ValueError('Changed rollout recipe')
+    if c.get('rollout_pilot'):
+        if not c.get('rollout_motif') or c['profile_only']:raise ValueError('Invalid rollout pilot')
+        for key in ('rollout_pilot_protocol','rollout_control_manifest'):
+            if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed pilot source')
     if geometry:
         for baseline in c['baseline_reports']:
             if sha(baseline['path'])!=baseline['sha256']:raise ValueError('Changed baseline evidence')
@@ -70,7 +74,7 @@ def main():
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed full geometry prerequisite')
     recipe=json.loads(Path(c['protocol']).read_text());dr=json.loads(Path(c['data_report']).read_text())
     if not dr['training_gate_passed'] or c['arm'] not in recipe['arms'] or c['seed']!=(json.loads(Path(c['warm_protocol']).read_text())['seed'] if warm else recipe['seed']) or c['batches']!=recipe['batches']:raise ValueError('Wrong recipe or data gate')
-    if c['updates']!=(40 if c['profile_only'] else 2000) or c['evaluation_steps']!=([40] if c['profile_only'] else [500,2000]):raise ValueError('Wrong update schedule')
+    if c['updates']!=(40 if c['profile_only'] else 500 if c.get('rollout_pilot') else 2000) or c['evaluation_steps']!=([40] if c['profile_only'] else [500] if c.get('rollout_pilot') else [500,2000]):raise ValueError('Wrong update schedule')
     if not c['profile_only']:
         if sha(c['profile_report'])!=c['profile_report_sha256'] or not json.loads(Path(c['profile_report']).read_text())['profile_qualified']:raise ValueError('Profile not qualified')
     a.output.mkdir(parents=True,exist_ok=False);start=time.monotonic();telemetry=None;m=dict(status='running',config=c,updates=0,training=[],batches=[],evaluations=[],initial_controls=[],sampling_controls=[],geometry_controls=[]);atomic_json(a.output/'manifest.json',m)

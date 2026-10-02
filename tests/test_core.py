@@ -139,6 +139,24 @@ class CoreTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'different embeddings'):
                 sample(net,esm,mask,cfg,noise=noise,conditioning_ids=['wrong']*6)
 
+    def test_compact_conditioning_preserves_samples_and_limits_cached_storage(self):
+        for pair in (False,True):
+            net=self.net(pair).eval();esm=torch.randn(1,8,12).repeat(3,1,1)
+            mask=(torch.arange(8)[None,:]<6).repeat(3,1);noise=torch.randn(3,8,8)
+            for guidance in (1.,2.):
+                cfg=SampleConfig(steps=5,guidance=guidance)
+                reference=sample(net,esm,mask,cfg,noise=noise,conditioning_ids=['a']*3)
+                with patch.object(net,'forward',wraps=net.forward) as forward:
+                    compact=sample(net,esm,mask,cfg,noise=noise,conditioning_ids=['a']*3,compact_condition=True)
+                    prepared=forward.call_args.kwargs['prepared']
+                    self.assertEqual(prepared[0].shape[0],1)
+                    self.assertEqual(forward.call_args.args[3].shape[0],1)
+                    if pair:self.assertTrue(all(pb.shape[0]==1 for pb in prepared[2]))
+                torch.testing.assert_close(reference,compact,rtol=2e-5,atol=2e-5)
+                self.assertFalse(torch.equal(compact[0],compact[1]))
+            with self.assertRaises(ValueError):sample(net,esm,mask,cfg,noise=noise,compact_condition=True)
+            with self.assertRaises(ValueError):sample(net,esm,mask,cfg,noise=noise,conditioning_ids=['a','b','c'],compact_condition=True)
+
     def test_checkpoint_roundtrip_and_architecture_rejection(self):
         for pair in (False, True):
             net = self.net(pair)

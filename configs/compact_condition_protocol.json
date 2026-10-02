@@ -1,0 +1,7 @@
+{
+  "purpose": "Reduce replicated conditioning storage for an ensemble sharing one sequence without changing weights, sampler or strict FP32 arithmetic.",
+  "candidate": "Keep prepared sequence tokens, pooled condition and per-layer pair biases at batch1, broadcast through the flow head, and build attention padding at the mask's batch size. Explicitly validate that all repeated inputs have one identical conditioning ID, embeddings and mask. Distinct sample noise remains independent. Default production behavior unchanged; reject multiple distinct conditioners in compact mode.",
+  "evaluation": "Reuse the four longest tuning-bucket targets and original CFG2/balanced500 CFG1 weights from the frozen tensor probe. Euler25/decoder3. Exact/padded singles and batches8/32 with target-indexed noise. All80 structural controls require RMSD<=0.2A and pair CA-lDDT>=0.99, including every matched sample across implementations. No locked-test scoring.",
+  "measurement": "One warmup and three repeats per layout,192 timing rows total. Clear unused allocator cache between layouts; record peak allocated and reserved bytes. Cached flow+decoder+transfer stage only, not ESMC or sequence-to-structure timing. Require every structural control and improved aggregate batch32 latency before full64/48 quality and matched end-to-end follow-up. Preserve failures.",
+  "resources": "One RTX15-minute cap,840-second work cap. The prior same-size arithmetic probe used783seconds and42.07GiB peak reserved. No compilation or package changes. Project total across GPU types<=8."
+}

@@ -16,6 +16,14 @@ def fixture():
 
 
 class SummaryTests(unittest.TestCase):
+    def test_compact_probe_has_no_invented_gemm_controls(self):
+        m=fixture();m['micro']=[]
+        for key in ('warmups','batches','controls'):
+            for row in m[key]:
+                if row['precision']=='tf32x3':row['precision']='compact'
+        self.assertTrue(analyze(m,candidate='compact',micro_controls=False)['qualified'])
+        with self.assertRaises(ValueError):analyze(m)
+
     def test_complete(self):
         d=analyze(fixture());self.assertTrue(d['qualified']);self.assertEqual(d['batch32_speed_ratio'],2)
     def test_failed_long_control_and_micro(self):

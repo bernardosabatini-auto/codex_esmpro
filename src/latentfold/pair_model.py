@@ -23,7 +23,7 @@ class PairAttention(nn.Module):
         pos = torch.arange(L, device=x.device)
         rel = (pos[None, :] - pos[:, None]).clamp(-self.rel, self.rel) + self.rel
         bias = self.bias(rel).permute(2, 0, 1).unsqueeze(0)                       # (1,H,L,L)
-        pad = torch.zeros(B, 1, 1, L, device=x.device, dtype=bias.dtype).masked_fill(~mask[:, None, None, :], float("-inf"))
+        pad = torch.zeros(mask.shape[0], 1, 1, L, device=x.device, dtype=bias.dtype).masked_fill(~mask[:, None, None, :], float("-inf"))
         o = F.scaled_dot_product_attention(q, k, v, attn_mask=(bias.to(q.dtype) + pb.to(q.dtype) + pad.to(q.dtype)),
                                            dropout_p=self.dropout if self.training else 0.0)
         return self.out(o.transpose(1, 2).reshape(B, L, D))

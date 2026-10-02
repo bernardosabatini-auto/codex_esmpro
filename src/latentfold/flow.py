@@ -153,15 +153,20 @@ def flow_loss(net, z, esm, mask, config, *, generator, return_state=False, resid
 
 
 @torch.no_grad()
-def sample(net, esm, mask, config, *, noise, cache_condition=True, conditioning_ids=None):
+def sample(net, esm, mask, config, *, noise, cache_condition=True, conditioning_ids=None, compact_condition=False):
     """Deterministic integration given explicit noise; no RNG inside.
 
     Midpoint uses two vector-field evaluations per interval. Self-conditioning
     advances at each evaluation, using its estimated endpoint. Formal second
     order accuracy only applies to an ordinary field without this learned
     history; actual checkpoints require empirical quality/validity controls.
+
+    Experimental compact_condition keeps cached conditioning at batch one for
+    an explicitly verified single-sequence ensemble; dynamic states stay batched.
     """
     validate_batch(esm, mask, noise)
+    if compact_condition and (not cache_condition or conditioning_ids is None):
+        raise ValueError('compact conditioning requires explicit cached conditioning IDs')
     if net.training:
         raise ValueError("sampling requires net.eval()")
     if mask.shape[1] > net.pos.num_embeddings:
@@ -178,6 +183,9 @@ def sample(net, esm, mask, config, *, noise, cache_condition=True, conditioning_
         static_esm=esm.index_select(0,first);static_mask=mask.index_select(0,first)
         if not torch.equal(esm,static_esm.index_select(0,inverse)) or not torch.equal(mask,static_mask.index_select(0,inverse)):
             raise ValueError('conditioning IDs merged different embeddings or masks')
+    if compact_condition and len(static_esm)!=1:
+        raise ValueError('compact conditioning requires one identical sequence')
+    forward_mask=static_mask if compact_condition else mask
     kwargs = {"pair": net.compute_pair(static_esm, static_mask)} if hasattr(net, "compute_pair") else {}
     x, sc = noise.clone(), None
     ts = torch.linspace(0, 1, config.steps + 1, device=esm.device)
@@ -186,7 +194,7 @@ def sample(net, esm, mask, config, *, noise, cache_condition=True, conditioning_
     cond_kwargs, uncond_kwargs = kwargs, kwargs
     if cache_condition:
         def expand(value):
-            if inverse is None:return value
+            if inverse is None or compact_condition:return value
             if isinstance(value,torch.Tensor):return value.index_select(0,inverse)
             return tuple(expand(item) for item in value)
         cond_kwargs = {"prepared": expand(net.prepare_condition(static_esm, static_mask, **kwargs))}
@@ -197,18 +205,18 @@ def sample(net, esm, mask, config, *, noise, cache_condition=True, conditioning_
         kwargs.clear()
     for i in range(config.steps):
         t = ts[i].expand(len(esm))
-        v = net(x, t, esm, mask, None, sc, **cond_kwargs)
+        v = net(x, t, esm, forward_mask, None, sc, **cond_kwargs)
         if config.guidance != 1:
-            uncond = net(x, t, esm, mask, drop, sc, **uncond_kwargs)
+            uncond = net(x, t, esm, forward_mask, drop, sc, **uncond_kwargs)
             v = uncond + config.guidance * (v - uncond)
         if config.solver == 'midpoint':
             dt=ts[i+1]-ts[i];middle=(ts[i]+ts[i+1])*.5
             middle_sc=x+(1-ts[i])*v if net.self_cond else None
             middle_x=x+.5*dt*v
             middle_t=middle.expand(len(esm))
-            middle_v=net(middle_x,middle_t,esm,mask,None,middle_sc,**cond_kwargs)
+            middle_v=net(middle_x,middle_t,esm,forward_mask,None,middle_sc,**cond_kwargs)
             if config.guidance != 1:
-                uncond=net(middle_x,middle_t,esm,mask,drop,middle_sc,**uncond_kwargs)
+                uncond=net(middle_x,middle_t,esm,forward_mask,drop,middle_sc,**uncond_kwargs)
                 middle_v=uncond+config.guidance*(middle_v-uncond)
             if net.self_cond:sc=middle_x+(1-middle)*middle_v
             x=x+dt*middle_v

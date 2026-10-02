@@ -8,7 +8,8 @@ LAYOUTS=('single_exact','single_padded','batch8','batch32')
 PRECISIONS=('fp32','tf32x3')
 
 
-def analyze(m):
+def analyze(m, *, candidate='tf32x3', micro_controls=True):
+    precisions=('fp32',candidate)
     d=dict(status=m['status'],qualified=False,timings=[])
     if m['status']!='complete':
         d['error']=m.get('error','incomplete probe');return d
@@ -17,32 +18,33 @@ def analyze(m):
     def complete(rows,keys,expected):
         observed=[tuple(r[k] for k in keys) for r in rows]
         if len(observed)!=len(expected) or set(observed)!=expected:raise ValueError('missing or duplicate records')
-    base=list(itertools.product(heads,targets,PRECISIONS,LAYOUTS))
+    base=list(itertools.product(heads,targets,precisions,LAYOUTS))
     complete(m['warmups'],('head','target_id','precision','layout'),set(base))
     complete(m['batches'],('head','target_id','precision','layout','repeat'),{(*v,r) for v in base for r in range(3)})
-    expected={(h,t,p,l,'batching') for h,t,p,l in base if l!='single_exact'}|{(h,t,'tf32x3',l,'arithmetic') for h,t,p,l in base}
+    expected={(h,t,p,l,'batching') for h,t,p,l in base if l!='single_exact'}|{(h,t,candidate,l,'arithmetic') for h,t,p,l in base}
     complete(m['controls'],('head','target_id','precision','layout','kind'),expected)
     shapes={(13,63,117):True,(128,256,256):False,(1024,1024,4096):True}
     micro=m['micro'];observed=[(tuple(r['shape']),r['precision']) for r in micro]
-    if len(observed)!=9 or set(observed)!=set(itertools.product(shapes,('torch_fp32','tf32','tf32x3'))):raise ValueError('missing micro controls')
+    if micro_controls and (len(observed)!=9 or set(observed)!=set(itertools.product(shapes,('torch_fp32','tf32','tf32x3')))):raise ValueError('missing micro controls')
+    if not micro_controls and micro:raise ValueError('unexpected GEMM controls')
     if any(r['bias']!=shapes[tuple(r['shape'])] for r in micro):raise ValueError('changed micro bias')
     for rows,keys in ((micro,('relative_rms','max_abs')),(m['controls'],('ca_rmsd','ca_lddt')),(m['batches'],('seconds','peak_reserved_bytes')),(m['warmups'],('seconds',))):
         if any(not np.isfinite(r[k]) or r[k]<0 for r in rows for k in keys):raise ValueError('nonfinite or negative result')
     if any(r['seconds']<=0 for r in m['batches']+m['warmups']):raise ValueError('invalid timing')
     counts=dict(single_exact=1,single_padded=1,batch8=8,batch32=32)
     if any(r['samples']!=(1 if r['kind']=='batching' else counts[r['layout']]) for r in m['controls']):raise ValueError('wrong control sample count')
-    d['micro_passed']=all(r['relative_rms']<=1e-5 for r in micro if r['precision']=='tf32x3')
+    d['micro_passed']=all(r['relative_rms']<=1e-5 for r in micro if r['precision']=='tf32x3') if micro_controls else None
     d['structural_passed']=all(r['ca_rmsd']<=.2 and r['ca_lddt']>=.99 for r in m['controls'])
     d['max_ca_rmsd']=max(r['ca_rmsd'] for r in m['controls']);d['min_pair_ca_lddt']=min(r['ca_lddt'] for r in m['controls'])
-    d['max_tf32x3_relative_rms']=max(r['relative_rms'] for r in micro if r['precision']=='tf32x3')
+    d['max_tf32x3_relative_rms']=max((r['relative_rms'] for r in micro if r['precision']=='tf32x3'),default=None)
     d['failed_controls']=[r for r in m['controls'] if r['ca_rmsd']>.2 or r['ca_lddt']<.99]
     for h,t,l in itertools.product(heads,targets,LAYOUTS):
-        times={p:float(np.median([r['seconds'] for r in m['batches'] if (r['head'],r['target_id'],r['layout'],r['precision'])==(h,t,l,p)])) for p in PRECISIONS}
-        d['timings'].append(dict(head=h,target_id=t,layout=l,**times,speed_ratio=times['fp32']/times['tf32x3']))
-    d['batch32_speed_ratio']=sum(r['fp32'] for r in d['timings'] if r['layout']=='batch32')/sum(r['tf32x3'] for r in d['timings'] if r['layout']=='batch32')
-    d['warmup_seconds']={p:sum(r['seconds'] for r in m['warmups'] if r['precision']==p) for p in PRECISIONS}
+        times={p:float(np.median([r['seconds'] for r in m['batches'] if (r['head'],r['target_id'],r['layout'],r['precision'])==(h,t,l,p)])) for p in precisions}
+        d['timings'].append(dict(head=h,target_id=t,layout=l,**times,speed_ratio=times['fp32']/times[candidate]))
+    d['batch32_speed_ratio']=sum(r['fp32'] for r in d['timings'] if r['layout']=='batch32')/sum(r[candidate] for r in d['timings'] if r['layout']=='batch32')
+    d['warmup_seconds']={p:sum(r['seconds'] for r in m['warmups'] if r['precision']==p) for p in precisions}
     d['peak_reserved_gib']=max(r['peak_reserved_bytes'] for r in m['batches'])/1024**3
-    d['qualified']=bool(d['micro_passed'] and d['structural_passed'] and d['batch32_speed_ratio']>1)
+    d['qualified']=bool((not micro_controls or d['micro_passed']) and d['structural_passed'] and d['batch32_speed_ratio']>1)
     return d
 
 

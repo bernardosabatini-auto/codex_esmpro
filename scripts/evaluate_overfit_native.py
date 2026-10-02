@@ -1,4 +1,4 @@
-"""Separate64-family accuracy check for every matched500-update teacher head."""
+"""Separate64-family accuracy check for every matched teacher head."""
 import argparse,gc,json,time
 from pathlib import Path
 import h5py,numpy as np,torch
@@ -23,7 +23,7 @@ def main():
     prior=json.loads(Path(c['baseline_manifest']).read_text());baseline={(r['target_id'],r['sample']):r for r in prior['scores'] if r['step']==0 and r['sampling_steps']==25}
     if prior['checkpoint']['sha256']!=c['checkpoint_sha256'] or prior['config']['evaluation_seed']!=c['evaluation_seed'] or len(baseline)!=192:raise ValueError('baseline mismatch')
     a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
-    start=time.monotonic();telemetry=None;m=dict(status='running',config=c,scores=[],controls=[],batches=[],training_updates_executed=0,scope='Separate64 tuning families, AFDB predicted references. Original34 and reserved17 unscored. Capacity500 checkpoints only; no training or promotion.')
+    start=time.monotonic();telemetry=None;m=dict(status='running',config=c,scores=[],controls=[],batches=[],training_updates_executed=0,scope=f"Separate64 tuning families, AFDB predicted references. Original34 and reserved17 unscored. Capacity{c.get('training_checkpoint_step',500)} checkpoints only; no training or promotion.")
     atomic_json(a.output/'manifest.json',m)
     try:
         records={}

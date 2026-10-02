@@ -1,0 +1,10 @@
+{
+  "purpose": "Measure transfer at the original final2000-update endpoint, retaining all four teacher heads even though only aligned balanced passes the final capacity gate.",
+  "panel": "Existing64 tuning families,three paired seeds; disjoint from32 training families. Original34 and reserved17 remain unscored. AFDB predicted references.",
+  "heads": ["original", "aligned_teacher_empirical", "pca_teacher_empirical", "aligned_teacher_balanced", "pca_teacher_balanced"],
+  "checkpoint": 2000,
+  "sampling": "Euler25,CFG1/2,decoder3,strict FP32,same noise as500 transfer. Original CFG2 must reproduce the frozen baseline; all head/guidance/bucket batching controls retained.",
+  "analysis": "Report every condition versus original CFG2 and matched guidance, plus balanced minus empirical within each frame. Unadjusted family intervals; no selection of a favorable endpoint or invalid-sample filtering.",
+  "quality_gate": "Unchanged reference-quality margins:95% family CA-lDDT difference lower bound>-0.005 and validity mean difference>=-0.01. Passing permits ensemble development assessment, not promotion.",
+  "resources": "One H10080GB,20-minute cap,1080-second work cap; measured same-workload32GiB peak leaves headroom. Share decoder and cached embeddings across heads; no training. Project total<=8 across GPU types."
+}

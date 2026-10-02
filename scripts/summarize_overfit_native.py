@@ -42,14 +42,14 @@ def main():
         d['max_reserved_gib']=max(r['peak_reserved_bytes'] for r in m['batches'])/1024**3
     else:d['error']=m.get('error','Incomplete evaluation')
     lines=['# Accuracy transfer from32-protein capacity training','',f"Status: {d['status']}.",'',
-           'All four matched500-update teacher checkpoints and the original model;64 separate tuning families,three paired seeds,CFG1/2,Euler25,decoder3,strict FP32. References are AFDB predictions. No locked-test scoring. All settings and geometry failures remain included. Family intervals are unadjusted. This measures transfer from a small training panel, not independent-test performance or biological populations.','',
+           f"All four matched{m.get('config',{}).get('training_checkpoint_step',500)}-update teacher checkpoints and the original model;64 separate tuning families,three paired seeds,CFG1/2,Euler25,decoder3,strict FP32. References are AFDB predictions. No locked-test scoring. All settings and geometry failures remain included. Family intervals are unadjusted. This measures transfer from a small training panel, not independent-test performance or biological populations.",'',
            '| Head / CFG | CA-lDDT | Delta versus original CFG2 | 95% interval | Valid | Validity delta | Quality gate |','|---|---:|---:|---|---:|---:|---|']
     for name,r in d.get('summaries',{}).items():
         ca=r['versus_original_cfg2']['ca_lddt'];v=r['versus_original_cfg2']['coarse_valid'];lines.append(f"| {name} | {ca['candidate']:.5f} | {ca['difference']:+.5f} | {ca['ci95']} | {v['candidate']:.5f} | {v['difference']:+.5f} | {r['quality_passed']} |")
     lines+=['','| Balanced minus empirical at matched frame/CFG | CA-lDDT difference | 95% interval | Validity difference |','|---|---:|---|---:|']
     for name,r in d.get('prior_effects',{}).items():lines.append(f"| {name} | {r['ca_lddt']['difference']:+.5f} | {r['ca_lddt']['ci95']} | {r['coarse_valid']['difference']:+.5f} |")
     if 'error' in d:lines+=['',d['error']]
-    lines+=['','Training-capacity gains do not imply generalization. A qualified model still needs separate ensemble development assessment and training-seed replication before promotion. Both scheduled2000-update endpoints retain their original budgets.']
+    lines+=['','Training-capacity gains do not imply generalization. A qualified model still needs separate ensemble development assessment and training-seed replication before promotion. All scheduled endpoints retain their original budgets.']
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 
 

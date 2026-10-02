@@ -1,0 +1,11 @@
+{
+  "purpose": "Separate matched reference-free retry pipeline on the unchanged64-family native tuning panel; earlier raw model failures remain failures.",
+  "heads": ["original", "compact500", "seed2026100171_balanced", "seed2026100181_balanced"],
+  "outputs_per_family": 3,
+  "max_attempts_per_output": 4,
+  "sampling": "FP32 Euler25/AE3. OriginalCFG2, all adapted headsCFG1. Compact conditioning for every head. For slot k, attempt a uses both latent and decoder noise index k+3*a at the frozen evaluation seed. First coarse-valid sample wins; exhausted slots return their original draw. No reference, state or confidence enters selection.",
+  "controls": "Regenerate all first3 draws with bucketed groups of8 families; compare per-draw CA-lDDT against stored raw references within1e-6 and require exactly identical coarse validity. Each head/bucket has a single-vs-batched CA-RMSD<=0.2A and CA-lDDT>=0.99 control. Every attempted retry is stored and scored, including failures. Never retry an initially valid slot.",
+  "analysis": "Report each raw and selected pipeline, all64 families and all192 outputs. Compare selected adapted heads with selected original using paired-family CA-lDDT and coarse validity. Native quality requires lower95% CA difference bound>-0.005 and validity difference>=-0.01. A qualified native pipeline still requires matched external diversity evaluation. Report attempted-draw count, exhausted slots, generation/retry seconds and peak memory; single-pass generation timings are descriptive and exclude ESM, loading and disk I/O.",
+  "resources": "One H200,15minutes,780second worker cap. Existing measured native batch24 runs fit H200; retain strict original controls. No locked tests. Completion watcher, eight-GPU running-plus-pending guard and15UTC deadline apply.",
+  "no_rescue": "No alternative cap, geometry threshold, target exclusion or retry ordering after observing results. Preserve historical raw failures. This is a separately declared inference pipeline, not a replacement for the raw-model gate."
+}

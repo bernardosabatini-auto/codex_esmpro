@@ -1,0 +1,9 @@
+{
+  "purpose": "A single fixed sampling-strength test on the completed distance conditioner while explicit motif-supervision training proceeds.",
+  "source": "CorrectedFP64distance conditioner49911511at2000updates; all16existing development families and same four generation noises. No new training or target filtering.",
+  "sampling": "Compare guidance1with guidance2,50Eulersteps/AE3. At guidance2use v_null+2*(v_fragment-v_null)with shared combined-velocity self-conditioning history. No output clamping. Precompute both conditions once. Guidance1requires50velocity evaluations and guidance2requires100; measure matched generation time and memory. No guidance grid.",
+  "controls": "All64guidance1outputs reproduce archived conditionedsamples. Allfourcontrolfamilies guidance0outputs reproduce archived nullsamples. Guidance2exactFP64quarter-rotation controls retain latent max error<=1e-4. Every output finite and archived; all scores recomputed independently.",
+  "evaluation": "MotifdRMS and proper-rotationCA RMSD,coarse geometry,strict raw motif/geometry success, and scaffold diversity after motif alignment. Report all pairs and qualified-pair counts; no population/generalization claim. Family bootstrap paired contrasts across16families.",
+  "followup": "A separate unchanged-budget design/refold assay is warranted only if guidance2produces at least one strict raw success among the fixed eight assay samples, has positive mean strict-success change over guidance1,and retains development validity with paired-family95percent lower difference>=-.05. Otherwise close this sampling recipe without a strength sweep. Training and original failed capacity results remain separate.",
+  "resources": "OneRTX bounded8minutes; no training; at most8ownrunning-plus-pending GPUs."
+}

@@ -1,4 +1,5 @@
 """Explicit fragment inputs, distinct from output latents and scaffold sequence."""
+import math
 import torch
 from torch import nn
 from torch.nn import functional as F
@@ -94,16 +95,23 @@ def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator,
 
 
 @torch.no_grad()
-def sample_fragment(net, adapter, features, keep, mask, *, noise, steps=50, drop_fragment=False, coordinates=None):
+def sample_fragment(net, adapter, features, keep, mask, *, noise, steps=50, drop_fragment=False, coordinates=None, guidance=1.):
     if net.training or adapter.training or type(steps) is not int or steps < 1 or noise.shape != (*mask.shape, 8) or not torch.isfinite(noise).all():
         raise ValueError('Eval models and finite correctly shaped sampling noise required')
+    if not isinstance(guidance,(int,float)) or not math.isfinite(guidance) or guidance<0:raise ValueError('Finite nonnegative guidance required')
+    if guidance==0:drop_fragment=True
     dropped = torch.full((len(mask),), drop_fragment, dtype=torch.bool, device=mask.device)
     esm, prepared = prepare_fragment_condition(net, adapter, features, keep, mask, dropped, coordinates=coordinates)
+    null_prepared=None
+    if not drop_fragment and guidance!=1:
+        _,null_prepared=prepare_fragment_condition(net,adapter,features,keep,mask,torch.ones_like(dropped),coordinates=coordinates)
     x, history = noise.clone(), None
     ts = torch.linspace(0, 1, steps+1, device=noise.device)
     for i in range(steps):
         t, dt = ts[i], ts[i+1]-ts[i]
         v = net(x, t.expand(len(x)), esm, mask, x_sc=history, prepared=prepared).float()
+        if null_prepared is not None:
+            unconditional=net(x,t.expand(len(x)),esm,mask,x_sc=history,prepared=null_prepared).float();v=unconditional+guidance*(v-unconditional)
         if net.self_cond:
             history = x + (1-t)*v
         x = x + dt*v

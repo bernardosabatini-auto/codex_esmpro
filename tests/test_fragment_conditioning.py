@@ -29,6 +29,18 @@ class FragmentConditioningTests(unittest.TestCase):
         conditional=sample_fragment(self.net,self.adapter,self.f,self.k,self.mask,noise=self.noise,steps=4)
         self.assertGreater(float((conditional-a).abs().max()),1e-5)
 
+    def test_guidance_zero_and_one_preserve_existing_paths(self):
+        with torch.no_grad():self.adapter.output.weight.normal_()
+        zero=sample_fragment(self.net,self.adapter,self.f,self.k,self.mask,noise=self.noise,steps=4,guidance=0)
+        null=sample_fragment(self.net,self.adapter,self.f,self.k,self.mask,noise=self.noise,steps=4,drop_fragment=True)
+        torch.testing.assert_close(zero,null,atol=0,rtol=0)
+        one=sample_fragment(self.net,self.adapter,self.f,self.k,self.mask,noise=self.noise,steps=4,guidance=1)
+        usual=sample_fragment(self.net,self.adapter,self.f,self.k,self.mask,noise=self.noise,steps=4)
+        torch.testing.assert_close(one,usual,atol=0,rtol=0)
+        two=sample_fragment(self.net,self.adapter,self.f,self.k,self.mask,noise=self.noise,steps=4,guidance=2)
+        self.assertTrue(torch.isfinite(two).all());self.assertGreater((two-one).abs().max(),1e-5)
+        with self.assertRaises(ValueError):sample_fragment(self.net,self.adapter,self.f,self.k,self.mask,noise=self.noise,steps=4,guidance=-1)
+
     def test_scaffold_features_and_invalid_placements_rejected(self):
         f=self.f.clone();f[0,0,0]=1
         with self.assertRaises(ValueError):self.adapter(f,self.k,self.mask,torch.zeros(2,dtype=torch.bool))
@@ -47,3 +59,14 @@ class FragmentConditioningTests(unittest.TestCase):
 
 
 if __name__=='__main__':unittest.main()
+
+class ScaffoldDiversityTests(unittest.TestCase):
+    def test_motif_alignment_preserves_scaffold_difference(self):
+        from summarize_fragment_guidance import scaffold_rmsd
+        import numpy as np
+        rng=np.random.default_rng(9);bb=rng.normal(size=(9,4,3));keep=np.arange(9)<4
+        rot=np.array([[0.,-1,0],[1,0,0],[0,0,1]])
+        moved=bb@rot+np.array([4.,8.,-3.])
+        self.assertLess(scaffold_rmsd(bb,moved,keep),1e-10)
+        moved[~keep]+=np.array([0.,0.,2.])
+        self.assertAlmostEqual(scaffold_rmsd(bb,moved,keep),2.,places=10)

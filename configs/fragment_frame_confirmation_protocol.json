@@ -1,0 +1,19 @@
+{
+  "purpose": "New baseline-relative label-quality screen after the missing matched baseline showed the original absolute screen also failed267/288. Original49972080failedgate is preserved and never rewritten.",
+  "prerequisite": "Calibration49976656: original and anchored globalpass267/288; all288valid; mean reconstruction differences approximatelyzero. No target-frame model has been trained or evaluated.",
+  "seeds": [
+    2026100247,
+    2026100248,
+    2026100249
+  ],
+  "measurements": "All288conditions, both original and anchored labels, each of3fresh decoder seeds; same noise perpair, FP32 decoder3steps. Every result saved, no filtering. Aggregate within each of32trainingproteins before paired bootstrap.",
+  "limits": {
+    "maximum_error_increase_A": 0.05,
+    "minimum_valid_fraction": 0.99,
+    "minimum_motif_fraction": 0.98,
+    "maximum_global_pass_fraction_loss": 0.01
+  },
+  "qualification": "Both arms>=99percentcoarsevalid and>=98percentvalidwithmotifproperRMSD<=1A. Upper95percentfamilyCI of anchored-minus-original global and motif RMSD <=.05A. Fraction validandglobalRMSD<=.5 may drop by atmost1percentagepoint. Limits set beforethese fresh-noise measurements; this revised screen is explicitly informed by the initial calibration and is not untouched validation.",
+  "followup": "If qualified, permit the already specified40update target-frame profile then500update matched training with original null targets; retain strict same-valid-refold downstream criteria unchanged. No automatic continuation.",
+  "resources": "OneRTX15minutes maximum; three noise replications on32existingfamilies are not96independentfamilies."
+}

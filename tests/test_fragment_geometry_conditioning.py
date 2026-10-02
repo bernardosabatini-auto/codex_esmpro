@@ -13,6 +13,11 @@ class FragmentGeometryTests(unittest.TestCase):
         altered=coords.clone();altered[0,0]=1
         with self.assertRaises(ValueError):a.pair_biases(altered,keep,mask,drop)
 
+    def test_double_precision_distances_preserve_exact_rigid_pose(self):
+        torch.manual_seed(14);a=FragmentGeometryAdapter(16,n_layers=2,n_heads=4,distance_precision='fp64');fragment=torch.randn(20,4,3)*10;coords=fragment_coordinates(fragment,length=24,start=2)[None].double();keep=torch.zeros(1,24,dtype=torch.bool);keep[:,2:22]=True;mask=torch.ones_like(keep);drop=torch.zeros(1,dtype=torch.bool);rotation=torch.tensor([[0.,-1,0],[1,0,0],[0,0,1]],dtype=torch.float64);posed=(coords@rotation+11)*keep[...,None]
+        with torch.no_grad():a.pair_output.weight.normal_()
+        one=torch.cat(a.pair_biases(coords,keep,mask,drop),1);two=torch.cat(a.pair_biases(posed,keep,mask,drop),1);torch.testing.assert_close(one,two,rtol=0,atol=0)
+
     def test_generator_parity_dropout_and_geometry_gradient(self):
         from latentfold.pair_model import PairFlowNet
         from latentfold.fragment_conditioning import fragment_features,sample_fragment,fragment_flow_loss

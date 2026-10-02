@@ -18,8 +18,10 @@ class FragmentGeometryAdapter(FragmentAdapter):
     No pair values involving scaffold residues are supplied. Zero initialization
     preserves the original generator, and fragment dropout removes both routes.
     """
-    def __init__(self, output_width, *, n_layers, n_heads, hidden=256, pair_hidden=64):
+    def __init__(self, output_width, *, n_layers, n_heads, hidden=256, pair_hidden=64, distance_precision="fp32"):
         super().__init__(output_width,hidden)
+        if distance_precision not in ("fp32","fp64"):raise ValueError("Unsupported distance precision")
+        self.distance_precision=distance_precision
         self.n_layers,self.n_heads=n_layers,n_heads
         self.register_buffer('centers',torch.arange(0,32,2,dtype=torch.float32))
         self.pair_hidden=nn.Linear(17,pair_hidden)
@@ -30,7 +32,8 @@ class FragmentGeometryAdapter(FragmentAdapter):
         if coordinates.shape!=(*mask.shape,3) or keep.shape!=mask.shape or dropped.shape!=mask.shape[:1]:raise ValueError('Invalid pair conditioning shapes')
         if mask.dtype!=torch.bool or keep.dtype!=torch.bool or dropped.dtype!=torch.bool or (keep&~mask).any() or not keep.any(1).all():raise ValueError('Invalid conditioning masks')
         if not torch.isfinite(coordinates).all() or (coordinates[~keep]!=0).any():raise ValueError('Scaffold coordinates must be absent')
-        distance=torch.cdist(coordinates.float(),coordinates.float(),compute_mode='donot_use_mm_for_euclid_dist')
+        work=coordinates.double() if self.distance_precision=='fp64' else coordinates.float()
+        distance=torch.cdist(work,work,compute_mode='donot_use_mm_for_euclid_dist').float()
         rbf=torch.exp(-.5*((distance[...,None]-self.centers)/2).square());features=torch.cat((rbf,(distance/(distance+10))[...,None]),-1)
         delta=self.pair_output(F.silu(self.pair_hidden(features)))
         known=keep[:,:,None]&keep[:,None,:]&~dropped[:,None,None]

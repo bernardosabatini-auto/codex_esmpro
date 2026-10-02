@@ -1,4 +1,4 @@
-"""Matched resident-model sequence-to-backbone ensemble latency on one H200."""
+"""Matched resident-model sequence-to-backbone ensemble latency on one GPU."""
 import argparse,gc,hashlib,json,time
 from pathlib import Path
 import h5py,numpy as np,torch
@@ -23,7 +23,7 @@ def main():
     for name in ('source','config','output'):p.add_argument('--'+name,type=Path,required=True)
     a=p.parse_args();c=json.loads(a.config.read_text());path=Path(c['panel'])
     if hashlib.sha256(path.read_bytes()).hexdigest()!=c['panel_sha256']:raise ValueError('changed panel')
-    for field in ('candidate_reference','quality_report','candidate_manifest'):
+    for field in ('candidate_reference','quality_report','candidate_manifest','timing_protocol'):
         if c.get(field+'_sha256') and file_identity(Path(c[field]),hash_contents=True)['sha256']!=c[field+'_sha256']:raise ValueError('changed '+field)
     if c.get('quality_report') and not json.loads(Path(c['quality_report']).read_text())['sampling_quality_gate_passed']:raise ValueError('candidate ensemble quality gate failed')
     byid={r['query_id']:r for r in json.loads(path.read_text())['development']};rows=[byid[i] for i in c['target_ids']]
@@ -32,10 +32,12 @@ def main():
     m=dict(status='running',config=c,rows=[],batches=[],controls=[],scope='Resident-model sequence-to-backbone latency, batch one sequence, K1/8/32, strict FP32. Includes sequence features, ESMC, trunk/flow, decoder, and output transfer. Teacher confidence heads omitted using validated early exit after backbone sampling. Loading, warmup, control comparisons and disk writes excluded from timed ranges.');atomic_json(a.output/'manifest.json',m)
     try:
         telemetry=Telemetry(a.output,True)
+        m['device_name']=torch.cuda.get_device_name(0)
         for kind in (('student','candidate','teacher') if c.get('candidate_checkpoint') else ('student','teacher')):
             if kind in ('student','candidate'):
-                checkpoint=Path(c['candidate_checkpoint']) if kind=='candidate' else a.source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt'
-                if kind=='candidate' and file_identity(checkpoint,hash_contents=True)['sha256']!=c['candidate_checkpoint_sha256']:raise ValueError('candidate checkpoint changed')
+                checkpoint=Path(c['candidate_checkpoint']) if kind=='candidate' else Path(c['student_checkpoint']) if c.get('student_checkpoint') else a.source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt'
+                identity=file_identity(checkpoint,hash_contents=True);m[kind+'_checkpoint']=identity
+                if c.get(kind+'_checkpoint_sha256') and identity['sha256']!=c[kind+'_checkpoint_sha256']:raise ValueError(kind+' checkpoint changed')
                 embedding=FinalESMC(a.source/'data/esmc6b',precision='fp32');model,_=load_legacy(checkpoint,trusted_pickle=True);model.cuda().eval().requires_grad_(False)
                 decoder=load_proteinae(a.source/'ProteinAE_v1',a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt',steps=3).cuda()
             else:

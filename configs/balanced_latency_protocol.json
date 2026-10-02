@@ -1,0 +1,9 @@
+{
+  "purpose": "Measure whether balanced aligned500 CFG1 is a faster quality-qualified pipeline than original CFG2 and the direct teacher at matched ensemble sizes.",
+  "candidate": "Aligned balanced500 checkpoint, Euler25 CFG1, decoder3, strict FP32; already passes separate64-family accuracy and48-family ensemble sampling-quality screens. Experimental-state coverage did not improve, so there is no training-diversity promotion claim.",
+  "timing": "One RTX PRO6000 Blackwell; original, candidate and teacher measured sequentially on that same device. Existing eight development sequences, K1/8/32, three repeats, rotating sample-count order. Includes ESMC/sequence features, all flow/trunk/diffusion work, decoding and output transfer. Loading, warmup and file output excluded from resident timings; report total capture separately.",
+  "controls": "Every original/candidate sequence must reproduce its frozen ensemble backbone within the existing0.2A/0.99 agreement limits, including fresh ESMC extraction. Teacher backbone-only early exit must agree with a full fold on each sequence within0.01A/0.999. This also checks previously untested ESMC and teacher execution on RTX. Stop on failure; no package or precision changes.",
+  "checkpoint_loading": "The original baseline can use the CPU-verified EMA-only export with all469 tensors identical to the original. Pin both source and export hashes. Candidate checkpoint remains independently hashed.",
+  "analysis": "Average per-sequence repeat medians; paired-family bootstrap ratios against original and direct teacher. Ratios>1 favor the candidate. No ratios between different GPUs, no FLOP-efficiency claim, no distribution-quality equality assumption.",
+  "resources": "One RTX,30-minute cap,1680-second work cap. Prior same-shape H200 benchmark peaked65.59GiB, below the RTX95GiB capacity and85% allocator ceiling. Project total across all GPU types<=8."
+}

@@ -18,6 +18,8 @@ def speed_ratio(reference,candidate):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs='+',required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();run=a.runs[0]
     m=json.loads((run/'manifest.json').read_text()) if (run/'manifest.json').exists() else dict(status='failed',error='Missing manifest');d=dict(status=m['status'],scope=m.get('scope'),summaries={})
+    device=json.loads((run/'device_metadata.json').read_text()) if (run/'device_metadata.json').exists() else {}
+    d['device_name']=m.get('device_name',device.get('cuda_device_name','unreported'))
     if m['status']=='complete':
         kinds=('student','candidate','teacher') if m['config'].get('candidate_checkpoint') else ('student','teacher')
         if len(m['rows'])!=len(kinds)*8*3*3 or len(m['controls'])!=len(kinds)*8:raise ValueError('incomplete timing or controls')
@@ -49,7 +51,7 @@ def main():
         for kind,counts in d['paired_speedup'].items():
             for count,r in counts.items():lines.append(f"| {kind} / candidate | {count} | {r['reference_seconds_over_candidate']:.4f} | {r['ci95']} |")
     if 'error' in d:lines+=['',d['error']]
-    lines+=['','This comparison does not equalize accuracy. Reference state coverage and geometry must be considered alongside cost. Student and teacher are measured sequentially on the same H200; repeat across devices before claiming a stable speed factor.']
+    lines+=['',f"This comparison does not equalize accuracy. Reference state coverage and geometry must be considered alongside cost. Pipelines are measured sequentially on the same {d['device_name']}; repeat across devices before claiming a stable speed factor."]
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 
 

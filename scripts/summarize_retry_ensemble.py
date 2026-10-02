@@ -5,6 +5,7 @@ import h5py,numpy as np
 from prepare_overfit import sha
 from latentfold.ensemble_metrics import backbone_geometry
 from antithetic_noise import noise_address
+from retry_sampler_settings import external_steps
 
 
 def validate_slot(draws,selection):
@@ -31,7 +32,7 @@ def analyze(m,run):
     if c.get('parent_predictions'):
         if len(parent)!=48 or {r['target_id'] for r in parent}!=set(rows) or any(not np.isfinite(r[k]) for r in parent for k in ('max_ca_rmsd','min_ca_lddt')) or any(r['max_ca_rmsd']>.2 or r['min_ca_lddt']<.99 or not r['validity_identical'] for r in parent):raise ValueError('Failed raw parent controls')
     elif parent:raise ValueError('Unexpected raw parent controls')
-    scheme=c.get('latent_noise_scheme','iid');recipe=json.loads(Path(c['protocol']).read_text())
+    scheme=c.get('latent_noise_scheme','iid');recipe=json.loads(Path(c['protocol']).read_text());steps=external_steps(c,recipe)
     if scheme!=recipe.get('latent_noise_scheme','iid'):raise ValueError('Undeclared latent noise scheme')
     for r in m['draws']:
         if scheme=='antithetic' or 'latent_noise_index' in r:
@@ -49,6 +50,7 @@ def analyze(m,run):
     batches=m['batches'];batch_keys=[(r['target_id'],r['attempt']) for r in batches]
     if len(batch_keys)!=len(set(batch_keys)) or {i for i,a in batch_keys if a==0}!=set(rows) or any(i not in rows or not 0<=a<4 for i,a in batch_keys):raise ValueError('Incorrect batch timing coverage')
     for r in batches:
+        if (steps!=25 or 'sampling_steps' in r) and r.get('sampling_steps')!=steps:raise ValueError('Recorded integration step count changed')
         if r['batch']!=sum(x['target_id']==r['target_id'] and x['attempt']==r['attempt'] for x in m['draws']) or any(not np.isfinite(r[k]) or r[k]<=0 for k in ('seconds','peak_reserved_bytes')):raise ValueError('Invalid batch cost accounting')
     if sum(r['batch'] for r in batches)!=len(m['draws']):raise ValueError('Missing attempt timings')
     with h5py.File(run/'predictions.h5') as h:

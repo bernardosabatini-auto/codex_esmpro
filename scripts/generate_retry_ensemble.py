@@ -11,6 +11,7 @@ from latentfold.precision import inference_precision
 from prepare_overfit import sha
 from profile_gpu import Telemetry,atomic_json
 from antithetic_noise import noise_address
+from retry_sampler_settings import external_steps
 
 
 def main():
@@ -21,13 +22,13 @@ def main():
         if c.get(key) and sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     recipe=json.loads(Path(c['protocol']).read_text());rows=json.loads(Path(c['panel']).read_text())['development']
     if c['name'] not in recipe['heads'] or (c['samples'],c['max_attempts'])!=(32,4) or c['noise_arms']!=['raw','latent'] or len(rows)!=48 or len({r['family'] for r in rows})!=48:raise ValueError('Wrong frozen scope')
-    scheme=c.get('latent_noise_scheme','iid')
+    scheme=c.get('latent_noise_scheme','iid');steps=external_steps(c,recipe)
     if scheme!=recipe.get('latent_noise_scheme','iid'):raise ValueError('Noise scheme differs from protocol')
     a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
     start=time.monotonic();telemetry=None;m=dict(status='running',config=c,targets=[],controls=[],parent_controls=[],positive_parent_controls=[],batches=[],draws=[],selections=[],training_updates_executed=0,timing_scope='Cached-conditioner generation only, excludes model loading, controls, geometry checks and disk I/O. Retry generation costs retained.');atomic_json(a.output/'manifest.json',m)
     try:
         telemetry=Telemetry(a.output,True);model,_=load_legacy(Path(c['checkpoint']),trusted_pickle=True);model.cuda().eval().requires_grad_(False)
-        decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval();cfg=SampleConfig(steps=25,guidance=c['primary_guidance'])
+        decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval();cfg=SampleConfig(steps=steps,guidance=c['primary_guidance'])
         with torch.no_grad(),inference_precision('fp32'),h5py.File(c['embedding_cache']) as cache,h5py.File(a.output/'predictions.h5','x') as out:
             if set(cache)!={r['query_id'] for r in rows}:raise ValueError('Embedding coverage changed')
             for row in rows:
@@ -45,7 +46,7 @@ def main():
                         noise[index,:n]=latent_sign*target_noise([ident],[n],8,seed=c['seed'],sample_index=latent_index,device='cuda')[0]
                     torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic()
                     z=sample(model,esm.repeat(b,1,1),mask.repeat(b,1),cfg,noise=noise,conditioning_ids=[ident]*b,compact_condition=c['compact_condition']);_,bb=decoder(z,mask.repeat(b,1),noise=dn.repeat(b,1,1),return_backbone=True);bb=bb[:,:n].cpu().numpy();torch.cuda.synchronize()
-                    m['batches'].append(dict(target_id=ident,attempt=attempt,batch=b,seconds=time.monotonic()-tick,length=length,peak_reserved_bytes=torch.cuda.max_memory_reserved()))
+                    m['batches'].append(dict(target_id=ident,sampling_steps=cfg.steps,attempt=attempt,batch=b,seconds=time.monotonic()-tick,length=length,peak_reserved_bytes=torch.cuda.max_memory_reserved()))
                     if not np.isfinite(bb).all():raise ValueError('Nonfinite generated backbone')
                     valid=backbone_geometry(bb)['coarse_valid']
                     if attempt==0:

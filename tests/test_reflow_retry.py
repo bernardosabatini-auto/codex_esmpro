@@ -1,6 +1,6 @@
 import unittest
 from prepare_reflow_retry_native import normalized_scores
-from retry_sampler_settings import native_steps
+from retry_sampler_settings import native_steps,external_steps
 
 class ReflowRetryTests(unittest.TestCase):
     def test_normalization_keeps_every_archived_value(self):
@@ -16,5 +16,12 @@ class ReflowRetryTests(unittest.TestCase):
         self.assertEqual(native_steps(dict(name='reflow10',sampling_steps=10),p),10)
         with self.assertRaises(ValueError):native_steps(dict(name='reflow10'),p)
         with self.assertRaises(ValueError):native_steps(dict(name='original',sampling_steps=10),p)
+
+    def test_external_worker_cannot_silently_ignore_short_steps(self):
+        c=dict(name='reflow10',flow_steps=10,flow_solver='euler',flow_time_power=1);p=dict(sampling_steps_by_head={'reflow10':10})
+        self.assertEqual(external_steps(c,p),10)
+        for change in ({'flow_steps':25},{'flow_steps':10.0},{'flow_solver':'midpoint'},{'flow_time_power':2}):
+            with self.assertRaises(ValueError):external_steps({**c,**change},p)
+        with self.assertRaises(ValueError):external_steps(c,{})
 
 if __name__=='__main__':unittest.main()

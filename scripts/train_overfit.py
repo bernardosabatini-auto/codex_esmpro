@@ -144,6 +144,11 @@ def main():
                     torch.cuda.synchronize();seconds=time.monotonic()-tick
                 finally:torch.cuda.nvtx.range_pop()
                 m['batches'].append(dict(nvtx_range=name,stage='training',seconds=seconds,updates=end-begin,peak_reserved_bytes=torch.cuda.max_memory_reserved()))
+                if c.get('trainable_tail_blocks') is not None:
+                    subset=m['training_subset'];subset['final_frozen_sha256']=frozen_digest(model);subset['ema_frozen_sha256']=frozen_digest(model,ema)
+                    subset['frozen_unchanged']=subset['initial_frozen_sha256']==subset['final_frozen_sha256']==subset['ema_frozen_sha256']
+                    subset['verified_update']=end
+                    if not subset['frozen_unchanged']:raise ValueError('frozen parameters changed')
                 if not c.get('profile_only'):
                     torch.save(dict(ema={k:v.cpu() for k,v in ema.items()},arch=architecture['architecture'],extra_arch=architecture['extra_architecture'],model=architecture['model'],experiment=c),a.output/f'ema_{end}.ckpt');evaluate(end)
         if c.get('trainable_tail_blocks') is not None:

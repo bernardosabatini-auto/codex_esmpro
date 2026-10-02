@@ -32,7 +32,7 @@ def main():
         audit_fixed_inputs(c)
     if c.get('assay')=='trained_fragment':
         from prepare_trained_fragment_designability import audit_inputs
-        audit_inputs(c)
+        audit_inputs(c,check_teacher=False)  # Already verified above, before any model use.
     if c.get('assay') in ('fragment_feedback_profile','fragment_feedback'):
         from prepare_fragment_feedback import audit_inputs
         audit_inputs(c)

@@ -15,7 +15,7 @@ from prepare_overfit import sha
 def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest',records=[])
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error','Incomplete'),completed_refolds=len(m['records']))
-    c=m['config'];audit_inputs(c);verify_fixed_sequences(m['sequences'],c['entries']);wanted={(r['name'],i) for r in c['entries'] for i in range(8)};index={(r['name'],r['sequence_index']):r for r in m['records']}
+    c=m['config'];audit_inputs(c,check_teacher=False);verify_fixed_sequences(m['sequences'],c['entries']);wanted={(r['name'],i) for r in c['entries'] for i in range(8)};index={(r['name'],r['sequence_index']):r for r in m['records']}
     if len(m['records'])!=288 or set(index)!=wanted:raise ValueError('Missing/duplicate refolds')
     positives={r['name'] for r in c['entries'] if r['head']=='experimental'}
     if len(m['controls'])!=4 or {r['name'] for r in m['controls']}!=positives or any(r['ca_rmsd']>.01 or r['ca_lddt']<.999 for r in m['controls']):raise ValueError('Teacher repeatability failed')

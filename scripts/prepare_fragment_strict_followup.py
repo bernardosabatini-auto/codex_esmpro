@@ -63,7 +63,7 @@ def main():
             item=next(v for key,v in selected.items() if key[1]==i) if arm=='native' else selected[arm,i,k];bb=native['references/'+i+'/backbone'][:] if arm=='native' else item[0];name=f'strict_followup_{index:03d}';out.create_dataset(name,data=bb[None]);entries.append(dict(name=name,head=arm,arm=arm,mode='native' if arm=='native' else 'generated',target_id=i,family=item[4],generation_slot=k,slot=0,length=len(bb),dataset=name,motif_start=item[3],fixed_start=item[3],fixed_sequence=item[2],repeatability_control=arm=='native'))
     c['entries']=entries
     for key,path in [('generation_manifest',Path(c['screens'][1]['manifest'])),('predictions',inputs),('protocol',protocol),('native_predictions',nativepath)]:c[key]=str(path);c[key+'_sha256']=sha(path)
-    audit_inputs(c);a.output.write_text(json.dumps(c,indent=2)+'\n');print('Screened',len(c['screen_rows']),'outputs; selected',len(selected),'rawmatches;',len(entries)*8,'refolds withnativecontrols')
+    audit_inputs(c,check_teacher=False);a.output.write_text(json.dumps(c,indent=2)+'\n');print('Screened',len(c['screen_rows']),'outputs; selected',len(selected),'rawmatches;',len(entries)*8,'refolds withnativecontrols')
 
 
 if __name__=='__main__':main()

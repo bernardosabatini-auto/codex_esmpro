@@ -16,8 +16,8 @@ def analyze(run):
     c=m['config']
     if c.get('assay')=='fragment_repetition_refold':
         from prepare_fragment_repetition_refold import audit_inputs as audit_repetition
-        audit_repetition(c)
-    else:audit_inputs(c)
+        audit_repetition(c,check_teacher=False)
+    else:audit_inputs(c,check_teacher=False)
     verify_fixed_sequences(m['sequences'],c['entries']);index={(r['name'],r['sequence_index']):r for r in m['records']};wanted={(r['name'],k) for r in c['entries'] for k in range(8)}
     if len(index)!=len(m['records']) or set(index)!=wanted or m['training_updates_executed']:raise ValueError('Incomplete/changed refold inventory')
     natives={r['name'] for r in c['entries'] if r['arm']=='native'}

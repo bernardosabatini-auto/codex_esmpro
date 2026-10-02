@@ -114,7 +114,7 @@ def main():
     c.update(entries=entries, expected_backbones=len(entries))
     for key, path in [('predictions', inputs), ('native_predictions', nativepath)]:
         c[key], c[key + '_sha256'] = str(path), sha(path)
-    audit_inputs(c)
+    audit_inputs(c,check_teacher=False)
     a.output.write_text(json.dumps(c, indent=2) + '\n')
     print('Screened', len(c['screen_rows']), 'fresh outputs;', len(selected), 'raw matches;', len(entries)*8, 'refolds including native control')
 

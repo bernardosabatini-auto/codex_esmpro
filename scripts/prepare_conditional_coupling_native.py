@@ -18,7 +18,7 @@ def main():
         ckpt=(run/'ema_500.ckpt').resolve();heads.append(dict(name=arm,checkpoint=str(ckpt),checkpoint_sha256=sha(ckpt),training_manifest=str(path.resolve()),training_manifest_sha256=sha(path)))
     protocol=root/'configs/conditional_coupling_native_protocol.json';recipe=json.loads(protocol.read_text());heads.sort(key=lambda h:recipe['heads'].index(h['name']))
     if [h['name'] for h in heads]!=recipe['heads']:raise ValueError('Missing or duplicate arm')
-    c.update(heads=heads,protocol=str(protocol),protocol_sha256=sha(protocol),capacity_report=str(a.comparison.resolve()),capacity_report_sha256=sha(a.comparison),training_family_count=32,training_checkpoint_step=500,work_cap_seconds=600)
+    c.update(heads=heads,protocol=str(protocol),protocol_sha256=sha(protocol),capacity_report=str(a.comparison.resolve()),capacity_report_sha256=sha(a.comparison),training_family_count=32,training_checkpoint_step=500,work_cap_seconds=480)
     a.output.write_text(json.dumps(c,indent=2)+'\n')
 
 

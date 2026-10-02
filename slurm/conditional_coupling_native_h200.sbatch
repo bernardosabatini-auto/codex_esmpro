@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=32G
-#SBATCH --time=00:12:00
+#SBATCH --time=00:10:00
 #SBATCH --output=/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/runs/conditional_coupling_native_%j.out
 set -euo pipefail
 cd /n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot

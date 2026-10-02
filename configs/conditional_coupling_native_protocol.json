@@ -1,10 +1,25 @@
 {
   "purpose": "Separate accuracy transfer only if the matched conditional coupling capacity gate passes.",
-  "heads": ["original", "independent", "optimal"],
-  "guidance_by_head": {"original": [1, 2], "independent": [1], "optimal": [1]},
+  "heads": [
+    "original",
+    "independent",
+    "optimal"
+  ],
+  "guidance_by_head": {
+    "original": [
+      1,
+      2
+    ],
+    "independent": [
+      1
+    ],
+    "optimal": [
+      1
+    ]
+  },
   "panel": "Unchanged64 tuning families, three fixed samples, disjoint from32training families. AFDB predicted references; original34/reserved17 locked tests remain unscored.",
   "sampling": "StrictFP32, Euler25, decoder3, identical target-specific noise. OriginalCFG2 must match archived baseline; all16 head/guidance/bucket batching controls must pass.",
   "analysis": "Audit all768 archived backbones against reference coordinates and geometry. Paired family CA-lDDT and validity differences: each setting versus originalCFG2, optimal versus independentCFG1 and originalCFG1. No reference-based sample selection.",
   "gate": "Optimal CA-lDDT lower95percent difference bound>-.005 and mean validity difference>=-.01 against both originalCFG2 and independentCFG1. Passing remains a development result requiring training-seed replication and external experimental-state coverage before promotion.",
-  "resources": "OneH200 at most12minutes,600second worker cap,finish before15UTC. No submission unless capacity qualifies and allocation fits remaining authorization."
+  "resources": "OneH200 at most10minutes,480second worker cap,finish before15UTC. The matched previous3setting screen49819892 took201seconds; adding originalCFG1 measured36.5seconds in49736749 projects238seconds. The larger10setting screen implies a conservative278seconds including its entire startup/control overhead.480seconds worker budget plus120seconds allocation overhead leaves substantial headroom. No submission unless capacity qualifies and allocation fits remaining authorization."
 }

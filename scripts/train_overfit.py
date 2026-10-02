@@ -31,7 +31,10 @@ def main():
     for k in ('source','config','output'):p.add_argument('--'+k,type=Path,required=True)
     a=p.parse_args();c=json.loads(a.config.read_text());expanded=bool(c.get('corpus_inventory'))
     if expanded:
-        from expanded_corpus import metadata,load
+        if c.get('corpus_kind')=='expansion':
+            from expansion_corpus import metadata,load
+        else:
+            from expanded_corpus import metadata,load
         source=metadata(c)
     else:
         path=Path(c['label_manifest']);source=json.loads(path.read_text())
@@ -50,7 +53,7 @@ def main():
         profile=json.loads(Path(c['profile_report']).read_text())
         if sha(c['profile_report'])!=c['profile_report_sha256'] or profile['status']!='complete' or not profile['profile_only'] or profile['max_reserved_gib']>c.get('maximum_profile_gib',110):raise ValueError('capacity gate failed')
     a.output.mkdir(parents=True,exist_ok=False);torch.cuda.set_device(0);torch.set_num_threads(4);torch.cuda.set_per_process_memory_fraction(.85);start=time.monotonic();telemetry=None
-    m=dict(status='running',config=c,updates=0,training=[],batches=[],scores=[],controls=[],scope=f'{122 if expanded else 32} training proteins; teacher-mode recall only. No unseen-family or biological-state claim. Original tests untouched.');atomic_json(a.output/'manifest.json',m)
+    m=dict(status='running',config=c,updates=0,training=[],batches=[],scores=[],controls=[],scope=f'{len(source["targets"]) if expanded else 32} training proteins; teacher-mode recall only. No unseen-family or biological-state claim. Original tests untouched.');atomic_json(a.output/'manifest.json',m)
     try:
         records={};buckets={k:[] for k in (128,256,384,512)}
         if expanded:records,buckets=load(c)
@@ -60,6 +63,9 @@ def main():
                     g=h[r['id']];record=dict(r,state=json.loads(g.attrs['state_definition']))
                     for key in ('esm','reference_z','reference_backbone','teacher_z_aligned','teacher_z_pca','teacher_backbone'):record[key]=torch.from_numpy(g[key][:])
                     record['valid_indices']=np.flatnonzero(g['coarse_valid'][:]);records[r['id']]=record;buckets[r['bucket']].append(r['id'])
+        from expansion_corpus import evaluation_records
+        evaluation_panel=evaluation_records(records,c)
+        m['training_targets']=len(records);m['evaluated_targets']=len(evaluation_panel)
         lengths=[sorted(buckets)[step%4] for step in range(c['updates'])]
         if expanded and not c.get('profile_only'):
             lengths=proportional_schedule({k:len(v) for k,v in buckets.items()},c['updates'],c['seed']+2)
@@ -78,7 +84,7 @@ def main():
         def evaluate(step):
             model.eval();raw={k:v.detach().cpu().clone() for k,v in model.state_dict().items()};model.load_state_dict(ema);state_cpu=torch.get_rng_state();state_gpu=torch.cuda.get_rng_state();evaluated_controls=set()
             with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/f'evaluation_{step}.h5','x') as out:
-                for index,(ident,r) in enumerate(records.items()):
+                for index,(ident,r) in enumerate(evaluation_panel.items()):
                     n=r['length'];length=r['bucket'];esm=torch.zeros(1,length,2560,device='cuda');esm[0,:n]=r['esm'].cuda();mask=torch.arange(length,device='cuda')[None]<n
                     noise=torch.zeros(32,length,8,device='cuda');dn=torch.zeros(32,4*length,3,device='cuda')
                     for k in range(32):

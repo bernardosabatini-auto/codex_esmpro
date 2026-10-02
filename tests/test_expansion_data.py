@@ -3,9 +3,18 @@ from unittest.mock import patch
 import numpy as np
 from expansion_data import profile_rows,eligibility,reconstruction_summary,capacity_ids
 from prepare_expansion_shards import partition
+from expansion_corpus import evaluation_records
 
 
 class ExpansionDataTest(unittest.TestCase):
+    def test_evaluation_subset_preserves_old_behavior_and_rejects_changed_panel(self):
+        records={str(i):dict(bucket=(128,256,384,512)[i%4]) for i in range(100)}
+        self.assertIs(evaluation_records(records,{}),records)
+        config=dict(corpus_kind='expansion',evaluation_ids=[str(i) for i in range(64)])
+        self.assertEqual(list(evaluation_records(records,config)),config['evaluation_ids'])
+        with self.assertRaises(ValueError):evaluation_records(records,dict(config,evaluation_ids=config['evaluation_ids'][:-1]))
+        with self.assertRaises(ValueError):evaluation_records(records,dict(config,corpus_kind='old'))
+
     def test_capacity_panel_fills_from_other_strata_without_outcome_selection(self):
         rows=[dict(id=f'{b}-{i:02d}',bucket=b) for b,n in ((128,2),(256,15),(384,15),(512,15)) for i in range(n)]
         ids=capacity_ids(rows);self.assertEqual(len(ids),32);self.assertEqual(ids,capacity_ids(list(reversed(rows))))

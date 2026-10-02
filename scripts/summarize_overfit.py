@@ -23,6 +23,10 @@ def main():
             d['local_geometry']=dict(updates=len(rows),active_updates=sum(r['geometry_count']>0 for r in rows),positive_gradient_updates=sum(r['aux_parameter_grad_norm']>0 for r in rows),maximum_aux_to_flow_ratio=max(r['aux_to_flow_ratio'] for r in rows),mean_geometry_loss=float(np.mean([r['geometry_loss'] for r in rows])),active_buckets=sorted({r['length'] for r in rows if r['aux_parameter_grad_norm']>0}))
         if not c.get('profile_only'):
             families=audited_families(c)
+            if c.get('evaluation_ids') is not None:
+                ids=c['evaluation_ids']
+                if c.get('corpus_kind')!='expansion' or len(ids)!=64 or len(set(ids))!=64 or not set(ids)<=set(families):raise ValueError('invalid evaluation panel')
+                d['training_targets']=len(families);families={i:families[i] for i in ids};d['evaluated_targets']=len(families)
             guidance_settings=c.get('evaluation_guidance',(1,2));targets=len(families)
             if len(m['scores'])!=(len(c['evaluation_steps'])+1)*targets*len(guidance_settings) or len(m['controls'])!=4*len(guidance_settings):raise ValueError('incomplete evaluations')
             for guidance in guidance_settings:
@@ -49,6 +53,7 @@ def main():
     if c.get('corpus_inventory'):
         lines[0]='# Expanded teacher-ensemble training diagnostic'
         lines[4]='All122 metadata-eligible training families, unchanged aligned labels, CFG1 ensembles. Teacher modes are predictions, not biological-state measurements. Full training draws length buckets proportional to target counts; the short profile cycles all buckets to test memory. All samples retained with unchanged geometry/state-hit criteria.'
+        if c.get('corpus_kind')=='expansion':lines[4]=f"Larger metadata-eligible training corpus; fixed64-family training-capacity panel (original32 plus32 new). All families are training data. Proportional bucket sampling, CFG1/Euler25/decoder3. No unseen-family or biological-state claim; unchanged native/external gates remain separate. Training targets: {m.get('training_targets')}."
     lines+=['',f"Training label distribution: {d['label_distribution']}. The state-TV column always compares with the original empirical teacher prior; equal-state-prior TV is reported separately by analyze_overfit_states.py."]
     if d['latent_diagnostics']:
         lines+=['','Latent diagnostics (nearest teacher RMSE): global reference fits below are evaluation-only and never alter predictions.','','| Updates / guidance | Sampled latent | Re-encoded backbone | Pose-aligned re-encoded backbone | Decoder/encoder RMSE |','|---|---:|---:|---:|---:|']

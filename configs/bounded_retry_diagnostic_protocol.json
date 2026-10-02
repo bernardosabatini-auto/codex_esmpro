@@ -1,0 +1,13 @@
+{
+  "purpose": "CPU-only feasibility analysis of a separately defined geometry-retry sampling pipeline using already generated development predictions. Raw models retain all previous failed gates.",
+  "frozen_at_utc": "2026-10-02T08:58:00Z",
+  "sources": {"original": "runs/student_extension_49799566", "compact500": "runs/student_extension_49799644"},
+  "families": 16,
+  "outputs": 32,
+  "max_attempts_per_output": 4,
+  "draw_order": "For output slot k=0..31, attempt a=0..3 uses stored draw k+32*a. Stop at first coarse-valid draw; if all four fail, return original draw k. Never retry an initially valid slot. Fixed output count and no sample reuse across slots.",
+  "selector": "Existing reference-free backbone_geometry coarse_valid only. No experimental state, confidence, reference score or target-specific tuning enters selection. Identical rule for original and compact500.",
+  "analysis": "Retain all128 historical draws, validity flags and state assignments. Report raw-first32 and selected32 validity, mean oracle nearest-reference CA-lDDT, frozen2A state coverage and both-state counts, paired-family intervals, attempts per output and unresolved slots. Verify the raw-first32 metrics reproduce the published extension report. Account for conceptual attempted draws separately from already incurred128-draw generation. No runtime or memory improvement claim from this CPU simulation.",
+  "decision": "Consider a separate matched native retry experiment only if both pipelines recover at least half of their initially invalid slots, neither loses observed state coverage and each has a paired-family lower CA-lDDT change bound above -0.005. This is a feasibility condition, not model promotion, an independent test or a claim of new modes. No cap/selector grid if unsuccessful.",
+  "locked_tests": "Original34 and reserved17 remain unscored. Only the existing16 two-state development families are read."
+}

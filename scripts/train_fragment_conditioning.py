@@ -57,6 +57,9 @@ def main():
         if not geometry or c['arm']!='adapter_only' or c.get('distance_precision')!='fp64' or sha(c['motif_objective_protocol'])!=c['motif_objective_protocol_sha256'] or sha(c['motif_baseline_report'])!=c['motif_baseline_report_sha256']:raise ValueError('Unqualified motif objective recipe')
         expected=json.loads(Path(c['motif_objective_protocol']).read_text())['auxiliary']
         if c['auxiliary_motif']!=expected:raise ValueError('Changed motif objective parameters')
+    if c.get('rollout_motif'):
+        if not warm or c.get('expanded_fragment_data') or c.get('auxiliary_motif') or sha(c['rollout_protocol'])!=c['rollout_protocol_sha256']:raise ValueError('Unqualified rollout objective')
+        if c['rollout_motif']!=json.loads(Path(c['rollout_protocol']).read_text())['auxiliary']:raise ValueError('Changed rollout recipe')
     if geometry:
         for baseline in c['baseline_reports']:
             if sha(baseline['path'])!=baseline['sha256']:raise ValueError('Changed baseline evidence')
@@ -84,6 +87,7 @@ def main():
         ema={k:v.detach().clone() for k,v in model.state_dict().items()};adapter_ema={k:v.detach().clone() for k,v in adapter.state_dict().items()}
         trunk=[p for p in model.parameters() if p.requires_grad];aps=list(adapter.parameters());parameters=trunk+aps;groups=[dict(params=aps,lr=3e-4,base_lr=3e-4)]
         if trunk:groups.append(dict(params=trunk,lr=1e-5,base_lr=1e-5))
+        gradient_model=torch.nn.ModuleDict({'generator':model,'fragment':adapter})
         optimizer=torch.optim.AdamW(groups,betas=(.9,.95),weight_decay=.01,foreach=False);order=np.random.default_rng(c['seed']);rng=torch.Generator(device='cuda').manual_seed(c['seed']);torch.cuda.manual_seed(c['seed']);m['trainable_parameters']=sum(p.numel() for p in parameters);telemetry=Telemetry(a.output,True)
         bucket_ids={n:sorted(ident for (cohort,ident),v in data.items() if cohort=='train' and (v['length']+127)//128*128==n) for n in (128,256,384,512)}
         def evaluate(step):
@@ -121,6 +125,16 @@ def main():
                     out.flush();atomic_json(a.output/'manifest.json',m)
             m['evaluations'].append(dict(step=step,scores=scores,seconds=time.monotonic()-tick));model.load_state_dict(raw);adapter.load_state_dict(araw);model.train();adapter.train();torch.cuda.set_rng_state(saved_rng);del raw,araw;atomic_json(a.output/'manifest.json',m)
         evaluate(0)
+        if c.get('rollout_motif'):
+            from latentfold.fragment_rollout import differentiable_sample_fragment,evaluation_modes
+            m['rollout_controls']=[]
+            with inference_precision('fp32'),evaluation_modes(model,adapter):
+                for ident in c['control_ids']:
+                    v=data[('development',ident)];q=v['conditions']['f30_center'];n=v['length'];ff=q['features'][None].cuda();kk=q['keep'][None].cuda();mm=torch.ones(1,n,dtype=torch.bool,device='cuda');cc=q['coordinates'][None].cuda();noise=target_noise([ident],[n],8,seed=2026100211,sample_index=0,stream='flow:0',device='cuda')
+                    expected=sample_fragment(model,adapter,ff,kk,mm,noise=noise,coordinates=cc);observed=differentiable_sample_fragment(model,adapter,ff,kk,mm,noise=noise,coordinates=cc);error=float((expected-observed.detach()).abs().max());m['rollout_controls'].append(dict(target_id=ident,latent_max_abs=error))
+                    if error>1e-5:raise ValueError('Differentiable production sampler parity failed')
+                    del observed,expected
+            atomic_json(a.output/'manifest.json',m)
         with inference_precision('fp32'):
             for begin,end in zip([0]+c['evaluation_steps'][:-1],c['evaluation_steps']):
                 torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic()
@@ -138,6 +152,10 @@ def main():
                         from latentfold.fragment_objective import endpoint_fragment_objective
                         from latentfold.training import controlled_backward
                         recipe_aux=c['auxiliary_motif'];cpu_rng=torch.get_rng_state();cuda_rng=torch.cuda.get_rng_state();auxiliary,stats=endpoint_fragment_objective(decoder,info['state'],ids,[data[('train',i)]['length'] for i in ids],coordinates,keep,step=step,seed=recipe_aux['seed'],maximum_examples=recipe_aux['maximum_examples'],minimum_time=recipe_aux['minimum_time'],maximum_time=recipe_aux['maximum_time']);torch.set_rng_state(cpu_rng);torch.cuda.set_rng_state(cuda_rng);stats.update(controlled_backward(adapter,loss,auxiliary,weight=recipe_aux['maximum_weight'],max_ratio=recipe_aux['maximum_gradient_ratio'],loss_scale=1.));m.setdefault('motif_objective_updates',[]).append(dict(step=step+1,**stats));del auxiliary,stats
+                    elif c.get('rollout_motif'):
+                        from latentfold.fragment_rollout import rollout_fragment_objective
+                        from latentfold.training import controlled_backward
+                        recipe_aux=c['rollout_motif'];cpu_rng=torch.get_rng_state();cuda_rng=torch.cuda.get_rng_state();auxiliary,stats=rollout_fragment_objective(model,adapter,decoder,features,keep,mask,coordinates,ids,[data[('train',i)]['length'] for i in ids],info['dropped'],step=step,seed=recipe_aux['seed'],maximum_examples=recipe_aux['maximum_examples']);stats.update(controlled_backward(gradient_model,loss,auxiliary,weight=recipe_aux['maximum_weight'],max_ratio=recipe_aux['maximum_gradient_ratio'],loss_scale=1.,shared_graph=False));torch.set_rng_state(cpu_rng);torch.cuda.set_rng_state(cuda_rng);m.setdefault('rollout_objective_updates',[]).append(dict(step=step+1,**stats));del auxiliary,stats
                     else:loss.backward()
                     anorm=torch.linalg.vector_norm(torch.stack([p.grad.norm() for p in aps if p.grad is not None]));norm=torch.nn.utils.clip_grad_norm_(parameters,1.,error_if_nonfinite=True)
                     if not torch.isfinite(loss) or not torch.isfinite(anorm) or anorm<=0 or norm<=0:raise FloatingPointError('Invalid flow loss/adapter gradient')

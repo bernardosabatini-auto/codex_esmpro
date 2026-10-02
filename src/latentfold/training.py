@@ -37,14 +37,16 @@ def objective(model, decoder, batch, config, *, generator, geometry_weight=0.,
     return (flow, geometry, stats) if return_parts else (flow+geometry_weight*geometry, stats)
 
 
-def controlled_backward(model, flow, geometry, *, weight, max_ratio=.1, loss_scale=128.):
+def controlled_backward(model, flow, geometry, *, weight, max_ratio=.1, loss_scale=128., shared_graph=True):
     """Bound the auxiliary parameter gradient before merging into the flow gradient.
 
     No optimizer steps are skipped. A nonfinite gradient fails the run. This is
     an explicit gradient-combination rule, not a fixed scalar loss function.
+    Set shared_graph=False only when the two losses have disjoint forward graphs;
+    that releases primary activations before the auxiliary backward pass.
     """
     parameters=[p for p in model.parameters() if p.requires_grad]
-    gf=torch.autograd.grad(flow*loss_scale,parameters,retain_graph=geometry is not None,allow_unused=True)
+    gf=torch.autograd.grad(flow*loss_scale,parameters,retain_graph=geometry is not None and shared_graph,allow_unused=True)
     gf=[None if g is None else g.div_(loss_scale) for g in gf]
     def norm(grads):
         parts=[g.square().sum(dtype=torch.float64) for g in grads if g is not None]

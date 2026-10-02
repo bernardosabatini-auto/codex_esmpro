@@ -1,0 +1,17 @@
+{
+  "purpose": "Test whether supervision of the actual generation trajectory improves isolated-fragment retention beyond teacher-forced flow matching.",
+  "initialization": "Same parent49929751 EMA and trained geometry adapter as the matched32-protein continuation49939857. Same32training proteins, fresh optimizer, primary seed2026100241, batches, LR schedule and2000additional updates. No expanded corpus or endpoint auxiliary.",
+  "auxiliary": {
+    "seed": 2026100243,
+    "maximum_examples": 2,
+    "maximum_weight": 1.0,
+    "maximum_gradient_ratio": 0.5,
+    "steps": 50,
+    "decoder_steps": 3
+  },
+  "objective": "Select up to2nondropped batch slots with an independent stream. Sample fresh noise through all50Euler steps including differentiable self-conditioning, then frozenAE3. Minimize protein-mean squared proper-rotation motif CA RMSD using supplied fragment atoms only. Bound auxiliary gradient norm across all trainable generator and adapter parameters to half the primary flow gradient. Keep primary draws identical to the plain continuation.",
+  "controls": "Forty-update RTX profile before scale. Compare grad-enabled sampler to production no-grad sampler on4fixed development controls at initialization using established latent<=1e-5 tolerance, finite gradients, frozen weights, pose/batch controls and parent output parity. CPU checkpoint/direct gradient parity and directional finite differences. Full trajectory uses nonreentrant checkpointing and restores all module modes. CPU bitwise forward assertion initially failed by2.4e-7; tolerance is numerical parity, not exact identity.",
+  "resources": "At most8own GPUs. Profile peak<=75GiB and extrapolated full allocation<=150minutes before scaling. Do not shorten the50step trajectory to rescue cost.",
+  "evaluation": "Same original32capacity/16development families,4fixed noises, conditioned/null, local500diagnostic/2000primary; proper RMSD and geometry retained. Every technical completion gets unchanged36backbone/288refold fixed-motif assay: raw valid motif and one SAME valid globally agreeing motif-preserving refold. Motif loss is not designability. No clamp, retries, selective failures or locked tests.",
+  "scope": "One actual-rollout objective arm, no weight sweep. Compare to completed plain32continuation, with primary draws and initial outputs audited."
+}

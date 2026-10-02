@@ -41,6 +41,12 @@ def analyze(run):
         rows=m['motif_objective_updates']
         if len(rows)!=c['updates'] or [r['step'] for r in rows]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['motif_mse']) or r['aux_to_flow_ratio']>c['auxiliary_motif']['maximum_gradient_ratio']+1e-7 or r['flow_parameter_grad_norm']<=0 for r in rows):raise ValueError('Incomplete/unbounded motif gradients')
         if sum(r['motif_examples'] for r in rows)<c['updates'] or not any(r['aux_parameter_grad_norm']>0 for r in rows):raise ValueError('Insufficient motif objective exposure')
+    if c.get('rollout_motif'):
+        if sha(c['rollout_protocol'])!=c['rollout_protocol_sha256'] or c['rollout_motif']!=json.loads(Path(c['rollout_protocol']).read_text())['auxiliary']:raise ValueError('Changed rollout provenance')
+        controls=m['rollout_controls'];rows=m['rollout_objective_updates']
+        if len(controls)!=4 or {r['target_id'] for r in controls}!=set(c['control_ids']) or any(not np.isfinite(r['latent_max_abs']) or r['latent_max_abs']>1e-5 for r in controls):raise ValueError('Rollout sampler parity failed')
+        if len(rows)!=c['updates'] or [r['step'] for r in rows]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['motif_mse']) or r['aux_to_flow_ratio']>c['rollout_motif']['maximum_gradient_ratio']+1e-7 or r['flow_parameter_grad_norm']<=0 for r in rows):raise ValueError('Incomplete/unbounded rollout gradients')
+        if sum(r['motif_examples'] for r in rows)<c['updates'] or not any(r['aux_parameter_grad_norm']>0 for r in rows) or any(r['motif_examples'] and r['velocity_evaluations']!=50 for r in rows):raise ValueError('Incomplete rollout objective')
     if m['updates']!=c['updates'] or len(m['training'])!=c['updates'] or m['frozen_initial']!=m['frozen_final']:raise ValueError('Incomplete/frozen-weight failure')
     if [r['step'] for r in m['training']]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['flow_loss']) or r['adapter_gradient_norm']<=0 for r in m['training']):raise ValueError('Invalid training trace')
     if any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in m['initial_controls']):raise ValueError('Failed initial controls')

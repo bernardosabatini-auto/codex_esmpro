@@ -52,10 +52,14 @@ class Telemetry:
             indices = []
         dcgmi = shutil.which("dcgmi")
         self.info["dcgm_status"] = "unavailable"
-        if nsys_metrics:
+        counters_off = os.environ.get('LATENTFOLD_GPU_COUNTERS') == 'off'
+        if counters_off:
+            self.info['dcgm_status'] = 'disabled by explicit job configuration'
+            self.info['nsys_status'] = 'not requested; NVML-only telemetry, no SM-activity claim'
+        elif nsys_metrics:
             self.info["dcgm_status"] = "disabled to avoid counter conflict with Nsight Systems"
             self.info["nsys_status"] = "requested by job wrapper; validate exported GPU_METRICS before claiming utilization"
-        if dcgmi and len(indices) == 1 and not nsys_metrics:
+        if dcgmi and len(indices) == 1 and not nsys_metrics and not counters_off:
             catalog = subprocess.run([dcgmi, "profile", "-l", "-i", indices[0]],
                                      capture_output=True, text=True, timeout=15)
             (output / "dcgm_catalog.txt").write_text(catalog.stdout + catalog.stderr)

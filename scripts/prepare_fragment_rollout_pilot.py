@@ -5,8 +5,8 @@ from prepare_overfit import sha
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--profile',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];d=json.loads(a.profile.read_text());c=d['config'].copy();run=root/'runs'/a.profile.stem;m=json.loads((run/'manifest.json').read_text());baseline=root/'runs/fragment_training_49939857/manifest.json';b=json.loads(baseline.read_text())
-    if not d['profile_qualified'] or d['manifest_sha256']!=sha(run/'manifest.json') or not c.get('rollout_motif') or c.get('expanded_fragment_data') or c['updates']!=40:raise ValueError('Unqualified actual-rollout profile')
+    p=argparse.ArgumentParser();p.add_argument('--profile',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];d=json.loads(a.profile.read_text());c=d['config'].copy();run=root/'runs'/a.profile.stem;m=json.loads((run/'manifest.json').read_text());baseline=Path(c.get('rollout_control_manifest',root/'runs/fragment_training_49939857/manifest.json'));b=json.loads(baseline.read_text())
+    if not d['profile_qualified'] or d['manifest_sha256']!=sha(run/'manifest.json') or not c.get('rollout_motif') or (c.get('expanded_fragment_data') and not c.get('rollout_breadth_protocol')) or c['updates']!=40:raise ValueError('Unqualified actual-rollout profile')
     keys=('step','length','batch','ids','conditions','learning_rate_factor','self_conditioned','noise_sha256','time_sha256','drop_sha256','rng_sha256','global_rng_sha256')
     if len(m['training'])!=40 or any(any(x[k]!=y[k] for k in keys) for x,y in zip(b['training'][:40],m['training'])) or b['adapter_initial']!=m['adapter_initial']:raise ValueError('Unmatched profile draws')
     full_estimate=d['training_seconds']/40*2000+d['evaluation_seconds']/2*12*3+240

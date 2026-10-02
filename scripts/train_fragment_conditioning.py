@@ -58,8 +58,12 @@ def main():
         expected=json.loads(Path(c['motif_objective_protocol']).read_text())['auxiliary']
         if c['auxiliary_motif']!=expected:raise ValueError('Changed motif objective parameters')
     if c.get('rollout_motif'):
-        if not warm or c.get('expanded_fragment_data') or c.get('auxiliary_motif') or sha(c['rollout_protocol'])!=c['rollout_protocol_sha256']:raise ValueError('Unqualified rollout objective')
+        if not warm or (c.get('expanded_fragment_data') and not c.get('rollout_breadth_protocol')) or c.get('auxiliary_motif') or sha(c['rollout_protocol'])!=c['rollout_protocol_sha256']:raise ValueError('Unqualified rollout objective')
         if c['rollout_motif']!=json.loads(Path(c['rollout_protocol']).read_text())['auxiliary']:raise ValueError('Changed rollout recipe')
+    if c.get('rollout_breadth_protocol'):
+        if not c.get('expanded_fragment_data') or not c.get('rollout_motif'):raise ValueError('Invalid breadth/objective combination')
+        for key in ('rollout_breadth_protocol','rollout_breadth_gate_report','rollout_breadth_gate_manifest','rollout_control_manifest'):
+            if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed breadth/objective source')
     if c.get('rollout_pilot'):
         if not c.get('rollout_motif') or c['profile_only']:raise ValueError('Invalid rollout pilot')
         for key in ('rollout_pilot_protocol','rollout_control_manifest'):

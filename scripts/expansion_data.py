@@ -16,6 +16,17 @@ def profile_rows(rows):
     return selected
 
 
+def capacity_ids(rows,count=32):
+    """Round-robin length strata, ID order, without student/audit scores."""
+    if count<1 or len(rows)<count or len({r['id'] for r in rows})!=len(rows) or any(r['bucket'] not in (128,256,384,512) for r in rows):raise ValueError('insufficient or invalid distinct capacity candidates')
+    queues={b:sorted(r['id'] for r in rows if r['bucket']==b) for b in (128,256,384,512)}
+    result=[]
+    while len(result)<count:
+        for b in queues:
+            if queues[b] and len(result)<count:result.append(queues[b].pop(0))
+    return result
+
+
 def eligibility(backbone, valid, confidence):
     confidence=np.asarray(confidence);valid=np.asarray(valid,dtype=bool)
     n=backbone.shape[1]

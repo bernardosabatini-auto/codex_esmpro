@@ -1,11 +1,17 @@
 import unittest
 from unittest.mock import patch
 import numpy as np
-from expansion_data import profile_rows,eligibility,reconstruction_summary
+from expansion_data import profile_rows,eligibility,reconstruction_summary,capacity_ids
 from prepare_expansion_shards import partition
 
 
 class ExpansionDataTest(unittest.TestCase):
+    def test_capacity_panel_fills_from_other_strata_without_outcome_selection(self):
+        rows=[dict(id=f'{b}-{i:02d}',bucket=b) for b,n in ((128,2),(256,15),(384,15),(512,15)) for i in range(n)]
+        ids=capacity_ids(rows);self.assertEqual(len(ids),32);self.assertEqual(ids,capacity_ids(list(reversed(rows))))
+        self.assertEqual(sum(i.startswith('128-') for i in ids),2)
+        with self.assertRaises(ValueError):capacity_ids(rows[:10])
+
     def test_expansion_partition_excludes_profile_and_is_complete(self):
         rows=[dict(id=f'{b}-{i}',family=f'{b}-{i}',bucket=b,length=b-20+i) for b in (128,256,384,512) for i in range(12)]
         used=[r['id'] for r in profile_rows(rows)];groups=partition(rows,used)

@@ -20,7 +20,9 @@ def analyze(run):
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     if c.get('variant')=='geometry':
-        if sha(c['geometry_protocol'])!=c['geometry_protocol_sha256'] or len(m['geometry_controls'])!=4*(len(c['evaluation_steps'])+1) or any(r['pose_latent_max_abs']>1e-4 for r in m['geometry_controls']):raise ValueError('Geometry conditioner controls failed')
+        if sha(c['geometry_protocol'])!=c['geometry_protocol_sha256'] or len(m['geometry_controls'])!=(8 if c.get('distance_precision')=='fp64' else 4)*(len(c['evaluation_steps'])+1) or any(r['pose_latent_max_abs']>1e-4 for r in m['geometry_controls']):raise ValueError('Geometry conditioner controls failed')
+    if c.get('distance_precision')=='fp64':
+        if sha(c['geometry_precision_protocol'])!=c['geometry_precision_protocol_sha256'] or sha(c['pose_diagnostic_report'])!=c['pose_diagnostic_report_sha256']:raise ValueError('Changed precision correction evidence')
     if m['updates']!=c['updates'] or len(m['training'])!=c['updates'] or m['frozen_initial']!=m['frozen_final']:raise ValueError('Incomplete/frozen-weight failure')
     if [r['step'] for r in m['training']]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['flow_loss']) or r['adapter_gradient_norm']<=0 for r in m['training']):raise ValueError('Invalid training trace')
     if any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in m['initial_controls']):raise ValueError('Failed initial controls')

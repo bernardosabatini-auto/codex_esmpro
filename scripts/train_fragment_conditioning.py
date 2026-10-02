@@ -41,6 +41,8 @@ def main():
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     geometry=c.get('variant')=='geometry'
+    if c.get('distance_precision')=='fp64':
+        if not geometry or sha(c['geometry_precision_protocol'])!=c['geometry_precision_protocol_sha256'] or sha(c['pose_diagnostic_report'])!=c['pose_diagnostic_report_sha256'] or not json.loads(Path(c['pose_diagnostic_report']).read_text())['corrected_precision_profile_qualified']:raise ValueError('Unqualified precision correction')
     if geometry:
         for baseline in c['baseline_reports']:
             if sha(baseline['path'])!=baseline['sha256']:raise ValueError('Changed baseline evidence')
@@ -56,7 +58,7 @@ def main():
         model,arch=load_legacy(Path(c['checkpoint']),trusted_pickle=True);model.cuda().train();model.checkpoint_blocks=True
         if c['arm']=='adapter_only':model.requires_grad_(False);frozen=[n for n,_ in model.named_parameters()]
         else:frozen=freeze_unused_conditioning(model)
-        torch.manual_seed(c['seed']);adapter=(FragmentGeometryAdapter(model.d_model,n_layers=len(model.blocks),n_heads=model.n_heads,hidden=recipe['adapter']['hidden']) if geometry else FragmentAdapter(model.d_model,recipe['adapter']['hidden'])).cuda().train();m['frozen_names']=frozen;m['frozen_initial']=frozen_hash(model,frozen);m['adapter_initial']=frozen_hash(adapter,[n for n,_ in adapter.named_parameters()]);m['token_adapter_initial']=frozen_hash(adapter,['hidden.weight','hidden.bias','output.weight','output.bias'])
+        torch.manual_seed(c['seed']);adapter=(FragmentGeometryAdapter(model.d_model,n_layers=len(model.blocks),n_heads=model.n_heads,hidden=recipe['adapter']['hidden'],distance_precision=c.get('distance_precision','fp32')) if geometry else FragmentAdapter(model.d_model,recipe['adapter']['hidden'])).cuda().train();m['frozen_names']=frozen;m['frozen_initial']=frozen_hash(model,frozen);m['adapter_initial']=frozen_hash(adapter,[n for n,_ in adapter.named_parameters()]);m['token_adapter_initial']=frozen_hash(adapter,['hidden.weight','hidden.bias','output.weight','output.bias'])
         decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval().requires_grad_(False)
         ema={k:v.detach().clone() for k,v in model.state_dict().items()};adapter_ema={k:v.detach().clone() for k,v in adapter.state_dict().items()}
         trunk=[p for p in model.parameters() if p.requires_grad];aps=list(adapter.parameters());parameters=trunk+aps;groups=[dict(params=aps,lr=3e-4,base_lr=3e-4)]
@@ -84,8 +86,14 @@ def main():
                             esm=features.new_zeros(1,n,model.cond_norm.normalized_shape[0]);original=sample_unconditional(model,esm,mask[:1],noise=noise[:1],steps=50);single=sample_fragment(model,adapter,features[:1],keep[:1],mask[:1],noise=noise[:1],coordinates=coordinates[:1] if geometry else None);control=dict(target_id=ident,original_max_abs=float((original-single).abs().max()),batched_max_abs=float((single-z[:1]).abs().max()));m['sampling_controls'].append(control)
                             if control['original_max_abs']>1e-5 or control['batched_max_abs']>1e-4:raise ValueError('Initial sampler/batch control failed')
                         if geometry and mode=='conditioned' and ident in c['control_ids']:
-                            rotation=features.new_tensor([[0,-1,0],[1,0,0],[0,0,1]]);posed=(coordinates@rotation+features.new_tensor([11,7,-3]))*keep[...,None];other=sample_fragment(model,adapter,features,keep,mask,noise=noise,steps=50,coordinates=posed);control=dict(step=step,target_id=ident,pose_latent_max_abs=float((other-z).abs().max()));m['geometry_controls'].append(control)
-                            if control['pose_latent_max_abs']>1e-4:raise ValueError('Geometry conditioner pose dependence')
+                            cc=coordinates.double() if c.get('distance_precision')=='fp64' else coordinates;rotations=[('quarter',cc.new_tensor([[0,-1,0],[1,0,0],[0,0,1]]))]
+                            if c.get('distance_precision')=='fp64':
+                                qr=np.linalg.qr(np.random.default_rng(2026100234).normal(size=(3,3)))[0]
+                                if np.linalg.det(qr)<0:qr[:,0]*=-1
+                                rotations.append(('general',cc.new_tensor(qr)))
+                            for kind,rotation in rotations:
+                                posed=(cc@rotation+cc.new_tensor([11,7,-3]))*keep[...,None];other=sample_fragment(model,adapter,features,keep,mask,noise=noise,steps=50,coordinates=posed);control=dict(step=step,target_id=ident,pose_kind=kind,pose_latent_max_abs=float((other-z).abs().max()));m['geometry_controls'].append(control)
+                                if control['pose_latent_max_abs']>1e-4:raise ValueError('Geometry conditioner pose dependence')
                         scores.extend(dict(cohort=cohort,mode=mode,target_id=ident,family=v['family'],slot=k,motif_drms=float(errors[k]),coarse_valid=int(geom['coarse_valid'][k]),**ca_metrics(bb[k,:,1],reference[:,1])) for k in range(4))
                     out.flush();atomic_json(a.output/'manifest.json',m)
             m['evaluations'].append(dict(step=step,scores=scores,seconds=time.monotonic()-tick));model.load_state_dict(raw);adapter.load_state_dict(araw);model.train();adapter.train();torch.cuda.set_rng_state(saved_rng);del raw,araw;atomic_json(a.output/'manifest.json',m)
@@ -113,7 +121,7 @@ def main():
                     del z,features,keep,mask,loss,info
                 torch.cuda.synchronize();m['batches'].append(dict(begin=begin,end=end,seconds=time.monotonic()-tick,peak_reserved_bytes=torch.cuda.max_memory_reserved()));m['frozen_final']=frozen_hash(model,frozen)
                 if m['frozen_final']!=m['frozen_initial']:raise ValueError('Frozen weights changed')
-                if not c['profile_only']:torch.save(dict(ema={k:v.cpu() for k,v in ema.items()},fragment_adapter={k:v.cpu() for k,v in adapter_ema.items()},adapter_config=dict(output_width=model.d_model,hidden=recipe['adapter']['hidden'],variant='geometry' if geometry else 'token',n_layers=len(model.blocks),n_heads=model.n_heads),arch=arch['architecture'],extra_arch=arch['extra_architecture'],model=arch['model'],experiment=c),a.output/f'ema_{end}.ckpt')
+                if not c['profile_only']:torch.save(dict(ema={k:v.cpu() for k,v in ema.items()},fragment_adapter={k:v.cpu() for k,v in adapter_ema.items()},adapter_config=dict(output_width=model.d_model,hidden=recipe['adapter']['hidden'],variant='geometry' if geometry else 'token',n_layers=len(model.blocks),n_heads=model.n_heads,distance_precision=c.get('distance_precision','fp32')),arch=arch['architecture'],extra_arch=arch['extra_architecture'],model=arch['model'],experiment=c),a.output/f'ema_{end}.ckpt')
                 evaluate(end)
         m['status']='complete'
     except BaseException as error:m.update(status='failed',error=f'{type(error).__name__}: {error}');raise

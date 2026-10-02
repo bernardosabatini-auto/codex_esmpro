@@ -1,0 +1,31 @@
+{
+  "version": 1,
+  "hypothesis": "Small bounded residue translations can repair local decoded backbone defects without removing samples or using a reference structure.",
+  "training_sources": ["runs/overfit_49753133/evaluation_2000.h5", "runs/overfit_49753251/evaluation_2000.h5"],
+  "targets_per_source": 122,
+  "samples_per_target": 32,
+  "repair": {
+    "steps": 100,
+    "learning_rate": 0.02,
+    "check_start": 20,
+    "check_every": 10,
+    "max_translation": 0.5,
+    "max_rms_translation": 0.2,
+    "neighbor_radius": 4.1,
+    "clash_target": 3.0,
+    "peptide_target": [1.25, 1.45],
+    "gap_target": 4.2,
+    "tether_weight": 0.05,
+    "preservation_weight": 0.2,
+    "accept_peptide": [1.12, 1.58],
+    "accept_clash": 2.55,
+    "accept_gap": 4.45,
+    "max_adjacent_change": 0.2,
+    "max_angle_change_degrees": 10.0,
+    "max_omega_change_degrees": 15.0,
+    "strong_volume_threshold": 0.1
+  },
+  "feasibility": {"minimum_repaired_fraction_each_seed": 0.5, "max_mean_seconds_per_32_samples": 0.25, "max_seconds_per_32_samples": 2.0},
+  "sequence": ["Freeze implementation and constants before scoring fixed training outputs", "Require feasibility in both seeds before unchanged native application to original and candidate heads", "Require paired native quality and validity before external ensemble generation"],
+  "restrictions": ["No reference coordinates in optimization", "No sample deletion, replacement, or resampling", "Initially valid samples bitwise unchanged", "Failed repair returns original", "No parameter grid", "No independent-test scoring", "Coarse validity is not physical or thermodynamic certification"]
+}

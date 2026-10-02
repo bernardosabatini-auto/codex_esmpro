@@ -10,18 +10,21 @@ from latentfold.ensemble_metrics import backbone_geometry
 from latentfold.precision import inference_precision
 from prepare_overfit import sha
 from profile_gpu import Telemetry,atomic_json
+from antithetic_noise import noise_address
 
 
 def main():
     p=argparse.ArgumentParser()
     for key in ('source','config','output'):p.add_argument('--'+key,type=Path,required=True)
     a=p.parse_args();c=json.loads(a.config.read_text())
-    for key in ('protocol','panel','native_manifest','capacity_report','embedding_cache','decoder_checkpoint','checkpoint','training_manifest','parent_manifest','parent_predictions','parent_scores'):
+    for key in ('protocol','panel','native_manifest','capacity_report','embedding_cache','decoder_checkpoint','checkpoint','training_manifest','parent_manifest','parent_predictions','parent_scores','positive_parent_manifest','positive_parent_predictions','positive_parent_scores'):
         if c.get(key) and sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     recipe=json.loads(Path(c['protocol']).read_text());rows=json.loads(Path(c['panel']).read_text())['development']
     if c['name'] not in recipe['heads'] or (c['samples'],c['max_attempts'])!=(32,4) or c['noise_arms']!=['raw','latent'] or len(rows)!=48 or len({r['family'] for r in rows})!=48:raise ValueError('Wrong frozen scope')
+    scheme=c.get('latent_noise_scheme','iid')
+    if scheme!=recipe.get('latent_noise_scheme','iid'):raise ValueError('Noise scheme differs from protocol')
     a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
-    start=time.monotonic();telemetry=None;m=dict(status='running',config=c,targets=[],controls=[],parent_controls=[],batches=[],draws=[],selections=[],training_updates_executed=0,timing_scope='Cached-conditioner generation only, excludes model loading, controls, geometry checks and disk I/O. Retry generation costs retained.');atomic_json(a.output/'manifest.json',m)
+    start=time.monotonic();telemetry=None;m=dict(status='running',config=c,targets=[],controls=[],parent_controls=[],positive_parent_controls=[],batches=[],draws=[],selections=[],training_updates_executed=0,timing_scope='Cached-conditioner generation only, excludes model loading, controls, geometry checks and disk I/O. Retry generation costs retained.');atomic_json(a.output/'manifest.json',m)
     try:
         telemetry=Telemetry(a.output,True);model,_=load_legacy(Path(c['checkpoint']),trusted_pickle=True);model.cuda().eval().requires_grad_(False)
         decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval();cfg=SampleConfig(steps=25,guidance=c['primary_guidance'])
@@ -37,7 +40,9 @@ def main():
                     if not pending:break
                     if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('External retry work cap')
                     b=len(pending);noise=torch.zeros(b,length,8,device='cuda')
-                    for index,k in enumerate(pending):noise[index,:n]=target_noise([ident],[n],8,seed=c['seed'],sample_index=k+32*attempt,device='cuda')[0]
+                    for index,k in enumerate(pending):
+                        latent_index,latent_sign=noise_address(k+32*attempt,scheme)
+                        noise[index,:n]=latent_sign*target_noise([ident],[n],8,seed=c['seed'],sample_index=latent_index,device='cuda')[0]
                     torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic()
                     z=sample(model,esm.repeat(b,1,1),mask.repeat(b,1),cfg,noise=noise,conditioning_ids=[ident]*b,compact_condition=c['compact_condition']);_,bb=decoder(z,mask.repeat(b,1),noise=dn.repeat(b,1,1),return_backbone=True);bb=bb[:,:n].cpu().numpy();torch.cuda.synchronize()
                     m['batches'].append(dict(target_id=ident,attempt=attempt,batch=b,seconds=time.monotonic()-tick,length=length,peak_reserved_bytes=torch.cuda.max_memory_reserved()))
@@ -53,15 +58,20 @@ def main():
                             if old.shape!=raw.shape:raise ValueError('Raw parent shape changed')
                             old_valid=backbone_geometry(old)['coarse_valid'];checks=[ca_metrics(x[:,1],y[:,1]) for x,y in zip(raw,old)];parent_control=dict(target_id=ident,max_ca_rmsd=max(r['ca_rmsd'] for r in checks),min_ca_lddt=min(r['ca_lddt'] for r in checks),validity_identical=bool(np.array_equal(valid,old_valid)));m['parent_controls'].append(parent_control)
                             if parent_control['max_ca_rmsd']>.2 or parent_control['min_ca_lddt']<.99 or not parent_control['validity_identical']:raise ValueError('Historical raw ensemble control failed')
+                        if c.get('positive_parent_predictions'):
+                            with h5py.File(c['positive_parent_predictions']) as parent:old=parent[ident][f"cfg{c['primary_guidance']}"]['raw']['backbone'][:16]
+                            if scheme!='antithetic' or old.shape!=raw[::2].shape:raise ValueError('Wrong positive-parent scope')
+                            old_valid=backbone_geometry(old)['coarse_valid'];checks=[ca_metrics(x[:,1],y[:,1]) for x,y in zip(raw[::2],old)];control=dict(target_id=ident,max_ca_rmsd=max(r['ca_rmsd'] for r in checks),min_ca_lddt=min(r['ca_lddt'] for r in checks),validity_identical=bool(np.array_equal(valid[::2],old_valid)));m['positive_parent_controls'].append(control)
+                            if control['max_ca_rmsd']>.2 or control['min_ca_lddt']<.99 or not control['validity_identical']:raise ValueError('Positive antithetic/IID identity failed')
                     remaining=[]
                     for index,k in enumerate(pending):
-                        draw=k+32*attempt;used[k]+=1;all_indices.append(draw);all_bb.append(bb[index]);m['draws'].append(dict(target_id=ident,slot=k,attempt=attempt,draw=draw,coarse_valid=int(valid[index])))
+                        draw=k+32*attempt;used[k]+=1;all_indices.append(draw);all_bb.append(bb[index]);latent_index,latent_sign=noise_address(draw,scheme);m['draws'].append(dict(target_id=ident,slot=k,attempt=attempt,draw=draw,latent_noise_index=latent_index,latent_noise_sign=latent_sign,coarse_valid=int(valid[index])))
                         if valid[index]:selected[k]=bb[index];selected_indices[k]=draw
                         else:remaining.append(k)
                     pending=remaining;del noise,z,bb
                 for k in range(32):m['selections'].append(dict(target_id=ident,slot=k,attempts=int(used[k]),selected_draw=int(selected_indices[k]),exhausted=k in pending))
                 for mode,backbone,indices in [('raw',raw,np.arange(32)),('latent',selected,selected_indices)]:
-                    g=group.create_group(mode);g.create_dataset('backbone',data=backbone);g.create_dataset('seed_indices',data=np.stack([indices,np.zeros(32,dtype=int)],axis=1))
+                    g=group.create_group(mode);g.attrs['latent_noise_scheme']=scheme;g.create_dataset('backbone',data=backbone);g.create_dataset('seed_indices',data=np.stack([indices,np.zeros(32,dtype=int)],axis=1))
                 attempt_group.create_dataset('backbone',data=np.stack(all_bb));attempt_group.create_dataset('draw_indices',data=all_indices)
                 m['targets'].append(dict(id=ident,length=n,category=row['category']));out.flush();atomic_json(a.output/'manifest.json',m);print('scored',len(m['targets']),'of48',flush=True)
         m['status']='complete'

@@ -1,0 +1,14 @@
+{
+  "purpose": "Test whether Gaussian sign pairing improves state coverage at fixed32 outputs for the qualified compact500 model. Same weights, guidance, precision, solver and retry cap as compact IID; no reference-informed sampling.",
+  "heads": ["compact500_antithetic"],
+  "latent_noise_scheme": "antithetic",
+  "native_run": "runs/bounded_retry_native_49847765",
+  "baseline_run": "runs/retry_ensemble_49844801",
+  "baseline_scores": "runs/state_scores_49844801/score.json",
+  "samples": 32,
+  "attempts": 4,
+  "sampling": "Logical draw d uses Gaussian index floor(d/2), with positive sign for even d and negative sign for odd d. Decoder noise is fixed at index0. Output slot k retries d=k+32*a for a=0..3; first coarse-valid sample wins, exhausted slots return the original. Same frozen external seed and compact conditioning as baseline.",
+  "controls": "All48 single-versus-batch controls retain0.2A RMSD/0.99 CA-lDDT limits. All16 positive first draws per family must match the first16 IID raw backbones under these limits and exactly identical coarse validity. Every attempted noise address/sign, failure and selected output retained. Negative draws intentionally differ and remain in all denominators.",
+  "analysis": "Unchanged48-family state/MD protocol, raw and selected32 separately. Compare against compact IID selected32 and report full MD differences. Sampling quality needs CA lower95% bound>-0.005, validity difference>=-0.01 and coverage difference>=0. Follow up a diversity gain only if coverage gain>=0.1 with positive lower95% bound. No pairing, temperature, sample-count or seed-search grid. Native quality versus original and compact IID is required first.",
+  "resources": "One RTX,15minutes,780second worker cap; automatic artifact audit and CPU scoring. Existing baseline reused after exact checkpoint/seed/native lineage checks. <=8 own running+pending GPUs;15UTC deadline; locked tests remain unscored."
+}

@@ -4,6 +4,7 @@ from pathlib import Path
 import h5py,numpy as np
 from prepare_overfit import sha
 from latentfold.ensemble_metrics import backbone_geometry
+from antithetic_noise import noise_address
 
 
 def validate_slot(draws,selection):
@@ -19,7 +20,7 @@ def validate_slot(draws,selection):
 def analyze(m,run):
     if m['status']!='complete' or m['training_updates_executed']!=0:raise ValueError('Incomplete inference')
     c=m['config']
-    for key in ('protocol','panel','native_manifest','capacity_report','parent_manifest','parent_scores'):
+    for key in ('protocol','panel','native_manifest','capacity_report','parent_manifest','parent_scores','positive_parent_manifest','positive_parent_predictions','positive_parent_scores'):
         if c.get(key) and sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     rows={r['query_id']:r for r in json.loads(Path(c['panel']).read_text())['development']}
     if len(rows)!=48 or len({r['family'] for r in rows.values()})!=48 or c['noise_arms']!=['raw','latent'] or c['samples']!=32 or c['max_attempts']!=4:raise ValueError('Wrong panel/recipe')
@@ -30,6 +31,15 @@ def analyze(m,run):
     if c.get('parent_predictions'):
         if len(parent)!=48 or {r['target_id'] for r in parent}!=set(rows) or any(not np.isfinite(r[k]) for r in parent for k in ('max_ca_rmsd','min_ca_lddt')) or any(r['max_ca_rmsd']>.2 or r['min_ca_lddt']<.99 or not r['validity_identical'] for r in parent):raise ValueError('Failed raw parent controls')
     elif parent:raise ValueError('Unexpected raw parent controls')
+    scheme=c.get('latent_noise_scheme','iid');recipe=json.loads(Path(c['protocol']).read_text())
+    if scheme!=recipe.get('latent_noise_scheme','iid'):raise ValueError('Undeclared latent noise scheme')
+    for r in m['draws']:
+        if scheme=='antithetic' or 'latent_noise_index' in r:
+            if (r.get('latent_noise_index'),r.get('latent_noise_sign'))!=noise_address(r['draw'],scheme):raise ValueError('Attempted noise address/sign changed')
+    positive=m.get('positive_parent_controls',[])
+    if scheme=='antithetic':
+        if not c.get('positive_parent_predictions') or len(positive)!=48 or {r['target_id'] for r in positive}!=set(rows) or any(not np.isfinite(r[k]) for r in positive for k in ('max_ca_rmsd','min_ca_lddt')) or any(r['max_ca_rmsd']>.2 or r['min_ca_lddt']<.99 or not r['validity_identical'] for r in positive):raise ValueError('Positive-noise identity controls failed')
+    elif positive:raise ValueError('Unexpected positive-noise controls')
     expected={(i,k) for i in rows for k in range(32)};key=lambda r:(r['target_id'],r['slot'])
     if len(m['selections'])!=1536 or {key(r) for r in m['selections']}!=expected or any(key(r) not in expected for r in m['draws']):raise ValueError('Incomplete/extra output slots')
     byslot={k:[] for k in expected}
@@ -54,6 +64,7 @@ def analyze(m,run):
             mapping={int(k):j for j,k in enumerate(indices)}
             if any(bool(validity[mapping[r['draw']]])!=bool(r['coarse_valid']) for r in ds):raise ValueError('Stored validity differs from coordinates')
             for mode,pos in [('raw',0),('latent',1)]:
+                if g[mode].attrs.get('latent_noise_scheme','iid')!=scheme:raise ValueError('Stored noise scheme differs from manifest')
                 wanted=[choices[(ident,k)][pos] for k in range(32)];pairs=np.stack([wanted,np.zeros(32,dtype=int)],axis=1)
                 if not np.array_equal(g[mode]['seed_indices'][:],pairs) or not np.array_equal(g[mode]['backbone'][:],bb[[mapping[k] for k in wanted]]):raise ValueError('Output differs from declared selected draw')
     initial=sum(not r['coarse_valid'] for r in m['draws'] if r['attempt']==0);left=sum(r['exhausted'] for r in m['selections'])

@@ -1,0 +1,8 @@
+{
+  "purpose": "Isolate the confidence modification from GPU architecture after RTX49816769 failed agreement with saved H200 outputs. Repeat chunked confidence on H200 against the exact same eight full-confidence H200 controls.",
+  "rationale": "Installed fold computes sample coordinates before confidence and returns the same coordinate tensor; confidence chunking should not change those coordinates. RTX discrepancies may involve hardware-dependent stochastic trunk dropout, numerical drift, or another implementation difference. This probe distinguishes same-hardware agreement without asserting the cause in advance.",
+  "scope": "Same eight targets, per-target seeds, FP32,3trunk loops,50steps,16draws and confidence chunks4 as the failed RTX probe. No changed outcome tolerances, states, or label corpus.",
+  "controls": {"max_ca_rmsd": 0.2, "min_ca_lddt": 0.99, "confidence_rmse": 0.0001, "confidence_max_abs": 0.001, "validity_exact": true, "confident_residue_mask_exact": true, "metadata_eligibility_exact": true, "eligible_contact_state_assignment_exact": true},
+  "resources": "OneH20010minute allocation/8minute work budget. Require all controls and peak<=64GiB. Saved unchunked H200 outputs provide comparisons; this is not a paired runtime benchmark.",
+  "interpretation": "H200 agreement cannot qualify H100 or RTX. Retain the failed RTX result. No future data regeneration, training modification or full AE-pipeline qualification follows automatically."
+}

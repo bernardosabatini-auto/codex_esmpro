@@ -22,6 +22,8 @@ def analyze(run):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed continuation source')
         controls=m['warm_controls']
         if len(controls)!=(32 if c['profile_only'] else 384) or any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in controls):raise ValueError('Warm-start parity failed')
+    if c.get('fragment_representation'):
+        if c['fragment_representation']!='geometry_sequence' or warm or c['arm']!='full' or sha(c['representation_protocol'])!=c['representation_protocol_sha256'] or m.get('representation_latent_max_abs')!=0:raise ValueError('Invalid representation contrast')
     if c.get('expanded_fragment_data'):
         if not warm or sha(c['expanded_protocol'])!=c['expanded_protocol_sha256']:raise ValueError('Invalid expanded continuation')
         parent_config=json.loads(Path(c['warm_parent_manifest']).read_text())['config']

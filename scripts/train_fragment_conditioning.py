@@ -21,7 +21,8 @@ from profile_gpu import Telemetry,atomic_json
 def digest(x):return hashlib.sha256(x.detach().cpu().contiguous().numpy().tobytes()).hexdigest()
 
 
-def load_data(path):
+def load_data(path,representation='latent_geometry'):
+    if representation not in ('latent_geometry','geometry_sequence'):raise ValueError('Unknown fragment representation')
     data={}
     with h5py.File(path) as f:
         for cohort in ('train','development'):
@@ -29,6 +30,7 @@ def load_data(path):
                 n=int(g.attrs['length']);conditions={}
                 for name,q in g['conditions'].items():
                     features,keep=fragment_features(torch.from_numpy(q['latent'][:]),q.attrs['sequence'],length=n,start=int(q.attrs['start']))
+                    if representation=='geometry_sequence':features[:,:8]=0
                     conditions[name]=dict(target=torch.from_numpy(q['target_latent'][:]) if 'target_latent' in q else None,features=features,keep=keep,fragment=q['fragment'][:],coordinates=fragment_coordinates(torch.from_numpy(q['fragment'][:]),length=n,start=int(q.attrs['start'])))
                 data[(cohort,ident)]=dict(length=n,family=g.attrs['family'],conditions=conditions,target=torch.from_numpy(g['reference_z'][:]) if cohort=='train' else None,reference=g['reference_backbone'][:] if cohort=='train' else None)
     return data
@@ -50,6 +52,8 @@ def main():
         parent_config=json.loads(Path(c['warm_parent_manifest']).read_text())['config']
         with h5py.File(parent_config['fragments']) as original:
             if sorted(original['train'])!=c['evaluation_train_ids']:raise ValueError('Changed original capacity panel')
+    if c.get('fragment_representation'):
+        if c['fragment_representation']!='geometry_sequence' or warm or c['arm']!='full' or c.get('variant')!='geometry' or c.get('auxiliary_motif') or c.get('expanded_fragment_data') or sha(c['representation_protocol'])!=c['representation_protocol_sha256']:raise ValueError('Invalid representation contrast')
     geometry=c.get('variant')=='geometry'
     if c.get('distance_precision')=='fp64':
         if not geometry or sha(c['geometry_precision_protocol'])!=c['geometry_precision_protocol_sha256'] or sha(c['pose_diagnostic_report'])!=c['pose_diagnostic_report_sha256'] or not json.loads(Path(c['pose_diagnostic_report']).read_text())['corrected_precision_profile_qualified']:raise ValueError('Unqualified precision correction')
@@ -89,7 +93,10 @@ def main():
         if sha(c['profile_report'])!=c['profile_report_sha256'] or not json.loads(Path(c['profile_report']).read_text())['profile_qualified']:raise ValueError('Profile not qualified')
     a.output.mkdir(parents=True,exist_ok=False);start=time.monotonic();telemetry=None;m=dict(status='running',config=c,updates=0,training=[],batches=[],evaluations=[],initial_controls=[],sampling_controls=[],geometry_controls=[]);atomic_json(a.output/'manifest.json',m)
     try:
-        torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85);data=load_data(c['fragments'])
+        torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85);data=load_data(c['fragments'],c.get('fragment_representation','latent_geometry'))
+        if c.get('fragment_representation'):
+            m['representation_latent_max_abs']=max(float(q['features'][:,:8].abs().max()) for v in data.values() for q in v['conditions'].values())
+            if m['representation_latent_max_abs']!=0:raise ValueError('Standalone latent input leaked into ablation')
         model,arch=load_legacy(Path(c['checkpoint']),trusted_pickle=True);model.cuda().train();model.checkpoint_blocks=True
         if c['arm']=='adapter_only':model.requires_grad_(False);frozen=[n for n,_ in model.named_parameters()]
         else:frozen=freeze_unused_conditioning(model)

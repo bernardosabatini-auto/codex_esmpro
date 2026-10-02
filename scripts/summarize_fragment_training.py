@@ -22,6 +22,8 @@ def analyze(run):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed continuation source')
         controls=m['warm_controls']
         if len(controls)!=(32 if c['profile_only'] else 384) or any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in controls):raise ValueError('Warm-start parity failed')
+    if c.get('backbone_tokens'):
+        if warm or c['arm']!='full' or c.get('fragment_representation') or sha(c['backbone_tokens_protocol'])!=c['backbone_tokens_protocol_sha256'] or not m.get('shared_adapter_initial'):raise ValueError('Invalid backbone-token contrast')
     if c.get('fragment_representation'):
         if c['fragment_representation']!='geometry_sequence' or warm or c['arm']!='full' or sha(c['representation_protocol'])!=c['representation_protocol_sha256'] or m.get('representation_latent_max_abs')!=0:raise ValueError('Invalid representation contrast')
     if c.get('expanded_fragment_data'):

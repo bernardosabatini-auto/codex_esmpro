@@ -21,7 +21,7 @@ from profile_gpu import Telemetry,atomic_json
 def digest(x):return hashlib.sha256(x.detach().cpu().contiguous().numpy().tobytes()).hexdigest()
 
 
-def load_data(path,representation='latent_geometry'):
+def load_data(path,representation='latent_geometry',backbone_tokens=False):
     if representation not in ('latent_geometry','geometry_sequence'):raise ValueError('Unknown fragment representation')
     data={}
     with h5py.File(path) as f:
@@ -31,6 +31,9 @@ def load_data(path,representation='latent_geometry'):
                 for name,q in g['conditions'].items():
                     features,keep=fragment_features(torch.from_numpy(q['latent'][:]),q.attrs['sequence'],length=n,start=int(q.attrs['start']))
                     if representation=='geometry_sequence':features[:,:8]=0
+                    if backbone_tokens:
+                        extra=torch.zeros(n,12);extra[keep]=torch.from_numpy(q['fragment'][:]).reshape(-1,12)/10.
+                        features=torch.cat((features,extra),dim=-1)
                     conditions[name]=dict(target=torch.from_numpy(q['target_latent'][:]) if 'target_latent' in q else None,features=features,keep=keep,fragment=q['fragment'][:],coordinates=fragment_coordinates(torch.from_numpy(q['fragment'][:]),length=n,start=int(q.attrs['start'])))
                 data[(cohort,ident)]=dict(length=n,family=g.attrs['family'],conditions=conditions,target=torch.from_numpy(g['reference_z'][:]) if cohort=='train' else None,reference=g['reference_backbone'][:] if cohort=='train' else None)
     return data
@@ -54,6 +57,8 @@ def main():
             if sorted(original['train'])!=c['evaluation_train_ids']:raise ValueError('Changed original capacity panel')
     if c.get('fragment_representation'):
         if c['fragment_representation']!='geometry_sequence' or warm or c['arm']!='full' or c.get('variant')!='geometry' or c.get('auxiliary_motif') or c.get('expanded_fragment_data') or sha(c['representation_protocol'])!=c['representation_protocol_sha256']:raise ValueError('Invalid representation contrast')
+    if c.get('backbone_tokens'):
+        if warm or c['arm']!='full' or c.get('variant')!='geometry' or c.get('fragment_representation') or c.get('auxiliary_motif') or c.get('expanded_fragment_data') or sha(c['backbone_tokens_protocol'])!=c['backbone_tokens_protocol_sha256']:raise ValueError('Invalid direct backbone contrast')
     geometry=c.get('variant')=='geometry'
     if c.get('distance_precision')=='fp64':
         if not geometry or sha(c['geometry_precision_protocol'])!=c['geometry_precision_protocol_sha256'] or sha(c['pose_diagnostic_report'])!=c['pose_diagnostic_report_sha256'] or not json.loads(Path(c['pose_diagnostic_report']).read_text())['corrected_precision_profile_qualified']:raise ValueError('Unqualified precision correction')
@@ -93,18 +98,19 @@ def main():
         if sha(c['profile_report'])!=c['profile_report_sha256'] or not json.loads(Path(c['profile_report']).read_text())['profile_qualified']:raise ValueError('Profile not qualified')
     a.output.mkdir(parents=True,exist_ok=False);start=time.monotonic();telemetry=None;m=dict(status='running',config=c,updates=0,training=[],batches=[],evaluations=[],initial_controls=[],sampling_controls=[],geometry_controls=[]);atomic_json(a.output/'manifest.json',m)
     try:
-        torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85);data=load_data(c['fragments'],c.get('fragment_representation','latent_geometry'))
+        torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85);data=load_data(c['fragments'],c.get('fragment_representation','latent_geometry'),c.get('backbone_tokens',False))
         if c.get('fragment_representation'):
             m['representation_latent_max_abs']=max(float(q['features'][:,:8].abs().max()) for v in data.values() for q in v['conditions'].values())
             if m['representation_latent_max_abs']!=0:raise ValueError('Standalone latent input leaked into ablation')
         model,arch=load_legacy(Path(c['checkpoint']),trusted_pickle=True);model.cuda().train();model.checkpoint_blocks=True
         if c['arm']=='adapter_only':model.requires_grad_(False);frozen=[n for n,_ in model.named_parameters()]
         else:frozen=freeze_unused_conditioning(model)
-        torch.manual_seed(c['seed']);adapter=(FragmentGeometryAdapter(model.d_model,n_layers=len(model.blocks),n_heads=model.n_heads,hidden=recipe['adapter']['hidden'],distance_precision=c.get('distance_precision','fp32')) if geometry else FragmentAdapter(model.d_model,recipe['adapter']['hidden'])).cuda().train()
+        torch.manual_seed(c['seed']);adapter=(FragmentGeometryAdapter(model.d_model,n_layers=len(model.blocks),n_heads=model.n_heads,hidden=recipe['adapter']['hidden'],distance_precision=c.get('distance_precision','fp32'),backbone_tokens=c.get('backbone_tokens',False)) if geometry else FragmentAdapter(model.d_model,recipe['adapter']['hidden'])).cuda().train()
         if warm:
             parent_checkpoint=torch.load(c['checkpoint'],map_location='cpu',weights_only=False,mmap=True);adapter.load_state_dict(parent_checkpoint['fragment_adapter']);del parent_checkpoint
         m['frozen_names']=frozen;m['frozen_initial']=frozen_hash(model,frozen);m['adapter_initial']=frozen_hash(adapter,[n for n,_ in adapter.named_parameters()]);m['token_adapter_initial']=frozen_hash(adapter,['hidden.weight','hidden.bias','output.weight','output.bias'])
         decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval().requires_grad_(False)
+        if c.get('backbone_tokens'):m['shared_adapter_initial']=frozen_hash(adapter,[n for n,_ in adapter.named_parameters() if not n.startswith('backbone_')])
         ema={k:v.detach().clone() for k,v in model.state_dict().items()};adapter_ema={k:v.detach().clone() for k,v in adapter.state_dict().items()}
         trunk=[p for p in model.parameters() if p.requires_grad];aps=list(adapter.parameters());parameters=trunk+aps;groups=[dict(params=aps,lr=3e-4,base_lr=3e-4)]
         if trunk:groups.append(dict(params=trunk,lr=1e-5,base_lr=1e-5))
@@ -161,7 +167,7 @@ def main():
                 torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic()
                 for step in range(begin,end):
                     if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('Fragment training cap')
-                    n=(128,256,384,512)[step%4];b=c['batches'][str(n)];ids=order.choice(bucket_ids[n],size=b).tolist();names=[order.choice(sorted(data[('train',ident)]['conditions'])) for ident in ids];z=torch.zeros(b,n,8);features=torch.zeros(b,n,29);keep=torch.zeros(b,n,dtype=torch.bool);mask=torch.zeros_like(keep);coordinates=torch.zeros(b,n,3) if geometry else None
+                    n=(128,256,384,512)[step%4];b=c['batches'][str(n)];ids=order.choice(bucket_ids[n],size=b).tolist();names=[order.choice(sorted(data[('train',ident)]['conditions'])) for ident in ids];z=torch.zeros(b,n,8);features=torch.zeros(b,n,41 if c.get('backbone_tokens') else 29);keep=torch.zeros(b,n,dtype=torch.bool);mask=torch.zeros_like(keep);coordinates=torch.zeros(b,n,3) if geometry else None
                     null_target=torch.zeros_like(z) if c.get('target_frame_training') else None
                     for i,(ident,name) in enumerate(zip(ids,names)):
                         v=data[('train',ident)];q=v['conditions'][name];l=v['length'];z[i,:l]=q['target'] if c.get('target_frame_training') else v['target'];features[i,:l]=q['features'];keep[i,:l]=q['keep'];mask[i,:l]=True
@@ -192,7 +198,7 @@ def main():
                     del z,features,keep,mask,loss,info
                 torch.cuda.synchronize();m['batches'].append(dict(begin=begin,end=end,seconds=time.monotonic()-tick,peak_reserved_bytes=torch.cuda.max_memory_reserved()));m['frozen_final']=frozen_hash(model,frozen)
                 if m['frozen_final']!=m['frozen_initial']:raise ValueError('Frozen weights changed')
-                if not c['profile_only']:torch.save(dict(ema={k:v.cpu() for k,v in ema.items()},fragment_adapter={k:v.cpu() for k,v in adapter_ema.items()},adapter_config=dict(output_width=model.d_model,hidden=recipe['adapter']['hidden'],variant='geometry' if geometry else 'token',n_layers=len(model.blocks),n_heads=model.n_heads,distance_precision=c.get('distance_precision','fp32')),arch=arch['architecture'],extra_arch=arch['extra_architecture'],model=arch['model'],experiment=c),a.output/f'ema_{end}.ckpt')
+                if not c['profile_only']:torch.save(dict(ema={k:v.cpu() for k,v in ema.items()},fragment_adapter={k:v.cpu() for k,v in adapter_ema.items()},adapter_config=dict(output_width=model.d_model,hidden=recipe['adapter']['hidden'],variant='geometry' if geometry else 'token',n_layers=len(model.blocks),n_heads=model.n_heads,distance_precision=c.get('distance_precision','fp32'),backbone_tokens=c.get('backbone_tokens',False)),arch=arch['architecture'],extra_arch=arch['extra_architecture'],model=arch['model'],experiment=c),a.output/f'ema_{end}.ckpt')
                 evaluate(end)
         m['status']='complete'
     except BaseException as error:m.update(status='failed',error=f'{type(error).__name__}: {error}');raise

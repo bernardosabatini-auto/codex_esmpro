@@ -1,0 +1,12 @@
+{
+  "purpose": "Test whether direct supplied atom coordinates improve conditioning beyond standalone latent codes and CA distance biases.",
+  "contrast": "Retain all29 original latent/sequence/mask channels and intramotif distance biases. Append12 coordinates per supplied residue (N,CA,C,O), in the existing isolated-fragment canonical frame, divided by10Angstrom. Scaffold channels remain zero. Add a separate12->256->1024 SiLU token branch with zero output initialization. Preserve shared adapter weights and RNG exactly. No new output target frame, loss, labels or scaffold sequence.",
+  "hypothesis": "Removing latent inputs worsened motif fit. Keeping those inputs while exposing the uncompressed supplied atoms tests loss of useful local detail in standalone encoding and pairwise distance conditioning.",
+  "training": "Fresh original generator,32proteins/nine isolated fragments each,2000updates,seed2026100231, identical batches/LRs/EMA/dropout/schedule to49929751. No warm start or auxiliary loss.",
+  "controls": "Original29 input channels and target labels unchanged; additional coordinates derive only from the stored isolated fragment. Shared adapter parameters initialized bitwise identically; all primary training draws matched;32 profile and384 full-run initial predictions identical. Existing rigid-pose controls remain; stored fragment canonicalization was previously qualified.",
+  "profile": "40updates, compare against49928663; memory<=75GiB; all source audits, common initialization and draw parity required before2000updates. OneRTX.",
+  "evaluation": "Unchanged32training/16development,4fixed noises,50Euler/AE3 at500and2000. Strict raw proper fit and unchanged36backbone/288refold assay on every completed training run; compare49929751 and49938555. No data or strength sweep.",
+  "feature_scale_A": 10.0,
+  "feature_width": 41,
+  "max_gpus_running_plus_pending": 8
+}

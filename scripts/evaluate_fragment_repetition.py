@@ -41,12 +41,12 @@ def main():
         model.cuda().eval().requires_grad_(False)
         ck = torch.load(c['checkpoint'], map_location='cpu', weights_only=False, mmap=True)
         adapter = FragmentGeometryAdapter(model.d_model, n_layers=len(model.blocks),
-            n_heads=model.n_heads, distance_precision='fp64').cuda().eval().requires_grad_(False)
+            n_heads=model.n_heads, distance_precision='fp64', backbone_tokens=ck['experiment'].get('backbone_tokens',False)).cuda().eval().requires_grad_(False)
         adapter.load_state_dict(ck['fragment_adapter'])
         decoder = load_proteinae(a.source / 'ProteinAE_v1', Path(c['decoder_checkpoint']),
                                 steps=c['decoder_steps']).cuda().eval()
         v = load_data(c['fragments'], ck['experiment'].get('fragment_representation',
-                      'latent_geometry'))['development', c['target_id']]
+                      'latent_geometry'), ck['experiment'].get('backbone_tokens',False))['development', c['target_id']]
         q, n = v['conditions'][c['condition']], v['length']
 
         def sample(seed, indices, guidance, posed=False, decode=True):

@@ -29,7 +29,7 @@ def load_data(path):
                 n=int(g.attrs['length']);conditions={}
                 for name,q in g['conditions'].items():
                     features,keep=fragment_features(torch.from_numpy(q['latent'][:]),q.attrs['sequence'],length=n,start=int(q.attrs['start']))
-                    conditions[name]=dict(features=features,keep=keep,fragment=q['fragment'][:],coordinates=fragment_coordinates(torch.from_numpy(q['fragment'][:]),length=n,start=int(q.attrs['start'])))
+                    conditions[name]=dict(target=torch.from_numpy(q['target_latent'][:]) if 'target_latent' in q else None,features=features,keep=keep,fragment=q['fragment'][:],coordinates=fragment_coordinates(torch.from_numpy(q['fragment'][:]),length=n,start=int(q.attrs['start'])))
                 data[(cohort,ident)]=dict(length=n,family=g.attrs['family'],conditions=conditions,target=torch.from_numpy(g['reference_z'][:]) if cohort=='train' else None,reference=g['reference_backbone'][:] if cohort=='train' else None)
     return data
 
@@ -60,6 +60,12 @@ def main():
     if c.get('rollout_motif'):
         if not warm or (c.get('expanded_fragment_data') and not c.get('rollout_breadth_protocol')) or c.get('auxiliary_motif') or sha(c['rollout_protocol'])!=c['rollout_protocol_sha256']:raise ValueError('Unqualified rollout objective')
         if c['rollout_motif']!=json.loads(Path(c['rollout_protocol']).read_text())['auxiliary']:raise ValueError('Changed rollout recipe')
+    if c.get('target_frame_training'):
+        if not warm or c.get('rollout_motif') or c.get('auxiliary_motif') or c.get('expanded_fragment_data'):raise ValueError('Invalid target-frame contrast')
+        for key in ('target_frame_protocol','frame_data_report','frame_data_manifest'):
+            if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed target-frame source')
+        fd=json.loads(Path(c['frame_data_report']).read_text())
+        if not fd['training_gate_passed'] or fd['manifest_sha256']!=c['frame_data_manifest_sha256'] or fd['fragments_sha256']!=c['fragments_sha256']:raise ValueError('Unqualified anchored targets')
     if c.get('rollout_breadth_protocol'):
         if not c.get('expanded_fragment_data') or not c.get('rollout_motif'):raise ValueError('Invalid breadth/objective combination')
         for key in ('rollout_breadth_protocol','rollout_breadth_gate_report','rollout_breadth_gate_manifest','rollout_control_manifest'):
@@ -78,7 +84,7 @@ def main():
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed full geometry prerequisite')
     recipe=json.loads(Path(c['protocol']).read_text());dr=json.loads(Path(c['data_report']).read_text())
     if not dr['training_gate_passed'] or c['arm'] not in recipe['arms'] or c['seed']!=(json.loads(Path(c['warm_protocol']).read_text())['seed'] if warm else recipe['seed']) or c['batches']!=recipe['batches']:raise ValueError('Wrong recipe or data gate')
-    if c['updates']!=(40 if c['profile_only'] else 500 if c.get('rollout_pilot') else 2000) or c['evaluation_steps']!=([40] if c['profile_only'] else [500] if c.get('rollout_pilot') else [500,2000]):raise ValueError('Wrong update schedule')
+    if c['updates']!=(40 if c['profile_only'] else 500 if c.get('rollout_pilot') or c.get('target_frame_training') else 2000) or c['evaluation_steps']!=([40] if c['profile_only'] else [500] if c.get('rollout_pilot') or c.get('target_frame_training') else [500,2000]):raise ValueError('Wrong update schedule')
     if not c['profile_only']:
         if sha(c['profile_report'])!=c['profile_report_sha256'] or not json.loads(Path(c['profile_report']).read_text())['profile_qualified']:raise ValueError('Profile not qualified')
     a.output.mkdir(parents=True,exist_ok=False);start=time.monotonic();telemetry=None;m=dict(status='running',config=c,updates=0,training=[],batches=[],evaluations=[],initial_controls=[],sampling_controls=[],geometry_controls=[]);atomic_json(a.output/'manifest.json',m)
@@ -149,13 +155,16 @@ def main():
                 for step in range(begin,end):
                     if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('Fragment training cap')
                     n=(128,256,384,512)[step%4];b=c['batches'][str(n)];ids=order.choice(bucket_ids[n],size=b).tolist();names=[order.choice(sorted(data[('train',ident)]['conditions'])) for ident in ids];z=torch.zeros(b,n,8);features=torch.zeros(b,n,29);keep=torch.zeros(b,n,dtype=torch.bool);mask=torch.zeros_like(keep);coordinates=torch.zeros(b,n,3) if geometry else None
+                    null_target=torch.zeros_like(z) if c.get('target_frame_training') else None
                     for i,(ident,name) in enumerate(zip(ids,names)):
-                        v=data[('train',ident)];q=v['conditions'][name];l=v['length'];z[i,:l]=v['target'];features[i,:l]=q['features'];keep[i,:l]=q['keep'];mask[i,:l]=True
+                        v=data[('train',ident)];q=v['conditions'][name];l=v['length'];z[i,:l]=q['target'] if c.get('target_frame_training') else v['target'];features[i,:l]=q['features'];keep[i,:l]=q['keep'];mask[i,:l]=True
+                        if null_target is not None:null_target[i,:l]=v['target']
                         if geometry:coordinates[i,:l]=q['coordinates']
-                    coordinates=coordinates.cuda() if geometry else None
+                    coordinates=coordinates.cuda() if geometry else None;null_target=null_target.cuda() if null_target is not None else None
                     z,features,keep,mask=[x.cuda() for x in (z,features,keep,mask)];factor=min((step+1)/100,1)*(.1+.9*.5*(1+math.cos(math.pi*step/1999)))
                     for group in optimizer.param_groups:group['lr']=group['base_lr']*factor
-                    optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates,return_state=bool(c.get('auxiliary_motif')))
+                    optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates,return_state=bool(c.get('auxiliary_motif')),null_target=null_target)
+                    if null_target is not None:m.setdefault('frame_target_updates',[]).append(dict(step=step+1,conditioned_target_sha256=digest(z),null_target_sha256=digest(null_target),selected_target_sha256=digest(info['target']),dropped_slots=info['dropped'].cpu().tolist()))
                     if c.get('auxiliary_motif'):
                         from latentfold.fragment_objective import endpoint_fragment_objective
                         from latentfold.training import controlled_backward

@@ -41,6 +41,10 @@ def analyze(run):
         rows=m['motif_objective_updates']
         if len(rows)!=c['updates'] or [r['step'] for r in rows]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['motif_mse']) or r['aux_to_flow_ratio']>c['auxiliary_motif']['maximum_gradient_ratio']+1e-7 or r['flow_parameter_grad_norm']<=0 for r in rows):raise ValueError('Incomplete/unbounded motif gradients')
         if sum(r['motif_examples'] for r in rows)<c['updates'] or not any(r['aux_parameter_grad_norm']>0 for r in rows):raise ValueError('Insufficient motif objective exposure')
+    if c.get('target_frame_training'):
+        from frame_target_audit import audit_frame_targets
+        if c.get('rollout_motif') or c.get('expanded_fragment_data') or c['updates']!=(40 if c['profile_only'] else 500) or c['evaluation_steps']!=([40] if c['profile_only'] else [500]):raise ValueError('Invalid target-frame schedule')
+        audit_frame_targets(m)
     if c.get('rollout_breadth_protocol'):
         if not c.get('expanded_fragment_data') or not c.get('rollout_motif'):raise ValueError('Invalid breadth/objective combination')
         for key in ('rollout_breadth_protocol','rollout_breadth_gate_report','rollout_breadth_gate_manifest','rollout_control_manifest'):
@@ -88,7 +92,7 @@ def analyze(run):
                     means=[np.mean([r['coarse_valid'] and r['motif_drms']<=1 for r in e['scores'] if (r['cohort'],r['mode'],r['family'])==(cohort,mode,family)]) for mode in ('conditioned','null')];paired.append(means[0]-means[1])
                 summaries.append(dict(step=e['step'],cohort=cohort,arms=arms,conditioned_minus_null_joint=interval(paired)))
     memory=max(b['peak_reserved_bytes']/2**30 for b in m['batches']);gate=next((r['conditioned_minus_null_joint']['ci95'][0]>0 for r in summaries if r['step']==2000 and r['cohort']=='train'),False)
-    return dict(status='complete',config=c,manifest_sha256=sha(path),updates=m['updates'],total_training_updates=m['updates']+c.get('total_prior_updates',0),audited_predictions=audited,training_seconds=sum(b['seconds'] for b in m['batches']),evaluation_seconds=sum(e['seconds'] for e in m['evaluations']),elapsed_seconds=m['elapsed_seconds'],max_reserved_GiB=memory,profile_qualified=c['profile_only'] and memory<=75,capacity_gate_passed=gate,summaries=summaries,initial_controls=len(m['initial_controls']),sampling_controls=len(m['sampling_controls']))
+    return dict(status='complete',config=c,manifest_sha256=sha(path),updates=m['updates'],total_training_updates=m['updates']+c.get('total_prior_updates',0),audited_predictions=audited,training_seconds=sum(b['seconds'] for b in m['batches']),evaluation_seconds=sum(e['seconds'] for e in m['evaluations']),elapsed_seconds=m['elapsed_seconds'],max_reserved_GiB=memory,profile_qualified=c['profile_only'] and memory<=75,capacity_gate_passed=None if c.get("rollout_pilot") or c.get("target_frame_training") else gate,summaries=summaries,initial_controls=len(m['initial_controls']),sampling_controls=len(m['sampling_controls']))
 
 
 def main():

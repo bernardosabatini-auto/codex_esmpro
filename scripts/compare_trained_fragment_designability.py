@@ -17,7 +17,7 @@ def matched_fragment_inputs(paths,ids):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs=2,required=True);p.add_argument('--reports',type=Path,nargs=2,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--arms',nargs=2,default=['adapter_only','full']);p.add_argument('--data-breadth',action='store_true');a=p.parse_args();ms=[json.loads((r/'manifest.json').read_text()) for r in a.runs];ds=[json.loads(r.read_text()) for r in a.reports]
+    p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs=2,required=True);p.add_argument('--reports',type=Path,nargs=2,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--arms',nargs=2,default=['adapter_only','full']);p.add_argument('--data-breadth','--changed-training-data',dest='data_breadth',action='store_true');a=p.parse_args();ms=[json.loads((r/'manifest.json').read_text()) for r in a.runs];ds=[json.loads(r.read_text()) for r in a.reports]
     if [d['arm'] for d in ds]!=a.arms or any(d['status']!='complete' or not d['interpretation_qualified'] for d in ds):raise ValueError('Audited qualified paired assays required')
     if any(d['manifest_sha256']!=sha(run/'manifest.json') for d,run in zip(ds,a.runs)):raise ValueError('Changed assay manifest')
     keys=('assay','protocol_sha256','num_sequences','temperature','mpnn_seed','seed','mpnn','dependencies','teacher_artifacts','precision','usalign_sha256','reference_predictions_sha256','isolated_predictions_sha256','fragments_sha256')

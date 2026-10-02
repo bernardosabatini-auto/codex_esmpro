@@ -6,7 +6,7 @@ from pathlib import Path
 def start(root, job_id):
     root=Path(root).resolve();jobs=json.loads((root/'runs/jobs.json').read_text())['jobs'];matches=[j for j in jobs if j['id']==job_id]
     if len(matches)!=1:raise ValueError('expected one explicitly registered own job')
-    job=matches[0];prefix={'summarize_ensemble':'ensemble','summarize_teacher_ensemble':'teacher_ensemble'}.get(job.get('completion_action'))
+    job=matches[0];prefix={'summarize_ensemble':'ensemble','summarize_teacher_ensemble':'teacher_ensemble','summarize_retry_ensemble':'retry_ensemble'}.get(job.get('completion_action'))
     if prefix is None:raise ValueError('job has no ensemble scoring action')
     run=root/'runs'/f'{prefix}_{job_id}';manifest=json.loads((run/'manifest.json').read_text())
     if manifest['status']!='complete':raise ValueError('ensemble predictions incomplete')

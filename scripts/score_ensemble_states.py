@@ -23,6 +23,28 @@ def state_definition(row):
     return positions,refs,i,j,features,labels
 
 
+def scoring_arms(config):
+    if 'noise_arms' not in config:return ('latent','decoder','factorial')
+    if config['noise_arms']!=['raw','latent'] or config.get('max_attempts')!=4 or config.get('samples')!=32:
+        raise ValueError('unsupported explicit noise arms')
+    return ('raw','latent')
+
+
+def validate_retry_parent(result, config):
+    if not config.get('parent_scores'):return
+    path=Path(config['parent_scores'])
+    if hashlib.sha256(path.read_bytes()).hexdigest()!=config['parent_scores_sha256']:raise ValueError('raw parent scores changed')
+    parent=json.loads(path.read_text());primary=config['primary_guidance']
+    if parent['status']!='complete' or parent['protocol_sha256']!=result['protocol_sha256'] or parent['definitions']!=result['definitions']:raise ValueError('raw parent state definitions changed')
+    actual={r['target_id']:r for r in result['rows'] if r['setting']==f'cfg{primary}/raw'}
+    expected={r['target_id']:r for r in parent['rows'] if r['setting']==f'cfg{primary}/latent'}
+    if set(actual)!=set(expected) or len(actual)!=48:raise ValueError('raw parent target mismatch')
+    for ident,row in actual.items():
+        old=expected[ident]
+        if row['family']!=old['family'] or row['category']!=old['category'] or row.get('coverage')!=old.get('coverage') or row['coarse_valid_fraction']!=old['coarse_valid_fraction']:
+            raise ValueError('historical raw coverage/validity changed')
+
+
 def main():
     p=argparse.ArgumentParser()
     for name in ('run','assets','protocol','output'):p.add_argument('--'+name,type=Path,required=True)
@@ -44,7 +66,7 @@ def main():
                 result['definitions'][ident]=dict(variable_contacts=len(i),reference_states=len(set(labels)) if len(i) else 0,reference_cluster_labels=labels)
             else:
                 key=row['id'];reference=references[key];result['definitions'][ident]=dict(reference_samples=len(reference),projection_dimensions=reference.shape[-1])
-            settings=[(setting,g[setting]['backbone'][:]) for setting in g] if teacher else [(cfg+'/'+arm,g[cfg][arm]['backbone'][:]) for cfg in g for arm in ('latent','decoder','factorial')]
+            settings=[(setting,g[setting]['backbone'][:]) for setting in g] if teacher else [(cfg+'/'+arm,g[cfg][arm]['backbone'][:]) for cfg in g for arm in scoring_arms(c)]
             for setting,bb in settings:
                 count=c['samples'] if teacher else 32;ks=[k for k in (1,4,16,32,128) if k<=count]
                 if bb.shape!=(count,row['length'],4,3):raise ValueError('unexpected ensemble size')
@@ -65,6 +87,7 @@ def main():
                         entry['generated_pairwise_rmsd']=float(np.mean([rmsd(ca[x],ca[y]) for x in range(count) for y in range(x)]));entry['reference_pairwise_rmsd']=row['mean_pairwise_ca_rmsd']
                 result['rows'].append(entry)
             print('scored',ident,flush=True)
+    validate_retry_parent(result,c)
     result['status']='complete';result['summaries']={}
     for setting in sorted({r['setting'] for r in result['rows']}):
         selected=[r for r in result['rows'] if r['setting']==setting];multi=[r for r in selected if 'coverage' in r];mdrows=[r for r in selected if r['category']=='md'];qualities=[r['oracle_nearest_reference_ca_lddt_mean'] for r in selected if 'oracle_nearest_reference_ca_lddt_mean' in r]

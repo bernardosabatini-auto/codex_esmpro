@@ -10,7 +10,7 @@ def sha(p):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--protocol',type=Path,default=Path('configs/overfit_protocol.json'));a=p.parse_args();recipe=json.loads(a.protocol.read_text());reliable=recipe.get('panel')=='confident_multistate'
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--protocol',type=Path,default=Path('configs/overfit_protocol.json'));p.add_argument('--inventory-output',type=Path);a=p.parse_args();recipe=json.loads(a.protocol.read_text());reliable=recipe.get('panel')=='confident_multistate'
     source=Path('runs/distillation_49654703/manifest.json');m=json.loads(source.read_text());c=m['config'];selection=json.loads(Path(c['selection']).read_text());rows={r['id']:r for r in selection['train']}
     if m['status']!='complete' or sha(c['selection'])!=c['selection_sha256']:raise ValueError('invalid frozen source')
     candidates=[]
@@ -35,5 +35,8 @@ def main():
     protocol=a.protocol
     d=dict(status='complete',selection=c['selection'],selection_sha256=c['selection_sha256'],embedding_cache=c['embedding_cache'],source_manifest=str(source.resolve()),source_manifest_sha256=sha(source),protocol=str(protocol.resolve()),protocol_sha256=sha(protocol),targets=chosen,candidates=len(candidates),scope='Training-only capacity test, teacher-defined modes are not experimentally established states',work_cap_seconds=780,seed=2026100161)
     a.output.write_text(json.dumps(d,indent=2)+'\n');print('selected',len(chosen),flush=True)
+    if a.inventory_output:
+        inventory=dict(d,targets=sorted(candidates,key=lambda r:(r['bucket'],-r['mean_teacher_confidence'],r['id'])),capacity_ids=[r['id'] for r in chosen],scope='Metadata-eligible training candidates under the original rule. No new training authorization from this inventory; expanded weighted reconstruction and transfer decisions remain separate.')
+        a.inventory_output.write_text(json.dumps(inventory,indent=2)+'\n')
 
 if __name__=='__main__':main()

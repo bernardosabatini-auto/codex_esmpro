@@ -33,6 +33,8 @@ def main():
     baseline={(r['target_id'],r['sample']):r for r in prior['scores'] if r['step']==0 and r['sampling_steps']==25}
     if len(baseline)!=192 or {i for i,k in baseline}!={r['id'] for r in rows}:raise ValueError('prior baseline incomplete')
     previous={}
+    cross=c.get('cross_hardware_reference')
+    if cross and (sha(cross['predictions'])!=cross['predictions_sha256'] or sha(cross['manifest'])!=cross['manifest_sha256']):raise ValueError('cross-hardware reference changed')
     if c.get('additional_control_manifest'):
         if sha(c['additional_control_manifest'])!=c['additional_control_manifest_sha256']:raise ValueError('additional solver control changed')
         additional=json.loads(Path(c['additional_control_manifest']).read_text())
@@ -41,6 +43,7 @@ def main():
     a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
     start=time.monotonic();telemetry=None;m=dict(status='running',config=c,checkpoint_sha256=c['checkpoint_sha256'],loaded_checkpoint=c.get('inference_checkpoint',dict(path=str(checkpoint),sha256=c['checkpoint_sha256'])),training_updates_executed=0,scores=[],controls=[],batches=[],scope='Original weights,64 tuning families,3 seeds; AFDB predicted references. No independent test scoring.')
     atomic_json(a.output/'manifest.json',m)
+    if cross:m['cross_hardware_controls']=[]
     try:
         records={}
         with h5py.File(c['embedding_cache']) as cache,h5py.File(selection['dataset']) as source:
@@ -77,12 +80,16 @@ def main():
                             if control['ca_rmsd']>.2 or control['ca_lddt']<.99:raise ValueError('solver batch control failed')
                         for i,ident in enumerate(chunk):
                             r=records[ident];pred=bb[3*i:3*i+3,:r['length']];group.create_dataset(ident,data=pred);geometry=backbone_geometry(pred)
+                            if cross:
+                                with h5py.File(cross['predictions']) as reference:matched=reference[label][ident][:]
+                                if matched.shape!=pred.shape:raise ValueError('cross-hardware prediction shape mismatch')
                             for k,x in enumerate(pred):
                                 score=dict(setting=label,target_id=ident,sample=k,**ca_metrics(x[:,1],r['ca']),**{key:float(value[k]) for key,value in geometry.items()})
                                 m['scores'].append(score)
                                 prior_score=previous.get((label,ident,k))
                                 if prior_score and any(abs(score[key]-prior_score[key])>1e-6 for key in ('ca_lddt','coarse_valid')):raise ValueError('additional solver baseline differs from prior run')
-                                if label=='euler_25_cfg2' and any(abs(score[key]-baseline[(ident,k)][key])>1e-6 for key in ('ca_lddt','coarse_valid')):raise ValueError('Euler baseline differs from prior run')
+                                if cross:m['cross_hardware_controls'].append(dict(setting=label,target_id=ident,sample=k,**ca_metrics(x[:,1],matched[k,:,1])))
+                                elif label=='euler_25_cfg2' and any(abs(score[key]-baseline[(ident,k)][key])>1e-6 for key in ('ca_lddt','coarse_valid')):raise ValueError('Euler baseline differs from prior run')
                         del z,bb,esm,mask,noise,dn
                 atomic_json(a.output/'manifest.json',m);print('scored',label,flush=True)
         m['status']='complete'

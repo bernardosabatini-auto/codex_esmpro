@@ -1,0 +1,8 @@
+{
+  "purpose": "Full cross-hardware quality assessment after RTX strict score-identity attempt49743331 failed by0.000344 CA-lDDT; maximum saved coordinate CA-RMSD was0.03135A. Preserve that failure.",
+  "settings": [{"solver": "euler", "steps": 25, "guidance": 2}],
+  "controls": "All192 predictions, same checkpoint, cached conditioning and noise as frozen H20049734171. Keep every result. Each matched structure must satisfy the existing batching agreement limits CA-RMSD<=0.2A and pair CA-lDDT>=0.99. Retain standard single-versus-batch controls at every length.",
+  "quality": "Existing reference-quality margins against frozen H200 results: paired family95% CA-lDDT lower bound>-0.005 and mean validity difference>=-0.01. No quality threshold changes or filtering. Exact score agreement is reported separately and not claimed.",
+  "resources": "One RTX PRO6000 Blackwell,10-minute cap,480-second work cap. No installation or precision change; project total<=8.",
+  "interpretation": "Passing only qualifies this cached FP32 inference workload for RTX. Training and sequence embedding extraction need their own checks; timing comparisons need matched hardware. This new follow-up protocol was fixed after the failed identity run, before collecting full-panel RTX scores."
+}

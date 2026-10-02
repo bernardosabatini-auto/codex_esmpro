@@ -5,6 +5,7 @@ import numpy as np
 from prepare_overfit import sha
 from latentfold.teacher_states import paired_change
 from antithetic_noise import noise_address,native_scheme,raw_identity_samples
+from retry_sampler_settings import native_steps
 
 
 def validate_slot(draws, selection):
@@ -54,7 +55,10 @@ def analyze(m):
         raw,retry=validate_slot(grouped[key(s)],s)
         values[s['head']]['raw'].append(raw);values[s['head']]['retry'].append(retry)
     for h in c['heads']:
-        scheme=native_scheme(h,protocol)
+        scheme=native_scheme(h,protocol);steps=native_steps(h,protocol)
+        if h.get('raw_source_manifest') and sha(h['raw_source_manifest'])!=h['raw_source_manifest_sha256']:raise ValueError('Archived raw source changed')
+        for record in m['draws']+m['batches']+m['controls']:
+            if record['head']==h['name'] and (steps!=25 or 'sampling_steps' in record) and record.get('sampling_steps')!=steps:raise ValueError('Recorded step count changed')
         for r in [r for r in m['draws'] if r['head']==h['name']]:
             if scheme=='antithetic' or 'latent_noise_index' in r:
                 if (r.get('latent_noise_index'),r.get('latent_noise_sign'))!=noise_address(r['draw'],scheme):raise ValueError('Recorded latent noise addressing changed')
@@ -76,6 +80,11 @@ def analyze(m):
         selected=[r for r in m['selections'] if r['head']==h];bs=[r for r in batches if r['head']==h]
         quality=comparisons['retry']['ca_lddt']['ci95'][0]>-.005 and comparisons['retry']['coarse_valid']['difference']>=-.01
         result['summaries'][h]=dict(comparisons=comparisons,retry_effect=effect,quality_passed=bool(quality),attempts=sum(r['attempts'] for r in selected),exhausted=sum(r['exhausted'] for r in selected),initial_seconds=sum(r['seconds'] for r in bs if r['attempt']==0),retry_seconds=sum(r['seconds'] for r in bs if r['attempt']>0),peak_reserved_gib=max(r['peak_reserved_bytes'] for r in bs)/1024**3)
+    if protocol.get('additional_reference_head'):
+        reference=protocol['additional_reference_head']
+        if reference not in heads:raise ValueError('Missing additional reference head')
+        for h in heads:result['summaries'][h]['versus_additional_reference']={k:paired_change(metric(h,'retry',k),metric(reference,'retry',k),families=families) for k in ('ca_lddt','coarse_valid')}
+        result['additional_reference_head']=reference
     if protocol.get('antithetic_head'):
         anti=protocol['antithetic_head'];effects={k:paired_change(metric(anti,'retry',k),metric('compact500','retry',k),families=families) for k in ('ca_lddt','coarse_valid')}
         result['antithetic_vs_compact']=effects
@@ -94,6 +103,9 @@ def main():
         lines.append(f"| {h} | {raw['ca_lddt']['candidate']:.5f} / {raw['coarse_valid']['candidate']:.5f} | {ca['candidate']:.5f} / {v['candidate']:.5f} | {ca['difference']:+.5f} {ca['ci95']} | {v['difference']:+.5f} | {r['quality_passed']} |")
     for h,r in d.get('summaries',{}).items():lines+=['',f"{h}: {r['attempts']} attempted draws for192 outputs; {r['exhausted']} exhausted slots. Initial generation {r['initial_seconds']:.2f}s plus retries {r['retry_seconds']:.2f}s; peak {r['peak_reserved_gib']:.2f}GiB."]
     lines+=['','Single-pass generation times exclude ESM, loading and disk I/O; not an end-to-end latency benchmark. Native qualification still requires matched external diversity and efficiency evidence. Original34 and reserved17 unscored.']
+    if d.get('additional_reference_head'):
+        for h,r in d['summaries'].items():
+            e=r['versus_additional_reference'];lines+=['',f"{h} versus selected{d['additional_reference_head']}: CA difference{e['ca_lddt']['difference']:+.5f},95% interval{e['ca_lddt']['ci95']}; validity difference{e['coarse_valid']['difference']:+.5f}."]
     if 'antithetic_qualified' in d:
         effects=d['antithetic_vs_compact'];lines+=['',f"Antithetic versus selected compact IID: CA difference{effects['ca_lddt']['difference']:+.5f},95% interval{effects['ca_lddt']['ci95']}; validity difference{effects['coarse_valid']['difference']:+.5f}. Both original and compact native criteria pass:{d['antithetic_qualified']}. Antithetic first output matches historical sample0; other first outputs intentionally use paired latent noise and remain fully included."]
     if d.get('error'):lines+=['',d['error']]

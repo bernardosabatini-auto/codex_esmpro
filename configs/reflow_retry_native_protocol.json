@@ -1,0 +1,23 @@
+{
+  "purpose": "Test the archived paired10-step reflow checkpoint as a separately defined bounded-retry fast sampler. Its prior raw validity failure remains unchanged; no new training or shorter-step grid.",
+  "heads": [
+    "original",
+    "compact500",
+    "reflow10"
+  ],
+  "outputs_per_family": 3,
+  "max_attempts_per_output": 4,
+  "sampling": "FP32 Euler/AE3. Original25 steps CFG2, compact50025 steps CFG1, archived paired-reflow200010 steps CFG1. IID latent and decoder noise use the same logical d=k+3*a and frozen seed. First coarse-valid draw accepted, at most four attempts; exhausted slots return original. Use historical expanded conditioning for strict first3 identity.",
+  "controls": "All first3 scores/validity must reproduce their corresponding historical same-checkpoint/same-step results within1e-6. Normalize archived reflow score field names only, with source hash retained and no score changes. Preserve all four per-head single-versus-batch controls and exact selected-original retry identity. Store actual step count and every attempted failure.",
+  "analysis": "Report each raw and selected pipeline, all64 families and all192 outputs. Compare selected adapted heads with selected original using paired-family CA-lDDT and coarse validity. Native quality requires lower95% CA difference bound>-0.005 and validity difference>=-0.01. A qualified native pipeline still requires matched external diversity evaluation. Report attempted-draw count, exhausted slots, generation/retry seconds and peak memory; single-pass generation timings are descriptive and exclude ESM, loading and disk I/O.",
+  "resources": "One H200,15minutes,780second worker cap. Existing measured native batch24 runs fit H200; retain strict original controls. No locked tests. Completion watcher, eight-GPU running-plus-pending guard and15UTC deadline apply.",
+  "no_rescue": "No alternative cap, geometry threshold, target exclusion or retry ordering after observing results. Preserve historical raw failures. This is a separately declared inference pipeline, not a replacement for the raw-model gate.",
+  "sampling_steps_by_head": {
+    "original": 25,
+    "compact500": 25,
+    "reflow10": 10
+  },
+  "source_run": "runs/reflow_49662855",
+  "decision": "Require unchanged selected native CA lower95% difference bound>-0.005 and validity difference>=-0.01 versus selected original before external testing. Report compact500 comparison too. If external coverage/quality pass, require measured K32 sequence-to-backbone speedup>=2x original and>=1.25x compact500 on matched hardware/targets before any useful speed claim. Include retry overhead and direct-teacher timing. No5/15/20 step or retry-cap extension after outcomes.",
+  "additional_reference_head": "compact500"
+}

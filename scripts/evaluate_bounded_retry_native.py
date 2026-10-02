@@ -11,6 +11,7 @@ from latentfold.precision import inference_precision
 from prepare_overfit import sha
 from profile_gpu import Telemetry,atomic_json
 from antithetic_noise import noise_address,native_scheme,raw_identity_samples
+from retry_sampler_settings import native_steps
 
 
 def main():
@@ -35,11 +36,11 @@ def main():
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'predictions.h5','x') as out:
             for head in c['heads']:
                 scheme=native_scheme(head,protocol)
-                for key in ('checkpoint','raw_manifest','training_manifest'):
+                for key in ('checkpoint','raw_manifest','training_manifest','raw_source_manifest'):
                     if head.get(key) and sha(head[key])!=head[key+'_sha256']:raise ValueError('Changed '+key)
                 raw=json.loads(Path(head['raw_manifest']).read_text());baseline={(r['target_id'],r['sample']):r for r in raw['scores'] if r['head']==head['raw_head'] and r['guidance']==head['guidance']}
                 if len(baseline)!=192:raise ValueError('Incomplete raw comparator')
-                model,_=load_legacy(Path(head['checkpoint']),trusted_pickle=True);model.cuda().eval().requires_grad_(False);torch.manual_seed(c['seed']);cfg=SampleConfig(steps=25,guidance=head['guidance'])
+                model,_=load_legacy(Path(head['checkpoint']),trusted_pickle=True);model.cuda().eval().requires_grad_(False);torch.manual_seed(c['seed']);cfg=SampleConfig(steps=native_steps(head,protocol),guidance=head['guidance'])
                 for length in (128,256,384,512):
                     ids=[r['id'] for r in rows if r['bucket']==length]
                     for offset in range(0,len(ids),8):
@@ -55,10 +56,10 @@ def main():
                                 dn[index,:4*n]=target_noise([ident],[4*n],3,seed=c['evaluation_seed'],sample_index=draw,stream='decoder',device='cuda')[0]*decoder.fm.scale_ref
                             torch.cuda.synchronize();tick=time.monotonic();torch.cuda.reset_peak_memory_stats()
                             z=sample(model,esm,mask,cfg,noise=noise,conditioning_ids=[i for i,k in pending]);_,bb=decoder(z,mask,noise=dn,return_backbone=True);bb=bb.cpu().numpy();torch.cuda.synchronize()
-                            m['batches'].append(dict(head=head['name'],length=length,offset=offset,attempt=attempt,batch=batch,seconds=time.monotonic()-tick,peak_reserved_bytes=torch.cuda.max_memory_reserved()))
+                            m['batches'].append(dict(head=head['name'],sampling_steps=cfg.steps,length=length,offset=offset,attempt=attempt,batch=batch,seconds=time.monotonic()-tick,peak_reserved_bytes=torch.cuda.max_memory_reserved()))
                             if attempt==0 and offset==0:
                                 n=records[pending[0][0]]['length'];single=sample(model,esm[:1,:n],mask[:1,:n],cfg,noise=noise[:1,:n]);alone=decoder(single,mask[:1,:n],noise=dn[:1,:4*n])[0].cpu().numpy();control=ca_metrics(bb[0,:n,1],alone)
-                                m['controls'].append(dict(head=head['name'],length=length,**control))
+                                m['controls'].append(dict(head=head['name'],sampling_steps=cfg.steps,length=length,**control))
                                 if control['ca_rmsd']>.2 or control['ca_lddt']<.99:raise ValueError('Batch control failed')
                             remaining=[]
                             for index,(ident,k) in enumerate(pending):
@@ -68,7 +69,7 @@ def main():
                                 if accepted:chosen[(ident,k)]=draw
                                 else:remaining.append((ident,k))
                                 latent_index,latent_sign=noise_address(draw,scheme)
-                                score=dict(head=head['name'],target_id=ident,slot=k,attempt=attempt,draw=draw,latent_noise_index=latent_index,latent_noise_sign=latent_sign,**ca_metrics(pred[:,1],r['ca']),**{key:float(value[0]) for key,value in geometry.items()});m['draws'].append(score)
+                                score=dict(head=head['name'],sampling_steps=cfg.steps,target_id=ident,slot=k,attempt=attempt,draw=draw,latent_noise_index=latent_index,latent_noise_sign=latent_sign,**ca_metrics(pred[:,1],r['ca']),**{key:float(value[0]) for key,value in geometry.items()});m['draws'].append(score)
                                 if attempt==0 and k in raw_identity_samples(head,protocol) and any(abs(score[key]-baseline[(ident,k)][key])>1e-6 for key in ('ca_lddt','coarse_valid')):raise ValueError('Historical raw score changed')
                                 out.require_group(head['name']+'/'+ident).create_dataset(str(draw),data=pred)
                             pending=remaining;del z,bb,esm,mask,noise,dn

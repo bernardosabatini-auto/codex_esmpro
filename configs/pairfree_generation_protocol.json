@@ -1,0 +1,17 @@
+{
+  "purpose": "Matched unconditional generation feasibility for corrected pair-free checkpoint r4b versus original pair model; no training or designability claim.",
+  "samples": 4,
+  "seed": 2026100211,
+  "heads": {
+    "original50": 50,
+    "pairfree50": 50
+  },
+  "modes": {
+    "unconditional": 1
+  },
+  "panel": "Same frozen16development families/four noises as generative_pilot_49855378. No selection from outcomes, rejection or locked tests.",
+  "sampling": "Existing FP32 learned-null sampler,50Euler steps,AE3. Four genericCFG0/null parity controls per head, archive all128backbones and latents. Unconditional path already skips sequence-conditioned pair computation; no3.5x speed expectation.",
+  "analysis": "Automatic all-output geometry/coverage audit. Separate CPU check must reproduce all64original archived outputs before comparison. Paired family validity interval and generation-only timing; geometry is not designability. No population novelty or same-sequence multistability claim.",
+  "decision": "Profile only. No further GPU work automatically authorized by this result. Designability requires a later matched ProteinMPNN/refold assay retaining every failed backbone.",
+  "resources": "OneRTX6minute allocation,240second worker cap. Previous original/reflow384output pilot completed2:12. This is128outputs and one generation mode. Exclude own ECC node and finish by15UTC."
+}

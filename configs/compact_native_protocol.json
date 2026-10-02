@@ -1,0 +1,10 @@
+{
+  "purpose": "Validate compact conditioning across the full64-family tuning panel after the four-bucket structural/speed probe passes.",
+  "heads": ["original", "aligned_teacher_balanced"],
+  "guidance_by_head": {"original": 2, "aligned_teacher_balanced": 1},
+  "modes": ["fp32", "compact"],
+  "evaluation": "Original and qualified small-panel balanced500 weights; Euler25/decoder3, strict FP32, three fixed samples per target. Expanded and compact paths are evaluated on the same RTX with one sequence per batch. Every expanded sample must agree with the frozen native output within0.2A/0.99, then every compact sample with its matched expanded sample. Exact-length versus padded-batch controls for each head/mode/bucket. All768 scores,384 frozen-reference controls,384 implementation controls and16 batching controls required. No locked tests.",
+  "analysis": "Keep every sample. Paired-family quality margins unchanged: CA-lDDT difference lower95% bound>-0.005 and validity difference>=-0.01. Require compact versus expanded noninferiority for each head and report both candidate pipelines relative to fresh expanded original CFG2. Existing source-native quality remains provenance, not a replacement for the fresh baseline. Structural agreement permits the new batch layout/hardware comparison; no claim of1e-6 score identity. Passing only permits48-family ensemble validation and matched end-to-end timing.",
+  "measurement": "Collection timings are diagnostic and include cached flow+decoder+transfer, without dedicated per-target warmup or repeats. Do not call these sequence-to-structure speedups. Peak allocated and reserved memory retained. Existing four-target repeated probe supplies initial speed evidence.",
+  "resources": "One RTX15-minute cap,840-second work cap,85% allocator ceiling. Only three samples per sequence; no training or precision changes. Project GPU total<=8."
+}

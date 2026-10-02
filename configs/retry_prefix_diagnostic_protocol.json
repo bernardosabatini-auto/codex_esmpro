@@ -1,0 +1,27 @@
+{
+  "purpose": "Diagnose original-head failed online timing control without changing0.2A/0.99 or geometry/index criteria.",
+  "failed_run": "runs/ensemble_latency_49852006",
+  "head": "original",
+  "targets": [
+    "ood60__P50405__67632888e82e",
+    "crypticpocket__P61586__aeabcc544d6c",
+    "crypticpocket__P08037__b8cdcf0b572c",
+    "crypticpocket__Q16658__6d919890c9e7",
+    "md_emulation__cath1_3udcA02__0175a90823bb",
+    "md_emulation__cath1_3luyA02__33e7c503c257",
+    "nmr__1BFY_1__b91a89d44751",
+    "nmr__1BM5_1__17d05a87e530"
+  ],
+  "variants": [
+    "cached",
+    "online"
+  ],
+  "sample_counts": [
+    1,
+    8,
+    32
+  ],
+  "comparisons": "Every output versus frozen selected original32; online versus cached at the sameK; each K1/8 prefix versus K32 within each embedding source. Preserve all checks and backbones. Embedding differences recorded.",
+  "decision": "No automatic model or speed qualification. Identify embedding versus batch effects before any rerun. Never omit a failed family, relax tolerance or secretly replace online embeddings with cache in a sequence-to-backbone benchmark.",
+  "resources": "OneRTX10minutes/480second worker cap,96GiB hostRAM,8original timing families, no locked tests. Complete CPU diagnostic report through registered watcher."
+}

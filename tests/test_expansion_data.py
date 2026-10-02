@@ -2,9 +2,18 @@ import unittest
 from unittest.mock import patch
 import numpy as np
 from expansion_data import profile_rows,eligibility,reconstruction_summary
+from prepare_expansion_shards import partition
 
 
 class ExpansionDataTest(unittest.TestCase):
+    def test_expansion_partition_excludes_profile_and_is_complete(self):
+        rows=[dict(id=f'{b}-{i}',family=f'{b}-{i}',bucket=b,length=b-20+i) for b in (128,256,384,512) for i in range(12)]
+        used=[r['id'] for r in profile_rows(rows)];groups=partition(rows,used)
+        assigned=[r['id'] for g in groups for r in g]
+        self.assertEqual(len(assigned),32);self.assertEqual(len(set(assigned)),32)
+        self.assertFalse(set(assigned)&set(used));self.assertEqual(set(assigned)|set(used),{r['id'] for r in rows})
+        self.assertEqual(groups,partition(list(reversed(rows)),used))
+
     def test_profile_selection_is_order_independent_and_spans_bucket(self):
         rows=[dict(id=f'{b}-{i}',family=f'{b}-{i}',bucket=b,length=b-20+i) for b in (128,256,384,512) for i in range(12)]
         selected=profile_rows(rows)

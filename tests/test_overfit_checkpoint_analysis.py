@@ -54,5 +54,20 @@ class CheckpointAnalysisTests(unittest.TestCase):
         self.assertEqual(run.call_count,1);self.assertTrue(run.call_args.args[0][1].endswith('compare_expanded.py'))
         self.assertNotIn('frequency_report',state['overfit_checkpoints']['expanded_500'])
 
+    def test_tail_waits_for_frozen_checks_and_uses_explicit_pairs(self):
+        spec=dict(kind='tail',jobs=['1','2','3','4'],steps=[500,2000])
+        (self.root/'runs/overfit_checkpoint_analyses.json').write_text(json.dumps(dict(comparisons=[spec])))
+        self.registry['jobs'].append(dict(id='4',completion_action='summarize_overfit'))
+        rows=[dict(step=s,guidance=1,target_id=str(i)) for s in (0,500) for i in range(122)]
+        for jid in spec['jobs']:
+            path=self.root/'runs'/f'overfit_{jid}';path.mkdir(exist_ok=True)
+            (path/'manifest.json').write_text(json.dumps(dict(status='running',updates=500,scores=rows,training_subset=dict(frozen_unchanged=True,verified_update=0 if jid=='4' else 500))))
+        state={};run=Mock();self.assertEqual(tick(self.root,state,self.registry,dict(python='python'),run),[])
+        p=self.root/'runs/overfit_4/manifest.json';m=json.loads(p.read_text());m['training_subset']['verified_update']=500;p.write_text(json.dumps(m))
+        self.assertEqual(len(tick(self.root,state,self.registry,dict(python='python'),run)),1)
+        command=run.call_args.args[0];self.assertIn('--full',command);self.assertIn('--tail',command);self.assertNotIn('--runs',command)
+        self.assertEqual(run.call_count,1)
+        tick(self.root,state,self.registry,dict(python='python'),run);self.assertEqual(run.call_count,1)
+
 
 if __name__=='__main__':unittest.main()

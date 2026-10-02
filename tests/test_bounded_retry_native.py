@@ -1,5 +1,5 @@
 import unittest
-from summarize_bounded_retry_native import validate_slot
+from summarize_bounded_retry_native import validate_slot,validate_prior_original
 
 class NativeRetryTests(unittest.TestCase):
     def test_stops_first_valid_and_keeps_all_failures(self):
@@ -16,6 +16,16 @@ class NativeRetryTests(unittest.TestCase):
         self.assertEqual(validate_slot(draws,s)[1]['draw'],2)
         with self.assertRaises(ValueError):validate_slot(draws[:3],{**s,'attempts':3})
         with self.assertRaises(ValueError):validate_slot(draws,{**s,'selected_draw':11})
+
+    def test_shared_original_identity_requires_all_slots_and_same_selection(self):
+        rows=[dict(head='original',target_id=str(i),slot=k,draw=k,coarse_valid=1.,ca_lddt=.8) for i in range(64) for k in range(3)]
+        prior=dict(status='complete',draws=rows,selections=[dict(head='original',target_id=r['target_id'],slot=r['slot'],selected_draw=r['draw']) for r in rows])
+        current=[dict(r) for r in rows];validate_prior_original(current,prior)
+        with self.assertRaises(ValueError):validate_prior_original(current[:-1],prior)
+        current[0]['draw']=3
+        with self.assertRaises(ValueError):validate_prior_original(current,prior)
+        current[0]['draw']=0;current[0]['ca_lddt']=.79
+        with self.assertRaises(ValueError):validate_prior_original(current,prior)
 
     def test_missing_duplicate_and_invalid_order_rejected(self):
         draws=[dict(attempt=i,draw=3*i,coarse_valid=int(i==1)) for i in range(2)]

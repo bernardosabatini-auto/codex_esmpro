@@ -16,8 +16,8 @@ def main():
     p=argparse.ArgumentParser()
     for key in ('source','config','output'):p.add_argument('--'+key,type=Path,required=True)
     a=p.parse_args();c=json.loads(a.config.read_text())
-    for key in ('selection','protocol','diagnostic'):
-        if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
+    for key in ('selection','protocol','diagnostic','capacity_report','prior_retry_manifest'):
+        if c.get(key) and sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     protocol=json.loads(Path(c['protocol']).read_text());selection=json.loads(Path(c['selection']).read_text());rows=selection['tuning']
     if len(rows)!=64 or len({r['family'] for r in rows})!=64 or [h['name'] for h in c['heads']]!=protocol['heads'] or (protocol['outputs_per_family'],protocol['max_attempts_per_output'])!=(3,4):raise ValueError('Wrong frozen scope')
     a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)

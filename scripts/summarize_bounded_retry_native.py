@@ -23,11 +23,21 @@ def validate_slot(draws, selection):
     return draws[0],next(r for r in draws if r['draw']==selection['selected_draw'])
 
 
+def validate_prior_original(current,prior):
+    if prior['status']!='complete':raise ValueError('Incomplete prior retry screen')
+    selections={(r['target_id'],r['slot']):r for r in prior['selections'] if r['head']=='original'}
+    previous={(r['target_id'],r['draw']):r for r in prior['draws'] if r['head']=='original'}
+    if len(selections)!=192 or len(current)!=192 or {(r['target_id'],r['slot']) for r in current}!=set(selections):raise ValueError('Missing shared original controls')
+    for r in current:
+        chosen=selections[(r['target_id'],r['slot'])]['selected_draw'];old=previous[(r['target_id'],chosen)]
+        if r['draw']!=chosen or any(abs(r[k]-old[k])>1e-6 for k in ('ca_lddt','coarse_valid')):raise ValueError('Selected original retry control changed')
+
+
 def analyze(m):
     if m['status']!='complete' or m['training_updates_executed']!=0:raise ValueError('Incomplete inference')
     c=m['config']
-    for key in ('selection','protocol','diagnostic'):
-        if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
+    for key in ('selection','protocol','diagnostic','capacity_report','prior_retry_manifest'):
+        if c.get(key) and sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     protocol=json.loads(Path(c['protocol']).read_text());families={r['id']:r['family'] for r in json.loads(Path(c['selection']).read_text())['tuning']};heads=protocol['heads']
     if len(families)!=64 or len(set(families.values()))!=64 or [h['name'] for h in c['heads']]!=heads:raise ValueError('Wrong panel or heads')
     expected={(h,i,k) for h in heads for i in families for k in range(3)}
@@ -35,7 +45,7 @@ def analyze(m):
     if len(m['selections'])!=len(expected) or {key(r) for r in m['selections']}!=expected or any(key(r) not in expected for r in m['draws']):raise ValueError('Missing/duplicate/extra slots')
     if any(not np.isfinite(r[k]) or not 0<=r[k]<=1 for r in m['draws'] for k in ('ca_lddt','coarse_valid')):raise ValueError('Invalid score')
     controls=m['controls'];control_set={(h,b) for h in heads for b in (128,256,384,512)}
-    if len(controls)!=16 or {(r['head'],r['length']) for r in controls}!=control_set or any(not np.isfinite(r[k]) for r in controls for k in ('ca_rmsd','ca_lddt')) or any(r['ca_rmsd']>.2 or r['ca_lddt']<.99 for r in controls):raise ValueError('Failed batching controls')
+    if len(controls)!=len(control_set) or {(r['head'],r['length']) for r in controls}!=control_set or any(not np.isfinite(r[k]) for r in controls for k in ('ca_rmsd','ca_lddt')) or any(r['ca_rmsd']>.2 or r['ca_lddt']<.99 for r in controls):raise ValueError('Failed batching controls')
     grouped={q:[] for q in expected}
     for r in m['draws']:grouped[key(r)].append(r)
     values={h:dict(raw=[],retry=[]) for h in heads}
@@ -48,6 +58,8 @@ def analyze(m):
         if len(baseline)!=192:raise ValueError('Incomplete historical controls')
         for r in values[h['name']]['raw']:
             if any(abs(r[k]-baseline[(r['target_id'],r['slot'])][k])>1e-6 for k in ('ca_lddt','coarse_valid')):raise ValueError('Historical raw score changed')
+    if c.get('prior_retry_manifest'):
+        validate_prior_original(values['original']['retry'],json.loads(Path(c['prior_retry_manifest']).read_text()))
     batches=m['batches'];initial={(h,b,o) for h in heads for b in (128,256,384,512) for o in (0,8)}
     if len([r for r in batches if r['attempt']==0])!=len(initial) or {(r['head'],r['length'],r['offset']) for r in batches if r['attempt']==0}!=initial:raise ValueError('Missing initial batch timings')
     if sum(r['batch'] for r in batches)!=len(m['draws']) or any(not np.isfinite(r[k]) or r[k]<=0 for r in batches for k in ('seconds','peak_reserved_bytes')):raise ValueError('Invalid draw/timing accounting')

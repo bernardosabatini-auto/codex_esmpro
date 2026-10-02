@@ -28,6 +28,8 @@ def load_features(c,records):
     for key in ('summary_protocol','feature_manifest'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('changed '+key)
     protocol=json.loads(Path(c['summary_protocol']).read_text())
+    expected=dict(learning_rate=protocol['flow_learning_rate'],warmup_updates=protocol['warmup_updates'],ema_decay=protocol['ema_decay'],batches=protocol['batches'],evaluation_seed=protocol['evaluation_seed'],evaluation_guidance=[1],decoder_steps=3)
+    if any(c.get(k)!=v for k,v in expected.items()):raise ValueError('summary recipe changed')
     m=json.loads(Path(c['feature_manifest']).read_text())
     if m['status']!='complete' or not m['qualified'] or c['summary_arm'] not in protocol['arms']:raise ValueError('feature extraction not qualified')
     if m['config']['label_manifest_sha256']!=c['label_manifest_sha256']:raise ValueError('different labels')

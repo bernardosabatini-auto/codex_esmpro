@@ -65,6 +65,13 @@ def main():
                     record['valid_indices']=np.flatnonzero(g['coarse_valid'][:]);records[r['id']]=record;buckets[r['bucket']].append(r['id'])
         from expansion_corpus import evaluation_records
         evaluation_panel=evaluation_records(records,c)
+        summary_protocol=None
+        if c.get('summary_arm'):
+            from summary_adapter import SummaryAdapter,load_features,condition
+            if expanded or c['arm']!='aligned_teacher' or distribution!='balanced' or c.get('local_geometry') or c.get('trainable_tail_blocks') is not None:raise ValueError('invalid summary learning scope')
+            summary_protocol=load_features(c,records)
+            if c['seed'] not in (summary_protocol['first_seed'],summary_protocol['replication_seed']):raise ValueError('undeclared summary seed')
+            if c['updates']!=(summary_protocol['profile']['updates'] if c.get('profile_only') else summary_protocol['updates']):raise ValueError('undeclared summary budget')
         m['training_targets']=len(records);m['evaluated_targets']=len(evaluation_panel)
         lengths=[sorted(buckets)[step%4] for step in range(c['updates'])]
         if expanded and not c.get('profile_only'):
@@ -79,13 +86,25 @@ def main():
             m['training_subset']['initial_frozen_sha256']=frozen_digest(model)
         trainable=[p for p in model.parameters() if p.requires_grad]
         decoder=load_proteinae(a.source/'ProteinAE_v1',a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt',steps=c['decoder_steps']).cuda()
-        torch.manual_seed(c['seed']);ema={k:v.detach().clone() for k,v in model.state_dict().items()};optimizer=torch.optim.AdamW(trainable,lr=c['learning_rate'],betas=(.9,.95),weight_decay=.01,foreach=False)
+        torch.manual_seed(c['seed'])
+        parameters=trainable
+        if summary_protocol:
+            adapter=summary_protocol['adapter'];model.summary_adapter=SummaryAdapter(adapter['width'],adapter['bound']).cuda()
+            adapter_parameters=list(model.summary_adapter.parameters());parameters=[dict(params=trainable),dict(params=adapter_parameters,lr=adapter['learning_rate'])];trainable=trainable+adapter_parameters
+            m['summary_adapter']=dict(parameters=sum(p.numel() for p in adapter_parameters),arm=c['summary_arm'],initial_sha256=hashlib.sha256(b''.join(v.detach().cpu().numpy().tobytes() for v in model.summary_adapter.state_dict().values())).hexdigest(),controls=[])
+            with torch.no_grad():
+                for length in buckets:
+                    ident=buckets[length][0];r=records[ident];n=r['length'];x=torch.zeros(1,length,2560,device='cuda');x[0,:n]=r['esm'].cuda();mask=torch.arange(length,device='cuda')[None]<n
+                    exact=torch.equal(condition(model,records,[ident],x,mask),x);m['summary_adapter']['controls'].append(dict(bucket=length,initial_exact=exact))
+                    if not exact:raise ValueError('summary adapter changes initial condition')
+        ema={k:v.detach().clone() for k,v in model.state_dict().items()};optimizer=torch.optim.AdamW(parameters,lr=c['learning_rate'],betas=(.9,.95),weight_decay=.01,foreach=False)
         order=np.random.default_rng(c['seed']);labels_rng=np.random.default_rng(c['seed']+1);rng=torch.Generator(device='cuda').manual_seed(c['seed']);queues={k:[] for k in buckets};telemetry=Telemetry(a.output,True)
         def evaluate(step):
             model.eval();raw={k:v.detach().cpu().clone() for k,v in model.state_dict().items()};model.load_state_dict(ema);state_cpu=torch.get_rng_state();state_gpu=torch.cuda.get_rng_state();evaluated_controls=set()
             with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/f'evaluation_{step}.h5','x') as out:
                 for index,(ident,r) in enumerate(evaluation_panel.items()):
                     n=r['length'];length=r['bucket'];esm=torch.zeros(1,length,2560,device='cuda');esm[0,:n]=r['esm'].cuda();mask=torch.arange(length,device='cuda')[None]<n
+                    if summary_protocol:esm=condition(model,records,[ident],esm,mask)
                     noise=torch.zeros(32,length,8,device='cuda');dn=torch.zeros(32,4*length,3,device='cuda')
                     for k in range(32):
                         noise[k,:n]=target_noise([ident],[n],8,seed=c['evaluation_seed'],sample_index=k,device='cuda')[0];dn[k,:4*n]=target_noise([ident],[4*n],3,seed=c['evaluation_seed'],sample_index=k,stream='decoder',device='cuda')[0]*decoder.fm.scale_ref
@@ -130,6 +149,9 @@ def main():
                                 r=records[ident];indices=r['valid_indices'];bank[k,:len(indices),:r['length']]=r[key][indices].cuda();valid[k,:len(indices)]=True
                             posterior_args=dict(teacher_bank=bank,teacher_valid=valid)
                         progress=step/max(c['updates']-1,1);lr=c['learning_rate']*min((step+1)/c['warmup_updates'],1)*(.1+.9*.5*(1+math.cos(math.pi*progress)));optimizer.param_groups[0]['lr']=lr;optimizer.zero_grad(set_to_none=True)
+                        if summary_protocol:
+                            optimizer.param_groups[1]['lr']=lr*summary_protocol['adapter']['learning_rate']/c['learning_rate']
+                            esm=condition(model,records,ids,esm,mask)
                         loss,info=flow_loss(model,z,esm,mask,FlowConfig(),generator=rng,return_state=True,**posterior_args)
                         if not torch.isfinite(loss):raise FloatingPointError('nonfinite loss')
                         if c.get('local_geometry'):
@@ -140,6 +162,10 @@ def main():
                             m.setdefault('local_geometry_updates',[]).append(dict(step=step+1,length=length,**aux_stats))
                             del auxiliary,aux_stats
                         else:loss.backward()
+                        if summary_protocol:
+                            adapter_norm=torch.stack([p.grad.detach().square().sum() for p in model.summary_adapter.parameters() if p.grad is not None]).sum().sqrt()
+                            if not torch.isfinite(adapter_norm) or adapter_norm<=0:raise FloatingPointError('summary adapter gradient vanished')
+                            m['summary_adapter'].setdefault('gradients',[]).append(dict(step=step+1,bucket=length,norm=float(adapter_norm)))
                         norm=torch.nn.utils.clip_grad_norm_(trainable,1.,error_if_nonfinite=True)
                         if norm<=0:raise FloatingPointError('zero gradient')
                         optimizer.step()

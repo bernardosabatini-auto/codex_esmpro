@@ -12,6 +12,11 @@ def main():
     d['label_distribution']=c.get('label_distribution','empirical')
     if m['status']=='complete':
         if m['updates']!=c['updates']:raise ValueError('incomplete training')
+        if c.get('summary_arm'):
+            adapter=m['summary_adapter'];controls=adapter['controls'];gradients=adapter['gradients']
+            if len(controls)!=4 or {r['bucket'] for r in controls}!={128,256,384,512} or not all(r['initial_exact'] for r in controls):raise ValueError('initial summary controls failed')
+            if len(gradients)!=m['updates'] or [r['step'] for r in gradients]!=list(range(1,m['updates']+1)) or any(not np.isfinite(r['norm']) or r['norm']<=0 for r in gradients):raise ValueError('summary gradient accounting failed')
+            d['summary_adapter']=dict(arm=adapter['arm'],parameters=adapter['parameters'],initial_sha256=adapter['initial_sha256'],initial_exact=True,positive_gradient_updates=len(gradients),buckets=sorted({r['bucket'] for r in gradients}))
         if c.get('trainable_tail_blocks') is not None:
             d['training_subset']=m['training_subset']
             if not d['training_subset']['frozen_unchanged']:raise ValueError('frozen parameters changed')
@@ -65,6 +70,8 @@ def main():
         h=d.get('hardware',{})
         if 'collection_mean_percent' in h:
             lines+=['',f"SM issue: {h['collection_mean_percent'].get('SM Issue [Throughput %]')}% within measured collection ranges; {h['whole_capture_mean_percent'].get('SM Issue [Throughput %]')}% over the entire capture. For full runs collection ranges include evaluation. Short-profile startup is not amortized."]
+    if 'summary_adapter' in d:
+        adapter=d['summary_adapter'];lines+=['',f"Pretrained-summary feasibility arm: {adapter['arm']}; jointly trained zero-output residual adapter with{adapter['parameters']} parameters. Initial conditioning exact in all four buckets; positive adapter gradients at{adapter['positive_gradient_updates']} updates. Compare only matched feature arms before inferring information gain."]
     if d['target_estimator']=='posterior':
         lines+=['',f"Target estimator: posterior mean plus detached conditional variance. Logged mean variance: {d.get('logged_posterior_variance_mean')}; logged mean variance/loss fraction: {d.get('logged_posterior_floor_fraction')}. These sparse logs are diagnostic, not an estimate of gradient-variance reduction. Time-bin errors still use sampled-label targets."]
     if 'training_subset' in d:

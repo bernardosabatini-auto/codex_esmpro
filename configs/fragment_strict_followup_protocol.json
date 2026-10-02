@@ -1,0 +1,29 @@
+{
+  "purpose": "Exploratory supplementary refolding of every strict raw match in the complete64sample development panels. The fixedeightcaseassays and failedguidancefollowupgate remain unchanged; neither fixedpanel contains the observedrare rawmatches.",
+  "sources": [
+    [
+      "plain32",
+      "fragment_training_49939857",
+      "development/conditioned"
+    ],
+    [
+      "frame32",
+      "fragment_training_49984633",
+      "development/conditioned"
+    ],
+    [
+      "plain128",
+      "fragment_guidance_49986569",
+      "guidance1"
+    ],
+    [
+      "guided128",
+      "fragment_guidance_49986569",
+      "guidance2"
+    ]
+  ],
+  "selection": "Recompute all64samples perarm: coarsevalid,motifdRMS<=1A,properCA motifRMSD<=1A. Refold EVERY rawmatch, not a selected best. Existing results contain1frame32and2guided128matches, allonefamily1BFY; no reference-scaffold fit or sequence-refolding outcome enters selection. Every rawfailure counts as strict failure; denominator64perarm.",
+  "assay": "Same8ProteinMPNNseqs,temperature.1seed1, motifresiduesfixed; guardedFP32teacher3loops50steps1sample. Require one SAME validrefold withscTM>.5andbothmotifthresholds. Add corresponding native scaffold with the SAME motifsequence fixed,8designs,andrepeatfirstrefold. Nativepositivecontrolmust itself pass strictcriterion for aqualifiedsuccessclaim.",
+  "scope": "Onefamily feasibility only, selected afterobservingrawfits on reuseddevelopmentdata. This is not independentvalidation, fullcohortglobaldesignability, or a replacementforfailedfixedpanelgates. No changedthresholds, inference hyperparameter sweep, traininglabels, or lockedtests.",
+  "resources": "Threegeneratedbackbones plusoneuniquenativecontrol,32refolds; oneRTX10minutes. Retainallfailures."
+}

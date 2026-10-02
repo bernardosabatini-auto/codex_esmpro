@@ -1,0 +1,17 @@
+{
+  "purpose": "Test antithetic latent-noise pairing for the qualified compact500 checkpoint at unchanged weights, sample count and retry cap. Paired z and -z each retain the Gaussian marginal; possible state-coverage benefit is an empirical hypothesis.",
+  "heads": [
+    "original",
+    "compact500",
+    "compact500_antithetic"
+  ],
+  "outputs_per_family": 3,
+  "max_attempts_per_output": 4,
+  "sampling": "FP32 Euler25/AE3. OriginalCFG2; both compact500 headsCFG1. Keep historical expanded conditioning for native identity. IID controls use latent noise logical index d; antithetic uses base index floor(d/2) and sign + for even d, - for odd d. Decoder noise remains indexed by d in all native heads. Output slot k retries logical d=k+3*a for a=0..3, stopping at first coarse-valid output; exhausted slots return initial output. No learned weights, reference scores or confidence in selection.",
+  "controls": "Original and compact500 IID first3 outputs must reproduce all historical CA-lDDT/validity within1e-6. Antithetic first output matches the historical sample0 exactly; its other outputs intentionally use different latent noise and remain in all metric denominators. All three heads have four independent single-versus-batch controls under existing0.2A/0.99 thresholds. Selected original must reproduce the previous retry screen. Negative noise is applied only to valid latent residues, never decoder noise or padded residues.",
+  "analysis": "Report each raw and selected pipeline, all64 families and all192 outputs. Compare selected adapted heads with selected original using paired-family CA-lDDT and coarse validity. Native quality requires lower95% CA difference bound>-0.005 and validity difference>=-0.01. A qualified native pipeline still requires matched external diversity evaluation. Report attempted-draw count, exhausted slots, generation/retry seconds and peak memory; single-pass generation timings are descriptive and exclude ESM, loading and disk I/O.",
+  "resources": "One H200,15minutes,780second worker cap. Existing measured native batch24 runs fit H200; retain strict original controls. No locked tests. Completion watcher, eight-GPU running-plus-pending guard and15UTC deadline apply.",
+  "no_rescue": "No alternative cap, geometry threshold, target exclusion or retry ordering after observing results. Preserve historical raw failures. This is a separately declared inference pipeline, not a replacement for the raw-model gate.",
+  "antithetic_head": "compact500_antithetic",
+  "decision": "Compare both selected compact heads with selected original under unchanged native thresholds. Additionally require selected antithetic-minus-selected compact IID CA lower95% bound>-0.005 and validity difference>=-0.01 before external diversity testing. External stage, if eligible, uses32 outputs with paired latent noise and fixed decoder0 against the existing compact IID retry baseline. No antithetic/scale grid."
+}

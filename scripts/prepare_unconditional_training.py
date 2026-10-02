@@ -1,5 +1,5 @@
 """Prepare matched training only from fully audited unconditional labels."""
-import argparse,json
+import argparse,json,math
 from pathlib import Path
 from prepare_overfit import sha
 from summarize_unconditional_labels import analyze
@@ -17,6 +17,8 @@ def main():
         profile=json.loads(a.profile_report.read_text())
         if profile['status']!='complete' or not profile['profile_qualified']:raise ValueError('Profile gate failed')
         c['profile_report']=str(a.profile_report.resolve());c['profile_report_sha256']=sha(a.profile_report)
+        c['allocation_minutes']=min(60,max(10,math.ceil((1.5*profile['projected1000_seconds']+120)/60)))
+        c['work_cap_seconds']=c['allocation_minutes']*60-120
     a.output.write_text(json.dumps(c,indent=2)+'\n');print('Prepared',a.arm,'profile',a.profile)
 
 if __name__=='__main__':main()

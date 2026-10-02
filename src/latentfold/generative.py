@@ -1,8 +1,8 @@
 """Unconditional Euler sampling with explicit, reproducible motif resampling.
 
 Ports the original motif recipe without importing side-effectful gate scripts.
-All motif codes currently come from a complete reference encoding; this is not
-an isolated-fragment encoder or a claim of scaffold-independent conditioning.
+Callers provide motif codes and record whether they came from a complete
+structure or an isolated fragment; this sampler does not encode coordinates.
 """
 import torch
 from torch.nn import functional as F
@@ -11,8 +11,9 @@ from .flow import validate_batch
 
 @torch.no_grad()
 def sample_unconditional(net, esm, mask, *, noise, steps, fixed=None,
-                         motif_noise=None, repaint=1, fresh_noise=None):
+                         motif_noise=None, repaint=1, fresh_noise=None, update_history_each_eval=False):
     validate_batch(esm, mask, noise)
+    if type(update_history_each_eval) is not bool:raise ValueError('history update flag must be boolean')
     if net.training or type(steps) is not int or steps < 1 or type(repaint) is not int or repaint < 1:
         raise ValueError('eval model and positive integer steps/refinements required')
     if mask.shape[1] > net.pos.num_embeddings:
@@ -52,9 +53,11 @@ def sample_unconditional(net, esm, mask, *, noise, steps, fixed=None,
                 endpoint = x + (1-ts[i+1])*v
                 x = (1-t)*eps + t*endpoint
                 x = torch.where(keep[..., None], (1-t)*motif_noise + t*target, x)
-                # Preserve the source recipe: history updates once per outer
-                # step, not inside a refinement cycle.
+                # Default preserves the source recipe. The explicit ablation
+                # refreshes history after each inner evaluation as well.
                 v = net(x, t.expand(len(x)), esm, mask, drop, sc, prepared=prepared).float()
+                if update_history_each_eval and net.self_cond:
+                    sc = x + (1-t)*v
                 x = x + dt*v
     x = F.layer_norm(x, (8,))*mask[..., None]
     if not torch.isfinite(x).all():

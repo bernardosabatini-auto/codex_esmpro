@@ -29,4 +29,26 @@ class GenerativeTests(unittest.TestCase):
         keep[1,-1]=True
         with self.assertRaises(ValueError):sample_unconditional(self.net,self.esm,self.mask,**kw)
 
+    def test_inner_history_refresh_and_unchanged_call_budget(self):
+        keep=torch.zeros_like(self.mask);keep[:,1:3]=True;target=torch.randn_like(self.noise);eps=torch.randn_like(self.noise)
+        kw=dict(noise=self.noise,steps=3,fixed=(target,keep),motif_noise=eps,repaint=3,fresh_noise=lambda i,j:eps*(1+i+j))
+        original=self.net.forward;records=[]
+        def capture(x,t,esm,mask,drop,history,**kwargs):
+            v=original(x,t,esm,mask,drop,history,**kwargs)
+            records.append((x.clone(),t.clone(),None if history is None else history.clone(),v.clone()))
+            return v
+        self.net.forward=capture
+        baseline=sample_unconditional(self.net,self.esm,self.mask,**kw)
+        self.assertEqual(len(records),7);old=list(records);records.clear()
+        candidate=sample_unconditional(self.net,self.esm,self.mask,**kw,update_history_each_eval=True)
+        self.assertEqual(len(records),7)
+        torch.testing.assert_close(old[2][2],old[1][2],atol=0,rtol=0)
+        x,t,_,v=records[1]
+        torch.testing.assert_close(records[2][2],x+(1-t[:,None,None])*v,atol=0,rtol=0)
+        self.assertGreater(float((baseline-candidate).abs().max()),0)
+        kw['repaint']=1
+        baseline=sample_unconditional(self.net,self.esm,self.mask,**kw)
+        candidate=sample_unconditional(self.net,self.esm,self.mask,**kw,update_history_each_eval=True)
+        torch.testing.assert_close(baseline,candidate,atol=0,rtol=0)
+
 if __name__=='__main__':unittest.main()

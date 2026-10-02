@@ -1,0 +1,20 @@
+{
+  "purpose": "Test whether more independently sequence-audited teacher-supervised families improve valid generalization after strong training capacity but weak external multistate recall. Change data breadth while retaining the full balanced-flow objective.",
+  "prerequisites": "Complete profile plus four label shards cover every1383 new source family; all control checks pass, full eligible-corpus reconstruction passes both empirical and balanced prior margins, and old122 arrays remain unchanged. Then40-update RTX memory/finite-gradient profile before full training. No partial-corpus training.",
+  "corpus": "All new families passing the unchanged teacher-confidence/contact-state metadata rule plus original122, with original labels and embeddings preserved. No family selection on student or reconstruction outcomes. Reject the corpus if its reconstruction certificate fails.",
+  "arm": "Full-network flow training from the original459M EMA, aligned labels, uniform contact-state prior then uniform valid teacher within state. No reference mixture, geometry auxiliary, restricted blocks or change in sampling solver.",
+  "seeds": [2026100171, 2026100181],
+  "updates": 2000,
+  "evaluation_steps": [500, 2000],
+  "evaluation_guidance": [1],
+  "evaluation_seed": 2026100162,
+  "learning_rate": 0.00003,
+  "ema_decay": 0.99,
+  "warmup_updates": 100,
+  "batches": {"128": 32, "256": 16, "384": 8, "512": 8},
+  "schedule": "Per-update length-bucket probabilities equal training-family counts; within-bucket permutation cycles. Same original optimizer, clipping, warmup/cosine schedule, strictFP32, frozen ESMC and AE. Profile cycles all buckets.",
+  "capacity_panel": "Frozen original32 plus32 new eligible families selected round-robin over128/256/384/512 strata, lexicographic ID within stratum. Sparse strata contribute all eligible families before remaining strata fill. Evaluate these64 at0/500/2000 with unchanged32-draw CFG1/Euler25/AE3 and seed. These are all training families, not an unseen test. Retain old/new cohort summaries separately.",
+  "analysis": "Report both seeds and endpoints. Replicated capacity improvement requires positive family-bootstrap lower95% intervals for new32 and combined64 recall versus exact same-seed initialization, validity delta>=-0.01. Compare original32 with historical full122 control at matched endpoints as a diagnostic; altered target draws prevent an exact paired optimization claim.",
+  "transfer": "Independently evaluate both checkpoints on the unchanged64-family native tuning panel, originalCFG2 and both larger-trained CFG1 heads,3samples each. Preserve CA-lDDT lowerCI>-0.005 and validity difference>=-0.01. Only qualified heads advance to unchanged48-family external ensemble evaluation. Retain both seeds and endpoints; no promotion on capacity alone. Original34 and reserved17 remain unscored.",
+  "resources": "OneRTX40-update10minute profile, finite positive gradients and peak<=80GiB. Full runs on RTX only after profile,150minute wall/144minute work cap each, including reduced64-family capacity evaluation. Eight total project GPUs running or pending, final jobs fit15:00UTC deadline. Smaller repeated capacity panel reduces evaluation overhead without altering training draws."
+}

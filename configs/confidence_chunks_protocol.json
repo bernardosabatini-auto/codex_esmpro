@@ -1,0 +1,8 @@
+{
+  "purpose": "Test whether four-at-a-time teacher confidence computation lets the unchanged16-draw label recipe fit H100 memory. No structure/training experiment or data regeneration.",
+  "scope": "Eight fixed families: the four historical profile controls plus the longest new profile family in each length bucket. Compare with their saved full-confidence FP32 outputs; no outcome selection.",
+  "change": "One protein, unchanged FP32 teacher, seed,3trunk loops,50diffusion steps,16samples. Run only the confidence head in chunks of4 and concatenate every returned confidence tensor in original sample order. Restore the instance method on exit. No installed package or active job changes.",
+  "controls": {"max_ca_rmsd": 0.2, "min_ca_lddt": 0.99, "confidence_rmse": 0.0001, "confidence_max_abs": 0.001, "validity_exact": true, "confident_residue_mask_exact": true, "metadata_eligibility_exact": true, "eligible_contact_state_assignment_exact": true},
+  "resources": "OneH100,10minute allocation/8minute work budget, eight proteins, no AE/ESMC loading. Peak reserved<=64GiB with all controls passing to qualify this confidence path for a future full label-pipeline profile. Confidence-only memory does not certify the full AE pipeline on H100.",
+  "interpretation": "Cross-hardware saved-output controls establish tolerance-qualified numerical agreement, not bitwise identity or same-hardware speedup. Current H200 label shards retain their frozen recipe."
+}

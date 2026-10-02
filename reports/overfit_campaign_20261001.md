@@ -441,3 +441,9 @@ Original extension registered49799566 and compact500 registered49799644, both ve
 ### 04:59 UTC: additional reference verification started onCPU
 
 Started bounded900-second source verification for all1383 sequence-audited unused candidates. The existing verifier now accepts an explicit audited expected count while preserving512/64 defaults and the same exact sequence/residue mapping plus0.02A rigid CA agreement criterion. Expansion inventory must match its completed audit hash and count before fetching. No new labels, embeddings orGPU allocations yet. Output runs/expansion_sources_20261002 remains provisional until complete.
+
+### 05:03 UTC: compact128 shows no additional states; new source inventory verified
+
+Compact student extension49799644 completed6:15. All prefix controls passed; first32 state-coverage prefixes exactly reproduced at1/2/3A. Coverage remains0.4375 atK32,K64,K128, and both-state recovery remains1/16. Valid fraction rises0.99023→0.99365; oracle CA-lDDT0.90231→0.90155 (delta−0.00076, interval[−0.00237,0.00063]). Teacher128-minus-student128 coverage gap0.28125 has positive counterpart interval[0.125,0.46875]; both-state gap6/16. Cached generation316.32seconds,45.93GiB peak. NoK256 escalation. This tested latent-noise draws with fixed decoder noise, not every possible noise policy. Original128 extension remains live.
+
+All1383 unused candidate backbones passed exact sequence/residue correspondence and rigid CA agreement: maximum4.58e−6A versus0.02A threshold. These are verified source structures, not new teacher labels. Before broader training, generate/profile fresh matching final-layer ESMC embeddings and16 aligned teacher conformations, apply the same confidence/state eligibility rule, and certify reconstruction. No full data-generation or additional training job submitted yet.

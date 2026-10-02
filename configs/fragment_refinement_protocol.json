@@ -1,0 +1,19 @@
+{
+  "purpose": "Selected-case feasibility of teacher-refold feedback through the explicitly trained isolated-fragment conditioner, versus equal-budget fresh sampling.",
+  "parent_training": "fragment_training_50019364",
+  "initial_report": "fragment_strict_followup_50030977",
+  "cases": ["nmr__1BFY_1__b91a89d44751", "nmr__1CB9_1__7ca9cd6d9b60"],
+  "condition": "f30_center",
+  "seed": 2026100260,
+  "rounds": [2, 3],
+  "steps": 50,
+  "decoder_steps": 3,
+  "start_time": 0.8,
+  "guidance": 1,
+  "selection": "Among coarse-valid refolds of the previous feedback backbone, choose minimum proper motif CA RMSD, then minimum motif dRMS, then higher global self-consistency TM, then lower sequence index. No complete experimental reference is used. With no valid refold, use the previous generated backbone and record fallback.",
+  "conditioning": "Whole selected refold is canonicalized and encoded; partial flow starts at 0.8*z_refold+0.2*fresh_noise. Keep original isolated-fragment features. Never rotate latent channels or clamp standalone fragment codes into whole-chain codes.",
+  "budget": "Reuse initial eight refolds per selected case. Two further backbones per case per arm, each with eight fixed-motif designs/refolds. Two fixed-motif native controls per round. 96 new refolds:64 generated and32 controls. Per arm per case:24 designs including the shared initial eight. Both arms use the same fresh Gaussian and decoder noise and50 velocity evaluations per additional backbone.",
+  "endpoints": "Report each round and cumulative strict same-refold success; global scTM>0.5, raw and same refold coarse-valid, raw and same refold proper motif RMSD<=1A and motif dRMS<=1A. Retain every failed sample. Record timing and memory. No tolerance, strength or noise sweep.",
+  "scope": "Two post-selected development cases with raw motif retention but refold drift; repair feasibility only, no generalization claim. No development refold becomes a training label. No locked tests. Continue to a fixed-panel comparison only if feedback yields strict success with passing native controls.",
+  "work_cap_seconds": 1080
+}

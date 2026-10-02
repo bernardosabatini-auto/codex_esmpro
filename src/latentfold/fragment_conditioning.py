@@ -105,18 +105,25 @@ def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator,
 
 
 @torch.no_grad()
-def sample_fragment(net, adapter, features, keep, mask, *, noise, steps=50, drop_fragment=False, coordinates=None, guidance=1.):
+def sample_fragment(net, adapter, features, keep, mask, *, noise, steps=50, drop_fragment=False, coordinates=None, guidance=1., reference=None, start_time=0.):
     if net.training or adapter.training or type(steps) is not int or steps < 1 or noise.shape != (*mask.shape, 8) or not torch.isfinite(noise).all():
         raise ValueError('Eval models and finite correctly shaped sampling noise required')
     if not isinstance(guidance,(int,float)) or not math.isfinite(guidance) or guidance<0:raise ValueError('Finite nonnegative guidance required')
+    if not isinstance(start_time,(int,float)) or not math.isfinite(start_time) or not 0 <= start_time < 1:
+        raise ValueError('Start time must lie in [0,1)')
+    if reference is not None and (reference.shape != noise.shape or reference.device != noise.device or reference.dtype != noise.dtype or not torch.isfinite(reference).all()):
+        raise ValueError('Finite matching reference codes required')
+    if start_time and reference is None:
+        raise ValueError('Partial flow requires reference codes')
     if guidance==0:drop_fragment=True
     dropped = torch.full((len(mask),), drop_fragment, dtype=torch.bool, device=mask.device)
     esm, prepared = prepare_fragment_condition(net, adapter, features, keep, mask, dropped, coordinates=coordinates)
     null_prepared=None
     if not drop_fragment and guidance!=1:
         _,null_prepared=prepare_fragment_condition(net,adapter,features,keep,mask,torch.ones_like(dropped),coordinates=coordinates)
-    x, history = noise.clone(), None
-    ts = torch.linspace(0, 1, steps+1, device=noise.device)
+    x = noise.clone() if start_time == 0 else start_time*reference + (1-start_time)*noise
+    history = None
+    ts = torch.linspace(start_time, 1, steps+1, device=noise.device)
     for i in range(steps):
         t, dt = ts[i], ts[i+1]-ts[i]
         v = net(x, t.expand(len(x)), esm, mask, x_sc=history, prepared=prepared).float()

@@ -6,7 +6,7 @@ from prepare_overfit import sha
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--profile',type=Path);p.add_argument('--data-report',type=Path);p.add_argument('--rollout',action='store_true');p.add_argument('--output',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];parent=root/'runs/fragment_training_49929751';report=root/'reports/fragment_training_49929751.json';d=json.loads(report.read_text());c=d['config'].copy();protocol=root/'configs/fragment_continuation_protocol.json'
+    p=argparse.ArgumentParser();p.add_argument('--profile',type=Path);p.add_argument('--data-report',type=Path);objective=p.add_mutually_exclusive_group();objective.add_argument('--rollout',action='store_true');objective.add_argument('--motif-weighted',action='store_true');p.add_argument('--output',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];parent=root/'runs/fragment_training_49929751';report=root/'reports/fragment_training_49929751.json';d=json.loads(report.read_text());c=d['config'].copy();protocol=root/'configs/fragment_continuation_protocol.json'
     if d['status']!='complete' or d['updates']!=2000 or c['arm']!='full' or c.get('variant')!='geometry' or c.get('auxiliary_motif') or d['manifest_sha256']!=sha(parent/'manifest.json'):raise ValueError('Unqualified parent')
     rows={(r['step'],r['cohort']):r['arms']['conditioned'] for r in d['summaries']};train=rows[2000,'train'];dev=rows[2000,'development']
     if train['mean_motif_drms']>.8*rows[500,'train']['mean_motif_drms'] or dev['raw_valid_fraction']<.95 or train['joint_fraction']>=.5 or dev['joint_fraction']>=.25:raise ValueError('Continuation prerequisite not met')
@@ -28,10 +28,17 @@ def main():
             original.visititems(check)
         c.update(expanded_fragment_data=True,training_protein_count=dd['training_proteins'],evaluation_train_ids=evaluation_ids)
         for key,path in [('data_report',a.data_report),('data_manifest',dm_path),('fragments',dm_path.parent/'fragments.h5'),('expanded_protocol',Path(dc['expanded_protocol']))]:c[key]=str(path.resolve());c[key+'_sha256']=sha(path)
+    if a.motif_weighted:
+        if c.get('training_protein_count')!=128:raise ValueError('Latent weighting requires the matched128protein corpus')
+        path=root/'configs/fragment_latent_weight_protocol.json';c.update(latent_motif_weight=json.loads(path.read_text())['weight'],latent_weight_protocol=str(path),latent_weight_protocol_sha256=sha(path))
     if a.profile:
         pd=json.loads(a.profile.read_text())
         if not pd['profile_qualified'] or pd['config']['warm_protocol_sha256']!=c['warm_protocol_sha256'] or pd['config']['checkpoint_sha256']!=c['checkpoint_sha256'] or pd['config']['fragments_sha256']!=c['fragments_sha256']:raise ValueError('Unqualified continuation profile')
         if pd['config'].get('rollout_motif')!=c.get('rollout_motif') or pd['config'].get('rollout_protocol_sha256')!=c.get('rollout_protocol_sha256'):raise ValueError('Mismatched rollout profile')
+        if pd['config'].get('latent_motif_weight')!=c.get('latent_motif_weight'):raise ValueError('Mismatched latent weighting profile')
+        if a.motif_weighted:
+            from audit_backbone_token_profile import audit_matched_profile
+            c['latent_weight_profile_audit']=audit_matched_profile(root,a.profile,'49947730')
         estimate=pd['training_seconds']/40*2000+pd['evaluation_seconds']/2*12*3+240;minutes=max(15,math.ceil((estimate*1.2+120)/60));c.update(profile_report=str(a.profile.resolve()),profile_report_sha256=sha(a.profile),allocation_minutes=minutes,work_cap_seconds=minutes*60-90);print('Continuation allocation minutes',minutes)
     if a.rollout and a.profile and c['allocation_minutes']>150:raise ValueError('Rollout cost exceeds declared150minute cap')
     a.output.write_text(json.dumps(c,indent=2)+'\n')

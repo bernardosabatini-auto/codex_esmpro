@@ -8,17 +8,17 @@ import numpy as np
 from prepare_overfit import sha
 
 
-def audit(root, report):
+def audit_matched_profile(root, report, baseline_id, adapter_key='adapter_initial'):
     root, report = Path(root), Path(report)
     d = json.loads(report.read_text())
     # The report binds the exact source manifest; resolve through its run name.
     manifest = root / 'runs' / report.stem / 'manifest.json'
     new = json.loads(manifest.read_text())
-    baseline_path = root / 'runs/fragment_training_49928663/manifest.json'
+    baseline_path = root / f'runs/fragment_training_{baseline_id}/manifest.json'
     base = json.loads(baseline_path.read_text())
-    if d['manifest_sha256'] != sha(manifest) or not d['profile_qualified'] or new['status'] != 'complete' or new['updates'] != 40 or not new['config'].get('backbone_tokens'):
+    if d['manifest_sha256'] != sha(manifest) or not d['profile_qualified'] or new['status'] != 'complete' or new['updates'] != 40:
         raise ValueError('Incomplete/unaudited backbone profile')
-    if new['shared_adapter_initial'] != base['adapter_initial'] or new['frozen_initial'] != base['frozen_initial']:
+    if new[adapter_key] != base['adapter_initial'] or new['frozen_initial'] != base['frozen_initial']:
         raise ValueError('Changed shared initialization')
     for key in ('seed', 'batches', 'checkpoint_sha256', 'fragments_sha256', 'decoder_checkpoint_sha256'):
         if new['config'][key] != base['config'][key]:
@@ -45,3 +45,9 @@ def audit(root, report):
         raise ValueError('Missing initial profile samples')
     return dict(matched_steps=40, identical_initial_samples=matched,
                 baseline_manifest_sha256=sha(baseline_path), candidate_manifest_sha256=sha(manifest))
+
+
+def audit(root, report):
+    d=json.loads(Path(report).read_text())
+    if not d['config'].get('backbone_tokens'):raise ValueError('Not a backbone-token profile')
+    return audit_matched_profile(root,report,'49928663','shared_adapter_initial')

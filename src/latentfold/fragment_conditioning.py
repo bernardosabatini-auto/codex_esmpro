@@ -67,11 +67,13 @@ def prepare_fragment_condition(net, adapter, features, keep, mask, dropped, *, c
     return esm, (token, pool, *prepared[2:])
 
 
-def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator, coordinates=None, return_state=False, null_target=None):
+def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator, coordinates=None, return_state=False, null_target=None, motif_weight=1.):
     """Protein-weighted flow matching; fragment dropout preserves a null branch."""
     if target.shape != (*mask.shape, 8) or target.requires_grad or not torch.isfinite(target).all():
         raise ValueError('Fixed finite full-structure latent targets required')
     if null_target is not None and (null_target.shape!=target.shape or null_target.requires_grad or not torch.isfinite(null_target).all()):raise ValueError('Fixed matching null targets required')
+    if not math.isfinite(motif_weight) or motif_weight <= 0:
+        raise ValueError('Finite positive motif weight required')
     b = len(target)
     noise = torch.randn(target.shape, device=target.device, generator=generator)
     t = torch.sigmoid(torch.randn(b, device=target.device, generator=generator)).clamp(1e-4, 1-1e-4)
@@ -88,7 +90,12 @@ def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator,
         with torch.no_grad():
             history = x + (1-tt)*net(x, t, esm, mask, x_sc=None, prepared=detach(prepared))
     velocity = net(x, t, esm, mask, x_sc=history, prepared=prepared)
-    loss = (((velocity - (target-noise)).square().mean(-1)*mask).sum(1)/mask.sum(1)).mean()
+    error = (velocity - (target-noise)).square().mean(-1)
+    if motif_weight == 1.:
+        loss = ((error*mask).sum(1)/mask.sum(1)).mean()
+    else:
+        weights = mask * (1 + (motif_weight-1) * (keep & ~dropped[:, None]))
+        loss = ((error*weights).sum(1)/weights.sum(1)).mean()
     if not torch.isfinite(loss):
         raise FloatingPointError('Nonfinite fragment flow loss')
     info=dict(noise=noise.detach(), t=t.detach(), dropped=dropped.detach(), self_conditioned=use_history)

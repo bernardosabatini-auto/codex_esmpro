@@ -57,6 +57,8 @@ def main():
             if sorted(original['train'])!=c['evaluation_train_ids']:raise ValueError('Changed original capacity panel')
     if c.get('fragment_representation'):
         if c['fragment_representation']!='geometry_sequence' or warm or c['arm']!='full' or c.get('variant')!='geometry' or c.get('auxiliary_motif') or c.get('expanded_fragment_data') or sha(c['representation_protocol'])!=c['representation_protocol_sha256']:raise ValueError('Invalid representation contrast')
+    if c.get('latent_motif_weight'):
+        if not warm or c.get('training_protein_count')!=128 or c.get('rollout_motif') or c.get('auxiliary_motif') or c.get('target_frame_training') or c.get('backbone_tokens') or c.get('fragment_representation') or sha(c['latent_weight_protocol'])!=c['latent_weight_protocol_sha256'] or c['latent_motif_weight']!=json.loads(Path(c['latent_weight_protocol']).read_text())['weight']:raise ValueError('Invalid latent motif weighting')
     if c.get('backbone_tokens'):
         if warm or c['arm']!='full' or c.get('variant')!='geometry' or c.get('fragment_representation') or c.get('auxiliary_motif') or c.get('expanded_fragment_data') or sha(c['backbone_tokens_protocol'])!=c['backbone_tokens_protocol_sha256']:raise ValueError('Invalid direct backbone contrast')
     geometry=c.get('variant')=='geometry'
@@ -176,7 +178,7 @@ def main():
                     coordinates=coordinates.cuda() if geometry else None;null_target=null_target.cuda() if null_target is not None else None
                     z,features,keep,mask=[x.cuda() for x in (z,features,keep,mask)];factor=min((step+1)/100,1)*(.1+.9*.5*(1+math.cos(math.pi*step/1999)))
                     for group in optimizer.param_groups:group['lr']=group['base_lr']*factor
-                    optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates,return_state=bool(c.get('auxiliary_motif')),null_target=null_target)
+                    optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates,return_state=bool(c.get('auxiliary_motif')),null_target=null_target,motif_weight=c.get('latent_motif_weight',1.))
                     if null_target is not None:m.setdefault('frame_target_updates',[]).append(dict(step=step+1,conditioned_target_sha256=digest(z),null_target_sha256=digest(null_target),selected_target_sha256=digest(info['target']),dropped_slots=info['dropped'].cpu().tolist()))
                     if c.get('auxiliary_motif'):
                         from latentfold.fragment_objective import endpoint_fragment_objective

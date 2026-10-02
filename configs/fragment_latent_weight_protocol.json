@@ -1,0 +1,10 @@
+{
+  "purpose": "Test a cheap conditional flow-loss emphasis on supplied-fragment residues, retaining the native latent targets and scaffold supervision.",
+  "contrast": "Weight per-residue latent velocity MSE by3 at known motif positions only when the condition is present, and by1 elsewhere. Divide each protein's loss by its total valid weight before averaging proteins. Dropped-condition examples retain the original uniform loss. Keep all latent, sequence and distance inputs and full-protein target latents unchanged.",
+  "hypothesis": "The current loss treats the supplied motif like the unconstrained scaffold. A fixed modest weighting tests insufficient emphasis on constraint retention. This is distinct from the failed decoder-based auxiliary objectives and introduces no decoder backpropagation or additional sampling steps.",
+  "weight": 3.0,
+  "training": "128-protein corpus49945596; same parent49929751 EMA+adapter, seed2026100241, fresh optimizer,2000updates and all sampling/schedule settings as49951202. No new data, frame change, backbone-token branch or other auxiliary loss.",
+  "controls": "Analytical gradient-ratio and dropped-condition tests; weight1 exact arithmetic parity; noise/time/drop/history streams identical.40update profile compared with49947730; all2000primary traces and384initial outputs match49951202.",
+  "evaluation": "Original32capacity/16development,4fixed noises at500/2000; strict proper raw motif fit; unchanged36backbone/288refold assay for every technically completed run. Compare49951202 and49961674. Report global designability alongside strict retention. No weight sweep follows a failure.",
+  "resources": "OneRTX profile before full training; measure cost and memory<=75GiB. At most8own running-plus-pending GPUs."
+}

@@ -9,6 +9,7 @@ from latentfold.flow import FlowConfig,SampleConfig,flow_loss,sample,target_nois
 from latentfold.precision import inference_precision
 from latentfold.metrics import ca_metrics
 from latentfold.teacher_states import draw_teacher
+from latentfold.training_schedule import proportional_schedule
 from latentfold.ensemble_metrics import backbone_geometry
 from audit_distill_labels import metrics
 from prepare_overfit import sha
@@ -28,8 +29,13 @@ def score_ensemble(bb,record):
 def main():
     p=argparse.ArgumentParser()
     for k in ('source','config','output'):p.add_argument('--'+k,type=Path,required=True)
-    a=p.parse_args();c=json.loads(a.config.read_text());path=Path(c['label_manifest']);source=json.loads(path.read_text())
-    if sha(path)!=c['label_manifest_sha256'] or source['status']!='complete' or not source['training_gate_passed'] or sha(path.parent/'labels.h5')!=source['labels_sha256']:raise ValueError('label gate/provenance failed')
+    a=p.parse_args();c=json.loads(a.config.read_text());expanded=bool(c.get('corpus_inventory'))
+    if expanded:
+        from expanded_corpus import metadata,load
+        source=metadata(c)
+    else:
+        path=Path(c['label_manifest']);source=json.loads(path.read_text())
+        if sha(path)!=c['label_manifest_sha256'] or source['status']!='complete' or not source['training_gate_passed'] or sha(path.parent/'labels.h5')!=source['labels_sha256']:raise ValueError('label gate/provenance failed')
     if c['arm'] not in ('reference','aligned_teacher','pca_teacher'):raise ValueError('invalid arm')
     estimator=c.get('target_estimator','sampled')
     if estimator not in ('sampled','posterior') or (estimator=='posterior' and c['arm']=='reference'):raise ValueError('invalid target estimator')
@@ -39,17 +45,24 @@ def main():
     if c['evaluation_steps'][-1]!=c['updates']:raise ValueError('invalid budget')
     if not c.get('profile_only'):
         profile=json.loads(Path(c['profile_report']).read_text())
-        if sha(c['profile_report'])!=c['profile_report_sha256'] or profile['status']!='complete' or not profile['profile_only'] or profile['max_reserved_gib']>110:raise ValueError('capacity gate failed')
+        if sha(c['profile_report'])!=c['profile_report_sha256'] or profile['status']!='complete' or not profile['profile_only'] or profile['max_reserved_gib']>c.get('maximum_profile_gib',110):raise ValueError('capacity gate failed')
     a.output.mkdir(parents=True,exist_ok=False);torch.cuda.set_device(0);torch.set_num_threads(4);torch.cuda.set_per_process_memory_fraction(.85);start=time.monotonic();telemetry=None
-    m=dict(status='running',config=c,updates=0,training=[],batches=[],scores=[],controls=[],scope='32 training proteins; teacher-mode recall only. No unseen-family or biological-state claim. Original tests untouched.');atomic_json(a.output/'manifest.json',m)
+    m=dict(status='running',config=c,updates=0,training=[],batches=[],scores=[],controls=[],scope=f'{122 if expanded else 32} training proteins; teacher-mode recall only. No unseen-family or biological-state claim. Original tests untouched.');atomic_json(a.output/'manifest.json',m)
     try:
         records={};buckets={k:[] for k in (128,256,384,512)}
-        with h5py.File(path.parent/'labels.h5') as h:
-            for r in source['config']['targets']:
-                g=h[r['id']];record=dict(r,state=json.loads(g.attrs['state_definition']))
-                for key in ('esm','reference_z','reference_backbone','teacher_z_aligned','teacher_z_pca','teacher_backbone'):record[key]=torch.from_numpy(g[key][:])
-                record['valid_indices']=np.flatnonzero(g['coarse_valid'][:]);records[r['id']]=record;buckets[r['bucket']].append(r['id'])
+        if expanded:records,buckets=load(c)
+        else:
+            with h5py.File(path.parent/'labels.h5') as h:
+                for r in source['config']['targets']:
+                    g=h[r['id']];record=dict(r,state=json.loads(g.attrs['state_definition']))
+                    for key in ('esm','reference_z','reference_backbone','teacher_z_aligned','teacher_z_pca','teacher_backbone'):record[key]=torch.from_numpy(g[key][:])
+                    record['valid_indices']=np.flatnonzero(g['coarse_valid'][:]);records[r['id']]=record;buckets[r['bucket']].append(r['id'])
+        lengths=[sorted(buckets)[step%4] for step in range(c['updates'])]
+        if expanded and not c.get('profile_only'):
+            lengths=proportional_schedule({k:len(v) for k,v in buckets.items()},c['updates'],c['seed']+2)
+        if expanded:m['length_schedule']=lengths
         ckpt=a.source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt';m['initial_checkpoint_sha256']=sha(ckpt)
+        if c.get('checkpoint_sha256') and c['checkpoint_sha256']!=m['initial_checkpoint_sha256']:raise ValueError('initial checkpoint changed')
         model,architecture=load_legacy(ckpt,trusted_pickle=True);model.cuda().train();model.checkpoint_blocks=True;model.pair.checkpoint_blocks=True
         decoder=load_proteinae(a.source/'ProteinAE_v1',a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt',steps=c['decoder_steps']).cuda()
         torch.manual_seed(c['seed']);ema={k:v.detach().clone() for k,v in model.state_dict().items()};optimizer=torch.optim.AdamW(model.parameters(),lr=c['learning_rate'],betas=(.9,.95),weight_decay=.01,foreach=False)
@@ -62,7 +75,7 @@ def main():
                     noise=torch.zeros(32,length,8,device='cuda');dn=torch.zeros(32,4*length,3,device='cuda')
                     for k in range(32):
                         noise[k,:n]=target_noise([ident],[n],8,seed=c['evaluation_seed'],sample_index=k,device='cuda')[0];dn[k,:4*n]=target_noise([ident],[4*n],3,seed=c['evaluation_seed'],sample_index=k,stream='decoder',device='cuda')[0]*decoder.fm.scale_ref
-                    for guidance in (1,2):
+                    for guidance in c.get('evaluation_guidance',(1,2)):
                         if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('overfit evaluation cap')
                         name=f'collect::overfit_eval::{step}::{index}::{guidance}';torch.cuda.synchronize();tick=time.monotonic();torch.cuda.reset_peak_memory_stats();torch.cuda.nvtx.range_push(name)
                         try:
@@ -90,7 +103,7 @@ def main():
                 try:
                     for step in range(begin,end):
                         if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('overfit training cap')
-                        length=sorted(buckets)[step%4];count=c['batches'][str(length)]
+                        length=lengths[step];count=c['batches'][str(length)]
                         while len(queues[length])<count:queues[length].extend(order.permutation(buckets[length]).tolist())
                         ids=queues[length][:count];del queues[length][:count];esm=torch.zeros(count,length,2560,device='cuda');z=torch.zeros(count,length,8,device='cuda');mask=torch.arange(length,device='cuda')[None]<torch.tensor([records[i]['length'] for i in ids],device='cuda')[:,None];choices=[]
                         for k,ident in enumerate(ids):

@@ -1,0 +1,22 @@
+{
+  "purpose": "Test whether the capacity and separate tuning gains from equal-state teacher sampling extend to a broader, metadata-selected training corpus and replicate across optimization seeds.",
+  "prerequisite": "Aligned balanced500 passed the original32 capacity gate and separate64-family tuning quality gate. No promotion is implied. Existing aligned122 reconstruction certificate passes under empirical and balanced priors.",
+  "data": "All122 families passing the original confidence/diversity rule, including the original32. Reuse the identical aligned label arrays and ESMC80 embeddings; no student-dependent filtering or new labels. The other90 are additional training inputs, not a test set. Original34 and reserved17 stay unscored.",
+  "arms": ["empirical", "balanced"],
+  "seeds": [2026100171, 2026100181],
+  "sampling": "Same initialization, target order and stochastic forward/noise streams within each seed. One uniform teacher draw per example in either prior. Empirical is uniform valid conformations; balanced gives equal mass to frozen contact states, uniform within a state. No reference-label mixture.",
+  "length_schedule": "Sample a bucket for each optimizer update with probability N_bucket/122, using a separate NumPy generator seeded training_seed+2. Within-bucket permutation cycles fill the batch. Protein-mean loss gives each protein equal expected coefficient before gradient clipping/optimizer updates. Record every selected length and sparse target/label hashes. Both priors share schedules. The40-update profile cycles all four buckets to exercise maximum memory.",
+  "batches": {"128": 32, "256": 16, "384": 8, "512": 8},
+  "updates": 2000,
+  "evaluation_steps": [500, 2000],
+  "evaluation_guidance": [1],
+  "evaluation_seed": 2026100162,
+  "learning_rate": 0.00003,
+  "ema_decay": 0.99,
+  "warmup_updates": 100,
+  "precision": "Strict FP32, original459M EMA initialization, frozen ESMC and ProteinAE, original AdamW/betas/decay/clipping, Euler25 and decoder3. No reduced-step combination.",
+  "evaluation": "Fresh32-sample teacher-state ensembles on every one of122 training proteins at0/500/2000, CFG1 primary. Retain invalid samples and the original2A and1A state-hit definitions. Report all122 and original32/additional90 separately; latter is still training-set performance. Keep initial prediction agreement visible within seed. No new frame comparison.",
+  "analysis": "Within each seed compare balanced minus empirical and each arm minus initialization with family bootstrap. Require positive balanced-minus-empirical and balanced-minus-initial recall intervals, validity delta>=-0.01, replicated in both seeds, before a replicated capacity claim. These are broader-corpus criteria, not a retroactive replacement for the32-protein/reference-control gate. Independently evaluate both endpoints on64 tuning families and advance only reference-quality-qualified settings to48-family ensemble evaluation. Report both seeds and endpoints without selecting the best seed.",
+  "resources": "First40 updates on one RTX PRO6000 Blackwell,10-minute cap; require finite loss/gradients and peak reserved<=80GiB before full RTX training. Profile does not establish optimization equivalence across hardware. Within-seed matched priors run on the same hardware type. Planned full runs capped150minutes each,144minute work cap; up to four total for2priors x2seeds, subject to the eight-GPU project cap and15:00UTC deadline.",
+  "interpretation": "This is an adaptive expansion following successful small-panel diagnostics. Frame choice is a practical audited-label choice, not evidence of a rotation advantage. Balanced frequencies are not equilibrium probabilities. Independent-test performance, biological diversity and speed remain unproven."
+}

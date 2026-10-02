@@ -60,10 +60,11 @@ def audited_families(config):
     """Read the frozen training-family mapping, checking the label-manifest hash."""
     import hashlib,json
     from pathlib import Path
-    raw=Path(config['label_manifest']).read_bytes()
-    if hashlib.sha256(raw).hexdigest()!=config['label_manifest_sha256']:
+    field='corpus_inventory' if config.get('corpus_inventory') else 'label_manifest'
+    raw=Path(config[field]).read_bytes()
+    if hashlib.sha256(raw).hexdigest()!=config[field+'_sha256']:
         raise ValueError('label manifest changed before analysis')
-    rows=json.loads(raw)['config']['targets']
+    source=json.loads(raw);rows=source['targets'] if field=='corpus_inventory' else source['config']['targets']
     families={r['id']:r['family'] for r in rows}
     if len(families)!=len(rows) or any(not f for f in families.values()):
         raise ValueError('missing or duplicate family metadata')

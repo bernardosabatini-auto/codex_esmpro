@@ -14,16 +14,19 @@ def main():
         if m['updates']!=c['updates']:raise ValueError('incomplete training')
         if not c.get('profile_only'):
             families=audited_families(c)
-            if len(m['scores'])!=(len(c['evaluation_steps'])+1)*32*2 or len(m['controls'])!=8:raise ValueError('incomplete evaluations')
-            for guidance in (1,2):
+            guidance_settings=c.get('evaluation_guidance',(1,2));targets=len(families)
+            if len(m['scores'])!=(len(c['evaluation_steps'])+1)*targets*len(guidance_settings) or len(m['controls'])!=4*len(guidance_settings):raise ValueError('incomplete evaluations')
+            for guidance in guidance_settings:
                 baseline={r['target_id']:r['coverage']['32'] for r in m['scores'] if r['step']==0 and r['guidance']==guidance}
                 for step in [0]+c['evaluation_steps']:
                     rows=[r for r in m['scores'] if r['step']==step and r['guidance']==guidance]
-                    if len(rows)!=32 or len({r['target_id'] for r in rows})!=32 or any(len(r['assignments'])!=32 for r in rows):raise ValueError('incomplete target/sample coverage')
+                    if len(rows)!=targets or {r['target_id'] for r in rows}!=set(families) or any(len(r['assignments'])!=32 for r in rows):raise ValueError('incomplete target/sample coverage')
                     key=f'{step}_cfg{guidance}';d['summaries'][key]={k:float(np.mean([r[k] for r in rows])) for k in ('valid_fraction','teacher_ca_lddt','reference_ca_lddt','teacher_feature_rmse','valid_teacher_hit_fraction','state_total_variation','teacher_sampling_expected_coverage32')};d['summaries'][key]['coverage32']=float(np.mean([r['coverage']['32'] for r in rows]));d['paired'][key]=paired_change({r['target_id']:r['coverage']['32'] for r in rows},baseline,families=families)
                     d['latent_diagnostics'][key]={metric:float(np.mean([r['latent_diagnostic'][metric] for r in rows])) for metric in rows[0]['latent_diagnostic']}
         d['max_reserved_gib']=max(r['peak_reserved_bytes'] for r in m['batches'])/1024**3;d['training_seconds']=sum(r['seconds'] for r in m['batches'] if r['stage']=='training')
-        lengths=sorted(int(k) for k in c['batches']);work=[(lengths[step%len(lengths)],c['batches'][str(lengths[step%len(lengths)])]) for step in range(m['updates'])]
+        lengths=sorted(int(k) for k in c['batches']);schedule=m.get('length_schedule',[lengths[step%len(lengths)] for step in range(m['updates'])])
+        if len(schedule)!=m['updates'] or set(schedule)-set(lengths):raise ValueError('invalid recorded length schedule')
+        work=[(length,c['batches'][str(length)]) for length in schedule]
         d['training_examples']=sum(count for length,count in work);d['padded_residue_examples']=sum(length*count for length,count in work)
         d['examples_per_training_second']=d['training_examples']/d['training_seconds'];d['padded_residues_per_training_second']=d['padded_residue_examples']/d['training_seconds']
         if d['target_estimator']=='posterior':
@@ -34,6 +37,9 @@ def main():
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n')
     lines=['# Small-ensemble learnability diagnostic','',f"Status: {d['status']}; arm: {d['arm']}; profile only: {d['profile_only']}.",'','32 training proteins selected for teacher diversity. Teacher-defined contact modes are predictions, not measured biological states. Fresh32-sample ensembles at both CFG settings; all samples retained. Coverage requires feature RMSE<=2A, nearest-contact teacher CA-lDDT>=0.8 and coarse-valid geometry.','', '| Updates / guidance | Mode recall @32 | Coarse valid | Teacher CA-lDDT | Reference CA-lDDT | State TV (lower better) |','|---|---:|---:|---:|---:|---:|']
     for key,r in d['summaries'].items():lines.append(f"| {key} | {r['coverage32']:.5f} | {r['valid_fraction']:.5f} | {r['teacher_ca_lddt']:.5f} | {r['reference_ca_lddt']:.5f} | {r['state_total_variation']:.5f} |")
+    if c.get('corpus_inventory'):
+        lines[0]='# Expanded teacher-ensemble training diagnostic'
+        lines[4]='All122 metadata-eligible training families, unchanged aligned labels, CFG1 ensembles. Teacher modes are predictions, not biological-state measurements. Full training draws length buckets proportional to target counts; the short profile cycles all buckets to test memory. All samples retained with unchanged geometry/state-hit criteria.'
     lines+=['',f"Training label distribution: {d['label_distribution']}. The state-TV column always compares with the original empirical teacher prior; equal-state-prior TV is reported separately by analyze_overfit_states.py."]
     if d['latent_diagnostics']:
         lines+=['','Latent diagnostics (nearest teacher RMSE): global reference fits below are evaluation-only and never alter predictions.','','| Updates / guidance | Sampled latent | Re-encoded backbone | Pose-aligned re-encoded backbone | Decoder/encoder RMSE |','|---|---:|---:|---:|---:|']

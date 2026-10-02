@@ -23,6 +23,9 @@ def main():
     for name in ('source','config','output'):p.add_argument('--'+name,type=Path,required=True)
     a=p.parse_args();c=json.loads(a.config.read_text());path=Path(c['panel'])
     if hashlib.sha256(path.read_bytes()).hexdigest()!=c['panel_sha256']:raise ValueError('changed panel')
+    for field in ('candidate_reference','quality_report','candidate_manifest'):
+        if c.get(field+'_sha256') and file_identity(Path(c[field]),hash_contents=True)['sha256']!=c[field+'_sha256']:raise ValueError('changed '+field)
+    if c.get('quality_report') and not json.loads(Path(c['quality_report']).read_text())['sampling_quality_gate_passed']:raise ValueError('candidate ensemble quality gate failed')
     byid={r['query_id']:r for r in json.loads(path.read_text())['development']};rows=[byid[i] for i in c['target_ids']]
     if len(rows)!=8 or len({r['family'] for r in rows})!=8:raise ValueError('eight development families required')
     a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85);start=time.monotonic();telemetry=None

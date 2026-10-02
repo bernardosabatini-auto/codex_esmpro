@@ -1,4 +1,4 @@
-"""Profile bounded confidence on H100 against frozen full-confidence labels."""
+"""Profile bounded confidence on declared hardware against saved full-confidence labels."""
 import argparse,hashlib,json,time
 from pathlib import Path
 import h5py,numpy as np,torch
@@ -29,7 +29,8 @@ def main():
     m=dict(status='running',config=c,records=[],batches=[]);atomic_json(a.output/'manifest.json',m)
     try:
         m['gpu']=torch.cuda.get_device_name(0)
-        if 'H100' not in m['gpu']:raise ValueError('H100 profile hardware required')
+        expected_gpu=c.get('expected_gpu','H100')
+        if expected_gpu not in ('H100','RTX PRO 6000') or expected_gpu not in m['gpu']:raise ValueError('declared profile hardware required')
         model,adapter=load_fast_model(a.source/'data/esmfold2_fast');m['teacher_adapter']=adapter;telemetry=Telemetry(a.output,True)
         with torch.no_grad(),inference_precision('fp32'),chunk_confidence(model,4):
             for index,r in enumerate(sorted(c['targets'],key=lambda r:-r['length'])):

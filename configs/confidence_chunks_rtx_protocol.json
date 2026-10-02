@@ -1,0 +1,8 @@
+{
+  "purpose": "Test whether four-at-a-time teacher confidence computation reduces unchanged16-draw label memory on RTX PRO6000 Blackwell. Replaces the never-started H100 probe after approximately30minutes pending; no H100 compatibility claim.",
+  "scope": "Exactly the same eight saved-output controls as the cancelled H100 configuration: four historical controls and longest new profile family per length bucket. No outcome selection or changed tolerances.",
+  "change": "One protein, unchanged FP32 teacher, seed,3trunk loops,50diffusion steps,16samples. Confidence head chunks of4, all confidence tensors concatenated in sample order, instance method restored on exit. No package changes.",
+  "controls": {"max_ca_rmsd": 0.2, "min_ca_lddt": 0.99, "confidence_rmse": 0.0001, "confidence_max_abs": 0.001, "validity_exact": true, "confident_residue_mask_exact": true, "metadata_eligibility_exact": true, "eligible_contact_state_assignment_exact": true},
+  "resources": "OneRTX,10minute allocation/8minute work budget, eight proteins, no AE/ESMC loading. Peak reserved<=64GiB with all controls passing before considering a full RTX label-pipeline profile.",
+  "interpretation": "Saved full-confidence outputs came from H200. Tolerance-qualified cross-hardware output agreement is not a same-hardware speed ratio. RTX-only memory measurements cannot qualify H100 or the complete AE pipeline. All prior data and student experiments remain unchanged."
+}

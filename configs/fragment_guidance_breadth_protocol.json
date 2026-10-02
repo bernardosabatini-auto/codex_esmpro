@@ -1,0 +1,9 @@
+{
+  "purpose": "SingleCFG2test on full-network128protein model after earlierCFG2test on frozen32protein conditioner failed. Test whether the stronger learned conditioner now supportsstrictretention without a newtrainingcost.",
+  "source": "Fixed parent49951202local2000/cumulative4000updates,128trainingproteins. MeanproperdevelopmentmotifRMSD3.383Aversus5.373Aforolderfrozenhead; bestraw1.145A. No selectedtarget/noise/checkpointsearch. Old failedguidance49927209remainsclosed.",
+  "sampling": "Compare guidance1with guidance2,50Eulersteps/AE3. At guidance2use v_null+2*(v_fragment-v_null)with shared combined-velocity self-conditioning history. No output clamping. Precompute both conditions once. Guidance1requires50velocity evaluations and guidance2requires100; measure matched generation time and memory. No guidance grid.",
+  "controls": "All64guidance1outputs reproduce archived conditionedsamples. Allfourcontrolfamilies guidance0outputs reproduce archived nullsamples. Guidance2exactFP64quarter-rotation controls retain latent max error<=1e-4. Every output finite and archived; all scores recomputed independently.",
+  "evaluation": "MotifdRMS and proper-rotationCA RMSD,coarse geometry,strict raw motif/geometry success, and scaffold diversity after motif alignment. Report all pairs and qualified-pair counts; no population/generalization claim. Family bootstrap paired contrasts across16families.",
+  "followup": "Exactly the original fixed screen rule: at leastone strict raw sample among the sameeightrefoldingcases, positive meanstrict-successchange, and lowerpairedvaliditydifferenceCI>=-.05. Then samebudget288refolds and strictsamevalidrefoldcriterion; otherwiseclosewithnostrengthsweep. No conditioning-strengthperformanceclaim beforedesignability.",
+  "resources": "OneRTX bounded8minutes; no training; at most8ownrunning-plus-pending GPUs."
+}

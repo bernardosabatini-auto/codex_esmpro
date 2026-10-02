@@ -10,13 +10,7 @@ from summarize_fragment_training import interval
 from prepare_overfit import sha
 
 
-def scaffold_rmsd(left,right,keep):
-    x,y=np.asarray(left,dtype=np.float64)[:,1],np.asarray(right,dtype=np.float64)[:,1]
-    keep=np.asarray(keep,dtype=bool)
-    if keep.sum()<3 or keep.all():raise ValueError('Motif and scaffold required')
-    mx,my=x[keep].mean(0),y[keep].mean(0)
-    u,_,vt=np.linalg.svd((x[keep]-mx).T@(y[keep]-my));correction=np.eye(3);correction[-1,-1]=np.linalg.det(u@vt);rotation=u@correction@vt
-    return float(np.sqrt(np.mean(np.sum(((x[~keep]-mx)@rotation+my-y[~keep])**2,axis=-1))))
+from latentfold.fragment_designability import scaffold_rmsd
 
 
 def analyze(run):

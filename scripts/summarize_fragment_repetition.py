@@ -12,7 +12,7 @@ from latentfold.fragment_designability import motif_fit
 from latentfold.metrics import ca_metrics
 from prepare_fragment_repetition import audit_config
 from prepare_overfit import sha
-from summarize_fragment_guidance import scaffold_rmsd
+from latentfold.fragment_designability import scaffold_rmsd
 
 
 def analyze(run):
@@ -24,12 +24,13 @@ def analyze(run):
     audit_config(c)
     if m['training_updates'] or sha(run / 'predictions.h5') != m['predictions_sha256']:
         raise ValueError('Changed repetition output')
-    expected = {('historical', 1), ('historical', 2), ('batch_partition', 1),
-                ('batch_partition', 2), ('pose', 2)}
+    batch_control = 'same_batch_repeat' if c.get('batch_size') == 4 else 'batch_partition'
+    expected = {('historical', 1), ('historical', 2), (batch_control, 1),
+                (batch_control, 2), ('pose', 2)}
     if len(m['controls']) != 5 or {(r['kind'], r['guidance']) for r in m['controls']} != expected:
         raise ValueError('Missing controls')
     for r in m['controls']:
-        if not np.isfinite(r['latent_max_abs']) or r['latent_max_abs'] > (1e-5 if r['kind'] == 'historical' else 1e-4):
+        if not np.isfinite(r['latent_max_abs']) or r['latent_max_abs'] > (1e-5 if r['kind'] in ('historical', 'same_batch_repeat') else 1e-4):
             raise ValueError('Failed latent control')
         if r['kind'] == 'historical' and (r['max_ca_rmsd'] > .2 or r['min_ca_lddt'] < .99 or not r['same_validity']):
             raise ValueError('Failed historical geometry control')
@@ -47,7 +48,7 @@ def analyze(run):
             z, bb = g['latent'][:], g['backbone'][:]
             if bb.shape != (c['samples'], int(v.attrs['length']), 4, 3) or z.shape != (c['samples'], len(bb[0]), 8) or not np.isfinite(bb).all() or not np.isfinite(z).all():
                 raise ValueError('Invalid generation arrays')
-            if np.max(abs(z - f[f'controls/partition{guidance}'][:])) > 1e-4:
+            if np.max(abs(z - f[f'controls/partition{guidance}'][:])) > (1e-5 if c.get('batch_size') == 4 else 1e-4):
                 raise ValueError('Stored partition parity failed')
             if guidance == 2 and np.max(abs(z - f['controls/pose2'][:])) > 1e-4:
                 raise ValueError('Stored pose parity failed')

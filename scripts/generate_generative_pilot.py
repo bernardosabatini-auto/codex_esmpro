@@ -16,9 +16,7 @@ from prepare_overfit import sha
 from profile_gpu import Telemetry,atomic_json
 
 
-def motif_error(bb,ref,keep):
-    x=bb[:,keep,1];y=ref[keep,1];dx=np.linalg.norm(x[:,:,None]-x[:,None,:],axis=-1);dy=np.linalg.norm(y[:,None]-y[None,:],axis=-1)
-    return np.sqrt(np.mean((dx-dy)**2,axis=(1,2)))
+from latentfold.fragment_designability import motif_error
 
 
 def main():

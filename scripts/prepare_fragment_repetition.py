@@ -20,6 +20,12 @@ def audit_config(c):
                 'guidance', 'steps', 'decoder_steps', 'work_cap_seconds'):
         if c[key] != spec[key]:
             raise ValueError('Changed prospective recipe: ' + key)
+    if c.get('batch_size', 16) != spec.get('batch_size', 16):
+        raise ValueError('Changed batching recipe')
+    if 'original_protocol' in spec:
+        root = Path(__file__).resolve().parents[1]
+        if sha(root / spec['original_protocol']) != spec['original_protocol_sha256']:
+            raise ValueError('Changed original failed protocol')
     for prefix, expected in [('generation', spec['parent_training']),
                              ('historical', spec['historical_screen'])]:
         path = Path(c[prefix + '_manifest'])
@@ -39,15 +45,17 @@ def audit_config(c):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--output', type=Path, required=True)
+    p.add_argument('--batch-four', action='store_true')
     a = p.parse_args()
     root = Path(__file__).resolve().parents[1]
-    protocol = root / 'configs/fragment_repetition_protocol.json'
+    protocol = root / ('configs/fragment_repetition_batch4_protocol.json' if a.batch_four else 'configs/fragment_repetition_protocol.json')
     spec = json.loads(protocol.read_text())
     train = root / 'runs' / spec['parent_training']
     old = root / 'runs' / spec['historical_screen']
     tc = json.loads((train / 'manifest.json').read_text())['config']
     c = {key: spec[key] for key in ('target_id', 'condition', 'seed', 'historical_seed',
          'samples', 'guidance', 'steps', 'decoder_steps', 'work_cap_seconds')}
+    c['batch_size'] = spec.get('batch_size', 16)
     paths = dict(generation_manifest=train / 'manifest.json',
                  training_report=root / 'reports' / (train.name + '.json'),
                  checkpoint=train / 'ema_2000.ckpt', fragments=Path(tc['fragments']),

@@ -4,7 +4,7 @@ from pathlib import Path
 import h5py,numpy as np,torch
 from prepare_overfit import sha
 from generate_isolated_motif import canonical_fragment
-from generate_generative_pilot import motif_error
+from latentfold.fragment_designability import motif_error
 from latentfold.fragment_conditioning import fragment_features
 
 

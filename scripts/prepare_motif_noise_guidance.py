@@ -5,7 +5,7 @@ import h5py,numpy as np
 from prepare_overfit import sha
 from summarize_noise_guidance import analyze
 from summarize_isolated_motif import analyze as fragment_audit
-from generate_generative_pilot import motif_error
+from latentfold.fragment_designability import motif_error
 
 
 def main():

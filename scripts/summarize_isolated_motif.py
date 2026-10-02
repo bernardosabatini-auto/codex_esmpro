@@ -3,7 +3,7 @@ import argparse,json
 from pathlib import Path
 import h5py,numpy as np
 from prepare_overfit import sha
-from generate_generative_pilot import motif_error
+from latentfold.fragment_designability import motif_error
 from generate_isolated_motif import canonical_fragment
 from latentfold.ensemble_metrics import backbone_geometry
 from latentfold.metrics import ca_metrics

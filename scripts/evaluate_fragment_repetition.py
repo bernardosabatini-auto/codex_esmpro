@@ -93,7 +93,9 @@ def main():
                 torch.cuda.synchronize()
                 torch.cuda.reset_peak_memory_stats()
                 tick = time.monotonic()
-                z, bb = sample(c['seed'], list(range(c['samples'])), guidance)
+                parts = [sample(c['seed'], list(range(k, k+c.get('batch_size', 16))), guidance)
+                         for k in range(0, c['samples'], c.get('batch_size', 16))]
+                z, bb = (np.concatenate([part[i] for part in parts]) for i in (0, 1))
                 torch.cuda.synchronize()
                 m['batches'].append(dict(guidance=guidance, seconds=time.monotonic()-tick,
                                         peak_reserved_GiB=torch.cuda.max_memory_reserved()/2**30))
@@ -103,12 +105,13 @@ def main():
                 chunks = np.concatenate([sample(c['seed'], list(range(k, k+4)), guidance,
                                                decode=False)[0] for k in range(0, c['samples'], 4)])
                 err = float(np.max(abs(z-chunks)))
-                m['controls'].append(dict(kind='batch_partition', guidance=guidance, latent_max_abs=err))
+                m['controls'].append(dict(kind='same_batch_repeat' if c.get('batch_size') == 4 else 'batch_partition', guidance=guidance, latent_max_abs=err))
                 out.create_dataset(f'controls/partition{guidance}', data=chunks)
-                if err > 1e-4:
-                    raise ValueError('Batch partition parity failed')
+                if err > (1e-5 if c.get('batch_size') == 4 else 1e-4):
+                    raise ValueError('Fresh batch latent parity failed')
                 if guidance == 2:
-                    posed, _ = sample(c['seed'], list(range(c['samples'])), guidance, posed=True, decode=False)
+                    posed = np.concatenate([sample(c['seed'], list(range(k, k+c.get('batch_size', 16))),
+                        guidance, posed=True, decode=False)[0] for k in range(0, c['samples'], c.get('batch_size', 16))])
                     err = float(np.max(abs(z-posed)))
                     m['controls'].append(dict(kind='pose', guidance=guidance, latent_max_abs=err))
                     out.create_dataset('controls/pose2', data=posed)

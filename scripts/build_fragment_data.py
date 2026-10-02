@@ -10,7 +10,7 @@ from latentfold.precision import inference_precision
 from latentfold.fragment_conditioning import fragment_features
 from latentfold.ensemble_metrics import backbone_geometry
 from generate_isolated_motif import canonical_fragment
-from generate_generative_pilot import motif_error
+from latentfold.fragment_designability import motif_error
 from prepare_overfit import sha
 from profile_gpu import atomic_json
 

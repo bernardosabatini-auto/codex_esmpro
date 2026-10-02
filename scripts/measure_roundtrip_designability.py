@@ -9,7 +9,7 @@ from latentfold.flow import target_noise
 from latentfold.metrics import ca_metrics
 from latentfold.precision import inference_precision
 from generate_isolated_motif import canonical_fragment
-from generate_generative_pilot import motif_error
+from latentfold.fragment_designability import motif_error
 from prepare_roundtrip_designability import audit_sources
 from profile_gpu import atomic_json,Telemetry
 

@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import h5py,numpy as np
 from latentfold.ensemble_metrics import backbone_geometry
-from generate_generative_pilot import motif_error
+from latentfold.fragment_designability import motif_error
 from prepare_overfit import sha
 
 root=Path(__file__).resolve().parents[1];isolated=root/'runs/isolated_motif_49864561';parent=root/'runs/generative_pilot_49855378';noise=root/'runs/noise_guidance_49863415';rows=json.loads((root/'runs/generative_pilot_selection.json').read_text())['rows'];records=[];random=[]

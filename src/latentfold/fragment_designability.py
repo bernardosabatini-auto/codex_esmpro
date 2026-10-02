@@ -31,3 +31,17 @@ def first_repaired_target(raw,refolds):
     outcome=same_refold_success(raw,refolds)
     if not raw['coarse_valid'] or not outcome['successful_refold_indices']:return None
     return outcome['successful_refold_indices'][0]
+
+
+def motif_error(bb,ref,keep):
+    x=bb[:,keep,1];y=ref[keep,1];dx=np.linalg.norm(x[:,:,None]-x[:,None,:],axis=-1);dy=np.linalg.norm(y[:,None]-y[None,:],axis=-1)
+    return np.sqrt(np.mean((dx-dy)**2,axis=(1,2)))
+
+
+def scaffold_rmsd(left,right,keep):
+    x,y=np.asarray(left,dtype=np.float64)[:,1],np.asarray(right,dtype=np.float64)[:,1]
+    keep=np.asarray(keep,dtype=bool)
+    if keep.sum()<3 or keep.all():raise ValueError('Motif and scaffold required')
+    mx,my=x[keep].mean(0),y[keep].mean(0)
+    u,_,vt=np.linalg.svd((x[keep]-mx).T@(y[keep]-my));correction=np.eye(3);correction[-1,-1]=np.linalg.det(u@vt);rotation=u@correction@vt
+    return float(np.sqrt(np.mean(np.sum(((x[~keep]-mx)@rotation+my-y[~keep])**2,axis=-1))))

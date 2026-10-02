@@ -3,7 +3,7 @@ import argparse,json
 from pathlib import Path
 import h5py,numpy as np
 from prepare_overfit import sha
-from generate_generative_pilot import motif_error
+from latentfold.fragment_designability import motif_error
 
 
 SOURCE_KEYS=('generation_manifest','training_report','training_predictions','fragments','isolated_predictions','reference_predictions','predictions','protocol','selection','usalign')

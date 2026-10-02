@@ -7,6 +7,7 @@ from latentfold.decoder import load_proteinae
 from latentfold.embedding import FinalESMC
 from latentfold.flow import SampleConfig,sample,target_noise
 from latentfold.metrics import ca_metrics
+from latentfold.latency import latency_kinds
 from latentfold.precision import inference_precision
 from latentfold.teacher import fast_features,load_fast_model
 from benchmark_esmfold2 import backbone_indices
@@ -33,11 +34,13 @@ def main():
     try:
         telemetry=Telemetry(a.output,True)
         m['device_name']=torch.cuda.get_device_name(0)
-        for kind in (('student','candidate','teacher') if c.get('candidate_checkpoint') else ('student','teacher')):
-            if kind in ('student','candidate'):
-                checkpoint=Path(c['candidate_checkpoint']) if kind=='candidate' else Path(c['student_checkpoint']) if c.get('student_checkpoint') else a.source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt'
+        for kind in latency_kinds(c):
+            is_candidate=kind in ('candidate','expanded_candidate')
+            if kind in ('student','candidate','expanded_candidate'):
+                checkpoint=Path(c['candidate_checkpoint']) if is_candidate else Path(c['student_checkpoint']) if c.get('student_checkpoint') else a.source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt'
                 identity=file_identity(checkpoint,hash_contents=True);m[kind+'_checkpoint']=identity
-                if c.get(kind+'_checkpoint_sha256') and identity['sha256']!=c[kind+'_checkpoint_sha256']:raise ValueError(kind+' checkpoint changed')
+                identity_key='candidate' if is_candidate else kind
+                if c.get(identity_key+'_checkpoint_sha256') and identity['sha256']!=c[identity_key+'_checkpoint_sha256']:raise ValueError(kind+' checkpoint changed')
                 embedding=FinalESMC(a.source/'data/esmc6b',precision='fp32');model,_=load_legacy(checkpoint,trusted_pickle=True);model.cuda().eval().requires_grad_(False)
                 decoder=load_proteinae(a.source/'ProteinAE_v1',a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt',steps=3).cuda()
             else:
@@ -47,13 +50,13 @@ def main():
                     ident=row['query_id'];n=row['length'];length=next(x for x in (128,256,384,512) if n<=x)
                     def predict(count):
                         seed=int.from_bytes(hashlib.sha256(f"{c['seed']}:{ident}:{count}".encode()).digest()[:8],'little')%(2**63-1);torch.manual_seed(seed)
-                        if kind in ('student','candidate'):
+                        if kind in ('student','candidate','expanded_candidate'):
                             esm=embedding([row['sequence']],length);mask=torch.arange(length,device='cuda')[None]<n
                             noise=torch.zeros(count,length,8,device='cuda');dn=torch.zeros(count,4*length,3,device='cuda')
                             for k in range(count):
                                 noise[k,:n]=target_noise([ident],[n],8,seed=c['seed'],sample_index=k,device='cuda')[0]
                                 dn[k,:4*n]=target_noise([ident],[4*n],3,seed=c['seed'],sample_index=0,stream='decoder',device='cuda')[0]*decoder.fm.scale_ref
-                            z=sample(model,esm.repeat(count,1,1),mask.repeat(count,1),SampleConfig(steps=c['candidate_steps'] if kind=='candidate' else 25,guidance=c.get('candidate_guidance',1) if kind=='candidate' else 2,solver=c.get('candidate_solver','euler') if kind=='candidate' else 'euler',time_power=c.get('candidate_time_power',1) if kind=='candidate' else 1),noise=noise,conditioning_ids=[ident]*count)
+                            z=sample(model,esm.repeat(count,1,1),mask.repeat(count,1),SampleConfig(steps=c['candidate_steps'] if is_candidate else 25,guidance=c.get('candidate_guidance',1) if is_candidate else 2,solver=c.get('candidate_solver','euler') if is_candidate else 'euler',time_power=c.get('candidate_time_power',1) if is_candidate else 1),noise=noise,conditioning_ids=[ident]*count,compact_condition=c.get('candidate_compact_condition',False) if kind=='candidate' else False)
                             _,bb=decoder(z,mask.repeat(count,1),noise=dn,return_backbone=True)
                             return bb[:,:n].cpu().numpy()
                         features=fast_features(row['sequence']);indices=backbone_indices(features,n);captured={};chunk=min(count,16)
@@ -70,8 +73,8 @@ def main():
                         return torch.cat(coordinates)[:,torch.as_tensor(indices,device='cuda'),:].float().cpu().numpy()
                     # Warm both capacity regimes; retain an exact teacher full-fold control.
                     warm=predict(1);predict(32)
-                    if kind in ('student','candidate'):
-                        with h5py.File(c['candidate_reference'] if kind=='candidate' else c['student_reference']) as reference:expected=reference[ident][f"cfg{c.get('candidate_guidance',1)}/latent/backbone" if kind=='candidate' else 'cfg2/latent/backbone'][0]
+                    if kind in ('student','candidate','expanded_candidate'):
+                        with h5py.File(c['candidate_reference'] if is_candidate else c['student_reference']) as reference:expected=reference[ident][f"cfg{c.get('candidate_guidance',1)}/latent/backbone" if is_candidate else 'cfg2/latent/backbone'][0]
                         control=ca_metrics(warm[0,:,1],expected[:,1]);m['controls'].append(dict(model=kind,target_id=ident,**control))
                         if control['ca_rmsd']>.2 or control['ca_lddt']<.99:raise ValueError('student sequence-to-ensemble parity failed')
                     if kind=='teacher':
@@ -89,7 +92,7 @@ def main():
                             if bb.shape!=(count,n,4,3) or not np.isfinite(bb).all():raise ValueError('invalid timed backbone')
                             r=dict(model=kind,target_id=ident,length=n,samples=count,repeat=repeat,seconds=seconds,peak_reserved_bytes=torch.cuda.max_memory_reserved(),nvtx_range=name);m['rows'].append(r);m['batches'].append(r)
                     atomic_json(a.output/'manifest.json',m);print(kind,ident,flush=True)
-            if kind in ('student','candidate'):del embedding,decoder
+            if kind in ('student','candidate','expanded_candidate'):del embedding,decoder
             else:del sampler
             del model;gc.collect();torch.cuda.empty_cache()
         m['status']='complete'

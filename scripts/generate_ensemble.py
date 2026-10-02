@@ -19,7 +19,7 @@ def main():
     a=p.parse_args();c=json.loads(a.config.read_text());path=Path(c['panel'])
     if hashlib.sha256(path.read_bytes()).hexdigest()!=c['panel_sha256']:raise ValueError('changed panel')
     if c.get('solver_screen_manifest') and file_identity(Path(c['solver_screen_manifest']),hash_contents=True)['sha256']!=c['solver_screen_manifest_sha256']:raise ValueError('solver quality screen changed')
-    for field in ('transfer_screen_manifest','training_manifest','capacity_report'):
+    for field in ('transfer_screen_manifest','training_manifest','capacity_report','compact_screen_manifest','compact_reference_manifest'):
         if c.get(field) and file_identity(Path(c[field]),hash_contents=True)['sha256']!=c[field+'_sha256']:raise ValueError(f'{field} changed')
     if c.get('hardware_qualification_report'):
         path=Path(c['hardware_qualification_report'])
@@ -90,11 +90,11 @@ def main():
                     cfg=SampleConfig(steps=c.get('flow_steps',25),guidance=guidance,solver=c.get('flow_solver','euler'),time_power=c.get('flow_time_power',1));g=target.create_group(f'cfg{guidance}')
                     name=f'collect::latent::{index}::{guidance}';torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic();torch.cuda.nvtx.range_push(name)
                     try:
-                        z=sample(model,esm.repeat(32,1,1),mask.repeat(32,1),cfg,noise=noise,conditioning_ids=[ident]*32);torch.cuda.synchronize();seconds=time.monotonic()-tick
+                        z=sample(model,esm.repeat(32,1,1),mask.repeat(32,1),cfg,noise=noise,conditioning_ids=[ident]*32,compact_condition=c.get('compact_condition',False));torch.cuda.synchronize();seconds=time.monotonic()-tick
                     finally:torch.cuda.nvtx.range_pop()
                     m['batches'].append(dict(nvtx_range=name,stage='latent',seconds=seconds,length=length,batch=32,peak_reserved_bytes=torch.cuda.max_memory_reserved()))
                     # Control unpadded single inference without cross-sample reuse.
-                    single=sample(model,esm[:,:n],mask[:,:n],cfg,noise=noise[:1,:n])
+                    single=sample(model,esm[:,:n],mask[:,:n],cfg,noise=noise[:1,:n],**({'conditioning_ids':[ident],'compact_condition':True} if c.get('compact_condition') else {}))
                     expected=decoder(single,mask[:,:n],noise=dn[:1,:4*n])[0].cpu().numpy()
                     g.create_dataset('z',data=z[:,:n].cpu().numpy())
                     arms={'latent':[(k,0) for k in range(32)],'decoder':[(0,k) for k in range(32)],'factorial':[(i,j) for i in range(8) for j in range(4)]}

@@ -1,0 +1,7 @@
+{
+  "purpose": "Measure full sequence-to-backbone benefit of compact conditioning after native and ensemble quality pass, including an otherwise identical expanded candidate on the same GPU.",
+  "pipelines": "Original CFG2, balanced500 CFG1 expanded, balanced500 CFG1 compact, and direct teacher. Euler25/decoder3 for every student; teacher trunk3/diffusion50, chunks<=16. Strict FP32. All four pipelines sequentially on one RTX.",
+  "timing": "Same frozen eight sequences, K1/8/32, three repeats with rotating count order. Include fresh ESMC, all flow/trunk/diffusion, decoding and output transfer. Exclude loading/warmup, controls and file output; report total capture separately. Retain old original and teacher controls; both candidate arms must reproduce the qualified compact ensemble backbone within0.2A/0.99. Teacher early exit must match full fold0.01A/0.999.",
+  "analysis": "Average per-sequence three-repeat medians; paired-family ratios against original, expanded balanced and teacher. Direct expanded-versus-compact comparison isolates the optimization; never infer that increment from different GPUs or different jobs. Development quality does not equal teacher accuracy or establish biological diversity.",
+  "resources": "One RTX30-minute cap,1680-second work cap. Previous three-pipeline RTX timing15:15; four pipelines budgeted with headroom. Existing verified compact original EMA reduces untimed loading. No package or precision changes. Total project GPUs<=8."
+}

@@ -3,6 +3,7 @@ import argparse,json
 from pathlib import Path
 import numpy as np
 from summarize_comparison import hardware
+from latentfold.latency import latency_kinds
 
 
 def speed_ratio(reference,candidate):
@@ -21,7 +22,7 @@ def main():
     device=json.loads((run/'device_metadata.json').read_text()) if (run/'device_metadata.json').exists() else {}
     d['device_name']=m.get('device_name',device.get('cuda_device_name','unreported'))
     if m['status']=='complete':
-        kinds=('student','candidate','teacher') if m['config'].get('candidate_checkpoint') else ('student','teacher')
+        kinds=latency_kinds(m['config'])
         if len(m['rows'])!=len(kinds)*8*3*3 or len(m['controls'])!=len(kinds)*8:raise ValueError('incomplete timing or controls')
         ids=m['config']['target_ids'];d['per_target']={}
         for kind in kinds:
@@ -38,7 +39,7 @@ def main():
         d['teacher_seconds_over_student']={str(count):d['summaries']['teacher'][str(count)]/d['summaries']['student'][str(count)] for count in (1,8,32)}
         if 'candidate' in kinds:
             d['student_seconds_over_candidate']={str(count):d['summaries']['student'][str(count)]/d['summaries']['candidate'][str(count)] for count in (1,8,32)}
-            d['paired_speedup']={kind:{str(count):speed_ratio(d['per_target'][kind][str(count)],d['per_target']['candidate'][str(count)]) for count in (1,8,32)} for kind in ('student','teacher')}
+            d['paired_speedup']={kind:{str(count):speed_ratio(d['per_target'][kind][str(count)],d['per_target']['candidate'][str(count)]) for count in (1,8,32)} for kind in kinds if kind!='candidate'}
         d['max_reserved_gib']={kind:max(r['peak_reserved_bytes'] for r in m['rows'] if r['model']==kind)/1024**3 for kind in kinds}
         try:d['hardware']=hardware(Path(str(run)+'_nsight.sqlite'),m['batches'])
         except Exception as error:d['hardware']=dict(status='unavailable',error=str(error))
@@ -46,6 +47,8 @@ def main():
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n');lines=['# Matched ensemble latency','',f"Status: {d['status']}.",'',str(d['scope']),'','Eight development sequences; three timed repeats per sequence and sample count. Values average per-sequence medians. Student flow25/CFG2, decoder3. Teacher trunk3/diffusion50, at most16 samples per diffusion chunk. Neither pipeline predicts a confidence ranking in this comparison. These are resident-model latencies, not cold-start latency or maximum multi-sequence throughput.','', '| Pipeline | K1 seconds | K8 seconds | K32 seconds | Incremental seconds/sample, 1 to32 |','|---|---:|---:|---:|---:|']
     for kind,r in d['summaries'].items():lines.append('| '+kind+' | '+' | '.join(f'{v:.4f}' for v in r.values())+' |')
     if m.get('config',{}).get('candidate_checkpoint'):lines+=['',f"Candidate uses {m['config']['candidate_steps']} {m['config'].get('candidate_solver','euler')} flow intervals, CFG{m['config'].get('candidate_guidance',1)} with time power {m['config'].get('candidate_time_power',1)} and the same three-step decoder.",'']
+    if m.get('config',{}).get('candidate_compact_condition'):
+        lines+=['','Candidate uses compact single-sequence conditioning in strict FP32. The expanded_candidate comparator, when present, uses identical weights and sampler with expanded conditioning on the same GPU.']
     if d.get('paired_speedup'):
         lines+=['','Ratios above one favor the candidate. Intervals resample paired sequence families, using each sequence’s three-repeat median; they do not include between-device variation.','','| Comparator / candidate | Samples | Ratio | Paired95% interval |','|---|---:|---:|---|']
         for kind,counts in d['paired_speedup'].items():

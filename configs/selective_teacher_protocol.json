@@ -1,0 +1,13 @@
+{
+  "purpose": "CPU-only diagnostic: does reference-free student disagreement identify teacher benefit, beyond predicting student error or chain length?",
+  "student_run": "runs/comparison_49414524_0",
+  "choices": "runs/consensus_final_ema_choices.json",
+  "teacher_run": "runs/external_49626106",
+  "clusters": "runs/development_clusters/clusters.json",
+  "scope": "All626 reused development targets,606sequence clusters. Existing FP32 predictions and fixed-correspondence metrics only. No new GPU inference, fitting, locked-test scoring or independent-validation claim.",
+  "student": "Previously frozen reference-free3sample CA-lDDT medoid; retain its existing choices. Disagreement=1-meanoffdiagonal pairwise CA-lDDT. All3student samples are required and must be counted in future end-to-end cost.",
+  "teacher": "Fixed first teacher sample0, no oracle selection or confidence optimization.",
+  "policies": "Before opening native scores freeze157/626targets (ceil25%) by highest disagreement, and a same-count longest-chain policy. Tie-break lexicographic ID. Random fallback expectation uses157/626 of average teacher-minus-student benefit. Report full teacher and no-fallback controls.",
+  "analysis": "TM and CA-lDDT differences with606cluster bootstrap; Pearson disagreement versus student error and teacher improvement, pooled and within<=256/>256 strata; partial Pearson after removing intercept/logL/logL squared. No fitted selector and no choosing a preferred budget after results. Report teacher-call fraction, not a speedup from unmatched timings. Correlation is not calibration.",
+  "decision": "Useful only if disagreement targets teacher benefit beyond same-budget random/length-only policies. Any positive result still requires independent families and matched end-to-end cost before deployment. A null result closes this simple fallback rule; no threshold or feature grid."
+}

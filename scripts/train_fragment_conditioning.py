@@ -64,8 +64,8 @@ def main():
         if not warm or c.get('rollout_motif') or c.get('auxiliary_motif') or c.get('expanded_fragment_data'):raise ValueError('Invalid target-frame contrast')
         for key in ('target_frame_protocol','frame_data_report','frame_data_manifest'):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed target-frame source')
-        fd=json.loads(Path(c['frame_data_report']).read_text())
-        if not fd['training_gate_passed'] or fd['manifest_sha256']!=c['frame_data_manifest_sha256'] or fd['fragments_sha256']!=c['fragments_sha256']:raise ValueError('Unqualified anchored targets')
+        from frame_target_audit import qualify_frame_data
+        qualify_frame_data(c)
     if c.get('rollout_breadth_protocol'):
         if not c.get('expanded_fragment_data') or not c.get('rollout_motif'):raise ValueError('Invalid breadth/objective combination')
         for key in ('rollout_breadth_protocol','rollout_breadth_gate_report','rollout_breadth_gate_manifest','rollout_control_manifest'):

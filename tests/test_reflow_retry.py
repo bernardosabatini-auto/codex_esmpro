@@ -1,6 +1,7 @@
 import unittest
 from prepare_reflow_retry_native import normalized_scores
 from retry_sampler_settings import native_steps,external_steps
+from compare_reflow_retry_ensemble import matched_settings
 
 class ReflowRetryTests(unittest.TestCase):
     def test_normalization_keeps_every_archived_value(self):
@@ -23,5 +24,12 @@ class ReflowRetryTests(unittest.TestCase):
         for change in ({'flow_steps':25},{'flow_steps':10.0},{'flow_solver':'midpoint'},{'flow_time_power':2}):
             with self.assertRaises(ValueError):external_steps({**c,**change},p)
         with self.assertRaises(ValueError):external_steps(c,{})
+
+    def test_external_comparison_allows_only_declared_differences(self):
+        common=dict(samples=32,max_attempts=4,noise_arms=['raw','latent'],seed=7,flow_solver='euler',flow_time_power=1,panel_sha256='p',embedding_cache_sha256='e',decoder_checkpoint_sha256='d')
+        a=dict(common,name='reflow10',flow_steps=10,primary_guidance=1,compact_condition=False);b=dict(common,name='compact500',flow_steps=25,primary_guidance=1,compact_condition=True);p=dict(sampling_steps_by_head={'reflow10':10,'compact500':25})
+        matched_settings(a,b,p)
+        for change in ({'seed':8},{'flow_steps':25},{'max_attempts':5},{'panel_sha256':'wrong'},{'compact_condition':True},{'primary_guidance':2},{'latent_noise_scheme':'antithetic'}):
+            with self.assertRaises(ValueError):matched_settings({**a,**change},b,p)
 
 if __name__=='__main__':unittest.main()

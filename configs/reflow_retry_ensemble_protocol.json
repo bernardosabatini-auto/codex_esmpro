@@ -1,0 +1,37 @@
+{
+  "purpose": "External diversity/quality check of the archived paired10-step checkpoint with bounded geometry retries. This tests a speed/quality tradeoff against original and compact25, without changing prior raw failures.",
+  "native_run": "runs/bounded_retry_native_49850092",
+  "heads": [
+    "original",
+    "compact500",
+    "reflow10"
+  ],
+  "sampling_steps_by_head": {
+    "original": 25,
+    "compact500": 25,
+    "reflow10": 10
+  },
+  "latent_noise_scheme": "iid",
+  "reuse_protocol": "configs/retry_ensemble_protocol.json",
+  "reuse_protocol_sha256": "5c1cd5e89830373173c6f0c24f1b782909347dde9e12db0fac6903c075a073d4",
+  "reused_controls": {
+    "original": {
+      "run": "runs/retry_ensemble_49844758",
+      "manifest_sha256": "97c591d5a541d1c9da5cdd750e90c4128231322c9743357790f924d379bbecfb",
+      "scores": "runs/state_scores_49844758/score.json",
+      "scores_sha256": "1ac909e7e2748cf3eba2473da33be30a81a78f428006ab49f9e3e3b33969935d"
+    },
+    "compact500": {
+      "run": "runs/retry_ensemble_49844801",
+      "manifest_sha256": "848086ce353fcfeecf98c699e11fc3c217dcfc8880a184891130ec2ba8c49509",
+      "scores": "runs/state_scores_49844801/score.json",
+      "scores_sha256": "62978f4637a47b6b1ba5f80bb909ddffc18a524335d8bd4d0a8d1e9adc74a9a4"
+    }
+  },
+  "panel": "All48 frozen development families;16 eligible state families. No new targets or locked tests.",
+  "sampling": "FP32 Euler10 CFG1 AE3 expanded conditioning for reflow10, original25CFG2 expanded and compact25CFG1 compact controls. K32 IID latent noise; decoder index0. Slot k uses latent k+32*a at attempt a=0..3; first geometry-valid accepted, exhausted slots return k. Seed2026100109, no reference-based selection. Preserve all raw/attempted outputs.",
+  "controls": "All48 batch-versus-single controls require CA-RMSD<=0.2A and CA-lDDT>=0.99. Actual step count recorded and audited. Original and compact controls are reused only with exact source hashes, model identity and common native screen; selected original equality explicitly verified. New checkpoint external outputs have no same-weight prior ensemble; do not impose fictitious raw identity.",
+  "metrics": "Unchanged ensemble_scoring_protocol.json; raw/selected quality, frozen2A coverage, both-state families, MD W1 and paired-family intervals. Include all failed/fallback outputs. Report both selected original and compact comparisons, retry cost and memory.",
+  "decision": "External quality requires CA lower95% difference bound>-0.005, coarse-valid difference>=-0.01 and coverage difference>=0 versus selected original. Compact comparison is mandatory; passing original does not establish noninferiority to compact. If external quality passes, measure end-to-end latency with retries, ESM and direct-teacher comparison. K32 speed thresholds>=2x original and>=1.25x compact; no speed claim from generation-only times. No5/15/20-step, retry-cap, guidance or seed grid.",
+  "resources": "One RTX15minute allocation/780second cap, cached ESM embeddings. Completion integrity audit and bounded CPU state scoring; <=8 own GPUs running+pending and15UTC deadline."
+}

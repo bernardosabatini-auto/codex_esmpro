@@ -45,7 +45,7 @@ class FragmentAdapter(nn.Module):
         return delta * (keep & ~dropped[:, None])[..., None]
 
 
-def prepare_fragment_condition(net, adapter, features, keep, mask, dropped):
+def prepare_fragment_condition(net, adapter, features, keep, mask, dropped, *, coordinates=None):
     """Reuse the pretrained learned-null condition; add fragment token features."""
     b, n = mask.shape
     # Preserve the established arithmetic initially; optimize only after parity.
@@ -57,10 +57,16 @@ def prepare_fragment_condition(net, adapter, features, keep, mask, dropped):
     prepared = net.prepare_condition(esm, mask, null, **kwargs)
     token = prepared[0] + adapter(features, keep, mask, dropped)
     pool = (token * mask[..., None]).sum(1) / mask.sum(1, keepdim=True)
+    if hasattr(adapter, 'pair_biases'):
+        if coordinates is None or len(prepared)!=3:raise ValueError('Geometry conditioning requires supplied coordinates and pair-attention model')
+        extra=adapter.pair_biases(coordinates,keep,mask,dropped)
+        if len(extra)!=len(prepared[2]) or any(x.shape!=y.shape for x,y in zip(extra,prepared[2])):raise ValueError('Pair adapter architecture mismatch')
+        return esm, (token,pool,tuple(x+y for x,y in zip(prepared[2],extra)))
+    if coordinates is not None:raise ValueError('Token-only adapter does not consume coordinates')
     return esm, (token, pool, *prepared[2:])
 
 
-def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator):
+def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator, coordinates=None):
     """Protein-weighted flow matching; fragment dropout preserves a null branch."""
     if target.shape != (*mask.shape, 8) or target.requires_grad or not torch.isfinite(target).all():
         raise ValueError('Fixed finite full-structure latent targets required')
@@ -69,7 +75,7 @@ def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator)
     t = torch.sigmoid(torch.randn(b, device=target.device, generator=generator)).clamp(1e-4, 1-1e-4)
     dropped = torch.rand(b, device=target.device, generator=generator) < .1
     use_history = bool(torch.rand((), device=target.device, generator=generator) < .5)
-    esm, prepared = prepare_fragment_condition(net, adapter, features, keep, mask, dropped)
+    esm, prepared = prepare_fragment_condition(net, adapter, features, keep, mask, dropped, coordinates=coordinates)
     tt = t[:, None, None]
     x = (1-tt)*noise + tt*target
     history = None
@@ -86,11 +92,11 @@ def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator)
 
 
 @torch.no_grad()
-def sample_fragment(net, adapter, features, keep, mask, *, noise, steps=50, drop_fragment=False):
+def sample_fragment(net, adapter, features, keep, mask, *, noise, steps=50, drop_fragment=False, coordinates=None):
     if net.training or adapter.training or type(steps) is not int or steps < 1 or noise.shape != (*mask.shape, 8) or not torch.isfinite(noise).all():
         raise ValueError('Eval models and finite correctly shaped sampling noise required')
     dropped = torch.full((len(mask),), drop_fragment, dtype=torch.bool, device=mask.device)
-    esm, prepared = prepare_fragment_condition(net, adapter, features, keep, mask, dropped)
+    esm, prepared = prepare_fragment_condition(net, adapter, features, keep, mask, dropped, coordinates=coordinates)
     x, history = noise.clone(), None
     ts = torch.linspace(0, 1, steps+1, device=noise.device)
     for i in range(steps):

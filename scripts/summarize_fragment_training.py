@@ -19,6 +19,8 @@ def analyze(run):
     c=m['config']
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
+    if c.get('variant')=='geometry':
+        if sha(c['geometry_protocol'])!=c['geometry_protocol_sha256'] or len(m['geometry_controls'])!=4*(len(c['evaluation_steps'])+1) or any(r['pose_latent_max_abs']>1e-4 for r in m['geometry_controls']):raise ValueError('Geometry conditioner controls failed')
     if m['updates']!=c['updates'] or len(m['training'])!=c['updates'] or m['frozen_initial']!=m['frozen_final']:raise ValueError('Incomplete/frozen-weight failure')
     if [r['step'] for r in m['training']]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['flow_loss']) or r['adapter_gradient_norm']<=0 for r in m['training']):raise ValueError('Invalid training trace')
     if any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in m['initial_controls']):raise ValueError('Failed initial controls')
@@ -39,9 +41,9 @@ def analyze(run):
                     for slot in range(4):
                         old=index[(cohort,mode,ident,slot)];metrics=ca_metrics(bb[slot,:,1],ref[:,1])
                         if abs(old['motif_drms']-err[slot])>1e-6 or old['coarse_valid']!=int(geom['coarse_valid'][slot]) or any(abs(old[key]-value)>1e-6 for key,value in metrics.items()):raise ValueError('Saved-score mismatch')
-                        if e['step']==0 and cohort=='development':
+                        if cohort=='development' and (e['step']==0 or c['arm']=='adapter_only' and mode=='null'):
                             original=initial['original50/unconditional/'+ident+'/backbone'][slot];control=ca_metrics(bb[slot,:,1],original[:,1])
-                            if control['ca_rmsd']>.2 or control['ca_lddt']<.99:raise ValueError('Saved historical parity failed')
+                            if control['ca_rmsd']>.2 or control['ca_lddt']<.99 or np.max(abs(z[slot]-initial['original50/unconditional/'+ident+'/latent'][slot]))>1e-5:raise ValueError('Saved historical parity failed')
                         audited+=1
             for cohort in sorted({key[0] for key in expected}):
                 families=sorted({r['family'] for r in e['scores'] if r['cohort']==cohort});arms={};paired=[]

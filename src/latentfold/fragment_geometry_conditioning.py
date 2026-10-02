@@ -1,0 +1,38 @@
+"""Optional direct distance information from supplied fragment atoms only."""
+import torch
+from torch import nn
+from torch.nn import functional as F
+from .fragment_conditioning import FragmentAdapter
+
+
+def fragment_coordinates(fragment, *, length, start):
+    if fragment.ndim!=3 or fragment.shape[1:]!=(4,3) or len(fragment)<3 or not torch.isfinite(fragment).all():raise ValueError('Finite supplied fragment backbone required')
+    if start<0 or start+len(fragment)>length:raise ValueError('Invalid placement')
+    coordinates=fragment.new_zeros(length,3);coordinates[start:start+len(fragment)]=fragment[:,1]
+    return coordinates
+
+
+class FragmentGeometryAdapter(FragmentAdapter):
+    """Retain the token adapter; additionally expose known intramotif distances.
+
+    No pair values involving scaffold residues are supplied. Zero initialization
+    preserves the original generator, and fragment dropout removes both routes.
+    """
+    def __init__(self, output_width, *, n_layers, n_heads, hidden=256, pair_hidden=64):
+        super().__init__(output_width,hidden)
+        self.n_layers,self.n_heads=n_layers,n_heads
+        self.register_buffer('centers',torch.arange(0,32,2,dtype=torch.float32))
+        self.pair_hidden=nn.Linear(17,pair_hidden)
+        self.pair_output=nn.Linear(pair_hidden,n_layers*n_heads)
+        nn.init.zeros_(self.pair_output.weight);nn.init.zeros_(self.pair_output.bias)
+
+    def pair_biases(self,coordinates,keep,mask,dropped):
+        if coordinates.shape!=(*mask.shape,3) or keep.shape!=mask.shape or dropped.shape!=mask.shape[:1]:raise ValueError('Invalid pair conditioning shapes')
+        if mask.dtype!=torch.bool or keep.dtype!=torch.bool or dropped.dtype!=torch.bool or (keep&~mask).any() or not keep.any(1).all():raise ValueError('Invalid conditioning masks')
+        if not torch.isfinite(coordinates).all() or (coordinates[~keep]!=0).any():raise ValueError('Scaffold coordinates must be absent')
+        distance=torch.cdist(coordinates.float(),coordinates.float(),compute_mode='donot_use_mm_for_euclid_dist')
+        rbf=torch.exp(-.5*((distance[...,None]-self.centers)/2).square());features=torch.cat((rbf,(distance/(distance+10))[...,None]),-1)
+        delta=self.pair_output(F.silu(self.pair_hidden(features)))
+        known=keep[:,:,None]&keep[:,None,:]&~dropped[:,None,None]
+        delta=(delta*known[...,None]).permute(0,3,1,2).contiguous()
+        return delta.split(self.n_heads,dim=1)

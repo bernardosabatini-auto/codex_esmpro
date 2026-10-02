@@ -6,12 +6,14 @@ from prepare_overfit import sha
 from generate_generative_pilot import motif_error
 
 
-SOURCE_KEYS=('generation_manifest','training_report','training_predictions','fragments','isolated_predictions','reference_predictions','predictions','protocol','selection')
+SOURCE_KEYS=('generation_manifest','training_report','training_predictions','fragments','isolated_predictions','reference_predictions','predictions','protocol','selection','usalign')
 
 
 def audit_inputs(c):
     for key in SOURCE_KEYS:
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
+    for dependency in c['dependencies']+c['teacher_artifacts']:
+        if sha(dependency['path'])!=dependency['sha256']:raise ValueError('Changed dependency '+dependency['path'])
     m=json.loads(Path(c['generation_manifest']).read_text());report=json.loads(Path(c['training_report']).read_text());ids=m['config']['control_ids'];rows={r['target_id']:r for r in json.loads(Path(c['selection']).read_text())['rows']}
     if m['status']!='complete' or m['updates']!=2000 or report['status']!='complete' or report['manifest_sha256']!=c['generation_manifest_sha256'] or report['config']!=m['config']:raise ValueError('Unqualified training provenance')
     if c['fragments_sha256']!=m['config']['fragments_sha256'] or c['reference_predictions_sha256']!=m['config']['initial_predictions_sha256']:raise ValueError('Changed training inputs')
@@ -45,8 +47,8 @@ def main():
                 else:bb=trained[f"development/{'null' if mode=='trained_null' else 'conditioned'}/{ident}/backbone"][:2]
                 dataset=mode+'/'+ident;out.create_dataset(dataset,data=bb)
                 for slot in ([0] if mode=='real' else range(2)):
-                    one=bb if mode=='real' else bb[slot];error=float(motif_error(one[None,st:st+len(fragment)],fragment,np.ones(len(fragment),bool))[0]);entries.append(dict(name=f'trained_fragment_{len(entries):03d}',head='experimental' if mode=='real' else m['config']['arm'] if mode in ('conditioned','trained_null') else 'original50',mode=mode,target_id=ident,family=row['family'],slot=slot,length=row['length'],dataset=dataset,motif_drms=error,motif_start=st,fixed_start=0 if mode=='real' else st,fixed_sequence='' if mode=='real' else str(q.attrs['sequence'])))
-    prior=json.loads((root/'runs/designability_49855973/manifest.json').read_text())['config'];c={k:prior[k] for k in ('num_sequences','temperature','mpnn_seed','seed','mpnn','dependencies','teacher_artifacts','precision','usalign','usalign_sha256')};c.update(assay='trained_fragment',entries=entries,work_cap_seconds=1080,arm=m['config']['arm'],decision='All36backbones,288refolds, fixed motif residues and same-refold joint criterion; no outcome filtering')
+                    one=bb if mode=='real' else bb[slot];error=float(motif_error(one[None,st:st+len(fragment)],fragment,np.ones(len(fragment),bool))[0]);entries.append(dict(name=f'trained_fragment_{len(entries):03d}',head='experimental' if mode=='real' else m['config'].get('variant',m['config']['arm']) if mode in ('conditioned','trained_null') else 'original50',mode=mode,target_id=ident,family=row['family'],slot=slot,length=row['length'],dataset=dataset,motif_drms=error,motif_start=st,fixed_start=0 if mode=='real' else st,fixed_sequence='' if mode=='real' else str(q.attrs['sequence'])))
+    prior=json.loads((root/'runs/designability_49855973/manifest.json').read_text())['config'];c={k:prior[k] for k in ('num_sequences','temperature','mpnn_seed','seed','mpnn','dependencies','teacher_artifacts','precision','usalign','usalign_sha256')};c.update(assay='trained_fragment',entries=entries,work_cap_seconds=1080,arm=m['config'].get('variant',m['config']['arm']),decision='All36backbones,288refolds, fixed motif residues and same-refold joint criterion; no outcome filtering')
     for key,path in [('generation_manifest',manifest),('training_report',a.report),('training_predictions',a.training/'evaluation_2000.h5'),('fragments',fragments),('isolated_predictions',isolated),('reference_predictions',initial),('predictions',inputs),('protocol',root/'configs/trained_fragment_designability_protocol.json'),('selection',selection)]:c[key]=str(path.resolve());c[key+'_sha256']=sha(path)
     audit_inputs(c);a.output.write_text(json.dumps(c,indent=2)+'\n');print('Prepared36backbones,288refolds')
 

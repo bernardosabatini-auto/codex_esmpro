@@ -1,0 +1,7 @@
+{
+  "purpose": "Calibrate the strict same-refold motif criterion on experimental scaffolds when the supplied motif sequence is fixed, following3/4strict successes in the free-redesign positives.",
+  "scope": "Exactly the four existing experimental positive backbones, unchanged centered30percent isolated motifs. Four backbones, eight designs each,32refolds; no new targets and no filtering. Compare descriptively with existing free-redesign positive results; sampling context differs, so this is a feasibility control, not a powered causal estimate.",
+  "recipe": "SameProteinMPNN CA-onlyv48_020,T.1,seed1 and guardedFP32 teacher3loops/50steps/1sample. Fix only supplied motif residues; native scaffold sequence absent. Repeat the first refold of each of four positives as numerical control.",
+  "criterion": "One SAME refold has fixed-correspondence scTM>.5, coarse-valid geometry and motif dRMS<=1A plus proper-rotation CA RMSD<=1A. Retain every result and exact successful sequence indices. Do not relax thresholds when a native positive fails.",
+  "resources": "OneRTX,10minute cap,all32folds audited; total own running-plus-pending GPUs<=8."
+}

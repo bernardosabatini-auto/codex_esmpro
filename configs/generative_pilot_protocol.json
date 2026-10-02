@@ -1,0 +1,14 @@
+{
+  "purpose": "Determine whether the conditional 10-step reflow checkpoint retains unconditional designability and motif scaffolding; neither is established by conditional folding gates.",
+  "panel": "Existing48 development families only. First complete, sequence-matched experimental reference per family. Select8 lengths<=128 and8 lengths>128 by SHA256(family) order. No outcome selection, locked tests or missing-residue filling.",
+  "samples": 4,
+  "seed": 2026100211,
+  "heads": {"original50": 50, "reflow10": 10},
+  "modes": {"unconditional": 1, "motif_u1": 1, "motif_u3": 3},
+  "motif": "Centered contiguous30%, minimum8 residues, encoded from the COMPLETE experimental reference in inherited PCA/skewness frame. Codes may contain scaffold context; this is not isolated-fragment design. No final hard clamp. Fixed motif Gaussian throughout trajectory, fresh deterministic Gaussian per refinement. Source history updates once per outer step.",
+  "sampling": "FP32, unconditional learned null token/pair, AE3, four fixed latent/decoder streams shared across heads/modes. No rejection, retry, geometry filtering or latent repair. Store every latent/backbone. Generic CFG0 versus null-only numerical checks on4 fixed targets per head; retain failures before raising.",
+  "designability": "ProteinMPNN CA-only v_48_020,8 sequences/backbone,temperature0.1,seed1. Guarded ESMFold2-Fast3loops50steps1sample per sequence; every attempt retained. scTM uses fixed residue correspondence with USalign; differs from original Foldseek alignment. Designable if best8 scTM>0.5. Experimental references supply positive controls. In-silico assay only, not experimental validation.",
+  "analysis": "Family bootstrap paired differences and all failures. Joint motif success requires motif CA-distance-matrix RMS<=1A and designability; coarse geometry and pairwise diversity are separate outcomes. Report per-sample and joint-success-per-GPU-second. No inference of same-sequence multistability from separately designed backbones.",
+  "decision": "Generation is a small geometry/numerical profile, not a designability qualification. Profile refolding on4 fixed families (2short/2long) xfirst2samples across all6arms plus4experimental controls before larger design loop. Do not drop poor arms based on geometry; complete matched comparison if technically feasible. Further expansion requires valid refolding controls and deadline-fit measured runtime. No training/grid.",
+  "resources": "Initial generation oneRTX20minutes,1080second worker cap,64GiB hostRAM. Refolding allocation follows measured pilot cost with at most8ownGPUs total. Finish before15UTC."
+}

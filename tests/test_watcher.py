@@ -112,6 +112,15 @@ class WatcherTests(unittest.TestCase):
         watch.tick(self.root, {}, query, analyze)
         self.assertEqual(analyze.call_count, 1)
 
+    def test_diagnostic_does_not_start_ensemble_scoring(self):
+        (self.root/'reports').mkdir()
+        (self.root/'reports/retry_prefix_123.json').write_text('{"status":"complete"}')
+        job=dict(id='123', completion_action='summarize_retry_prefix')
+        with patch.object(watch.subprocess, 'run'), patch('start_state_scoring.start') as start:
+            result=watch.followup(self.root, job, dict(python='python'))
+        start.assert_not_called()
+        self.assertTrue(result.endswith('retry_prefix_123.md'))
+
     def test_score_coverage_rejects_duplicates_and_missing(self):
         manifest = dict(status='complete', completed_predictions=2,
                         config=dict(flow_steps=[25], guidance=[2], target_ids=['a'], samples=2))

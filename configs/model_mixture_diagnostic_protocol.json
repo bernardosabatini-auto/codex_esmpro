@@ -1,0 +1,10 @@
+{
+  "purpose": "CPU-only exploratory test of whether the existing saved model samples contain complementary experimental states. No GPU generation, per-family model choice or promotion from an oracle support bound.",
+  "sources": {"original": "49844758", "compact500": "49844801", "balanced171": "49844820", "balanced181": "49844861"},
+  "families": 16,
+  "fixed_mixtures": {"original_compact": {"original": 16, "compact500": 16}, "balanced_seeds": {"balanced171": 16, "balanced181": 16}, "four_heads": {"original": 8, "compact500": 8, "balanced171": 8, "balanced181": 8}},
+  "selection": "Use the first declared number of selected retry outputs from each head for every family. No reference-informed sample or family-specific head selection. Preserve existing frozen2A/CA0.8/coarse-valid state assignments.",
+  "support_bound": "Union of states reached by all32 selected outputs from all four models:128 existing outputs per family. This is an observed-sample support bound, not a32-sample deployment pipeline or a claim about all possible model outputs.",
+  "decision": "Report coverage, both-state families, validity and oracle CA-lDDT for each fixed32 mixture, with paired-family changes versus original32. No GPU mixture test unless a fixed mixture gains>=0.1 coverage with positive lower95% bound and CA lower bound>-0.005, with validity difference>=-0.01. No mixing-weight grid. Full48-family MD and native/timing qualification would still be required.",
+  "scope": "All16 existing two-state development families; original34 and reserved17 unscored. This diagnostic is motivated after seeing the four-model aggregate results, not a preregistered confirmation test."
+}

@@ -1,0 +1,20 @@
+{
+  "purpose": "Prospective stochastic replication of the sole strict guided success; selected-case reliability, not new-protein generalization.",
+  "parent_training": "fragment_training_49951202",
+  "historical_screen": "fragment_guidance_49986569",
+  "target_id": "nmr__1BFY_1__b91a89d44751",
+  "condition": "f30_center",
+  "seed": 2026100250,
+  "historical_seed": 2026100211,
+  "samples": 16,
+  "guidance": [1, 2],
+  "steps": 50,
+  "decoder_steps": 3,
+  "controls": "Reproduce all four historical samples in both arms; fresh batch16 versus four batches4 latent parity; CFG2 exact FP64 rigid-pose parity.",
+  "refolding": "Refold every strict raw match in both arms, eight fixed-motif ProteinMPNN sequences each, and the native scaffold with the same motif sequence fixed. Repeat its first refold. Include every raw failure in the denominator of16 per arm.",
+  "strict": "Raw and same refold coarse valid, motif dRMS<=1A and proper CA RMSD<=1A; that same refold global scTM>0.5. Native fixed-motif strict control must pass.",
+  "diversity": "For each successful generated backbone take its first qualifying refold index; report all pairwise global TM and proper motif-aligned scaffold RMSD among these refolds, separately by arm. Undefined with fewer than two successes.",
+  "scope": "One previously selected development family. No noise/strength sweeps, no development labels for training, no locked-test access.",
+  "work_cap_seconds": 480,
+  "max_refold_backbones": 33
+}

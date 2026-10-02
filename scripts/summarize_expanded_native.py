@@ -21,11 +21,15 @@ def analyze(m):
     if any(not np.isfinite(r[k]) or not 0<=r[k]<=1 for r in rows for k in ('ca_lddt','coarse_valid')):raise ValueError('invalid scores')
     values={(h,g):{key:{i:float(np.mean([r[key] for r in rows if (r['head'],r['guidance'],r['target_id'])==(h,g,i)])) for i in families} for key in ('ca_lddt','coarse_valid')} for h,g in settings}
     def compare(a,b):return {k:paired_change(values[a][k],values[b][k],families=families) for k in ('ca_lddt','coarse_valid')}
-    d=dict(step=c['training_checkpoint_step'],summaries={},prior_effects={})
+    arms=protocol.get('comparison_arms',['empirical','balanced'])
+    if arms not in (['empirical','balanced'],['full','tail']):raise ValueError('unsupported comparison arms')
+    if protocol['heads']!=['original']+[f'seed{seed}_{arm}' for seed in protocol['seeds'] for arm in arms] or len(set(protocol['seeds']))!=2:raise ValueError('both paired seeds required')
+    effect='adaptation_effects' if arms==['full','tail'] else 'prior_effects'
+    d=dict(step=c['training_checkpoint_step'],summaries={});d[effect]={}
     for h,g in settings:
         metrics=compare((h,g),('original',2));d['summaries'][h+f'_cfg{g}']=dict(versus_original_cfg2=metrics,quality_passed=bool(metrics['ca_lddt']['ci95'][0]>-.005 and metrics['coarse_valid']['difference']>=-.01))
-    for seed in protocol['seeds']:d['prior_effects'][str(seed)]=compare((f'seed{seed}_balanced',1),(f'seed{seed}_empirical',1))
-    d['replicated_quality_passed']=all(d['summaries'][f'seed{seed}_balanced_cfg1']['quality_passed'] for seed in protocol['seeds'])
+    for seed in protocol['seeds']:d[effect][str(seed)]=compare((f'seed{seed}_{arms[1]}',1),(f'seed{seed}_{arms[0]}',1))
+    d['replicated_quality_passed']=all(d['summaries'][f'seed{seed}_{arms[1]}_cfg1']['quality_passed'] for seed in protocol['seeds'])
     return d
 
 
@@ -42,8 +46,12 @@ def main():
     for name,r in d.get('summaries',{}).items():
         ca=r['versus_original_cfg2']['ca_lddt'];v=r['versus_original_cfg2']['coarse_valid'];lines.append(f"| {name} | {ca['candidate']:.5f} | {ca['difference']:+.5f} | {ca['ci95']} | {v['candidate']:.5f} | {v['difference']:+.5f} | {r['quality_passed']} |")
     for seed,r in d.get('prior_effects',{}).items():lines+=['',f"Seed{seed}, balanced minus empirical: CA-lDDT {r['ca_lddt']['difference']:+.5f},95% interval {r['ca_lddt']['ci95']}; validity {r['coarse_valid']['difference']:+.5f}."]
+    if 'adaptation_effects' in d:
+        lines[0]='# Restricted adaptation: separate accuracy transfer'
+        lines[4]='64 separate tuning families, three paired samples. Full-network and restricted-tail balanced training at both seeds, CFG1 versus original CFG2. Euler25/decoder3, strict FP32. AFDB references are predictions. No independent-test scoring. Unadjusted family intervals; invalid samples remain included.'
+        for seed,r in d['adaptation_effects'].items():lines+=['',f"Seed{seed}, tail minus full: CA-lDDT {r['ca_lddt']['difference']:+.5f},95% interval {r['ca_lddt']['ci95']}; validity {r['coarse_valid']['difference']:+.5f}."]
     if 'error' in d:lines+=['',d['error']]
-    else:lines+=['',f"Both balanced seeds qualify: {d['replicated_quality_passed']}. External experimental-state ensembles remain a separate test; no model promotion."]
+    else:lines+=['',f"Both candidate seeds qualify: {d['replicated_quality_passed']}. External experimental-state ensembles remain a separate test; no model promotion."]
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 
 

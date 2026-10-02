@@ -28,5 +28,16 @@ class ExpandedNativeTests(unittest.TestCase):
             else:m['controls'][-1]['ca_rmsd']=.21
             with self.assertRaises(ValueError):analyze(m)
 
+    def test_tail_pairs_use_same_gate_and_require_both_seeds(self):
+        c=self.m['config'];protocol=json.loads(Path('configs/tail_native_protocol.json').read_text())
+        old=[h['name'] for h in c['heads']];names=dict(zip(old,protocol['heads']))
+        for r in self.m['scores']+self.m['controls']:r['head']=names[r['head']]
+        c['heads']=[dict(name=h) for h in protocol['heads']]
+        p=Path(c['protocol']);p.write_text(json.dumps(protocol));c['protocol_sha256']=sha(p)
+        d=analyze(self.m);self.assertTrue(d['replicated_quality_passed']);self.assertIn('adaptation_effects',d);self.assertNotIn('prior_effects',d)
+        rows=[r for r in self.m['scores'] if r['head']=='seed2026100181_tail']
+        for r in rows[:2]:r['coarse_valid']=0
+        d=analyze(self.m);self.assertFalse(d['replicated_quality_passed']);self.assertTrue(d['summaries']['seed2026100171_tail_cfg1']['quality_passed'])
+
 
 if __name__=='__main__':unittest.main()

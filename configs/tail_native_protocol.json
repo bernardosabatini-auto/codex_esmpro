@@ -1,0 +1,38 @@
+{
+  "purpose": "Separate tuning transfer of restricted versus full-network balanced122 training at both seeds and both500/2000 endpoints.",
+  "heads": [
+    "original",
+    "seed2026100171_full",
+    "seed2026100171_tail",
+    "seed2026100181_full",
+    "seed2026100181_tail"
+  ],
+  "guidance_by_head": {
+    "original": [
+      2
+    ],
+    "seed2026100171_full": [
+      1
+    ],
+    "seed2026100171_tail": [
+      1
+    ],
+    "seed2026100181_full": [
+      1
+    ],
+    "seed2026100181_tail": [
+      1
+    ]
+  },
+  "seeds": [
+    2026100171,
+    2026100181
+  ],
+  "evaluation": "The same frozen64 tuning families, three paired samples, Euler25/decoder3, strict FP32. Original CFG2 must reproduce the frozen baseline. Each head has an exact-length versus padded-batch control per length bucket,0.2A/0.99. No locked-test scoring. All960 predictions and20 controls required.",
+  "analysis": "Report all four trained settings versus originalCFG2 and tail minus full within each seed. Both seeds retained. Unchanged CA-lDDT lower95% difference>-0.005 and valid-fraction difference>=-0.01. Require both tail seeds for a replicated qualification; experimental-state ensembles are separate. No best-seed substitution or test scoring.",
+  "resources": "One H100,15-minute cap,780-second work cap. Five settings instead of the former ten; previous ten-setting H100 run12:44, peak memory compatible. GPU cap8 across types. No training or package changes.",
+  "comparison_arms": [
+    "full",
+    "tail"
+  ]
+}

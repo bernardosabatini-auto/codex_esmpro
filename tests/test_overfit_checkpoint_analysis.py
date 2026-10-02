@@ -85,6 +85,17 @@ class CheckpointAnalysisTests(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs['env']['CUDA_VISIBLE_DEVICES'],'')
         tick(self.root,state,self.registry,dict(python='python'),run);self.assertEqual(run.call_count,1)
 
+    def test_replay_uses_two_full_two_candidates_and64_targets(self):
+        spec=dict(kind='replay',jobs=['1','2','3','4'],steps=[500,2000])
+        (self.root/'runs/overfit_checkpoint_analyses.json').write_text(json.dumps(dict(comparisons=[spec])))
+        self.registry['jobs'].append(dict(id='4',completion_action='summarize_overfit'))
+        rows=[dict(step=s,guidance=1,target_id=str(i)) for s in (0,500) for i in range(64)]
+        for jid in spec['jobs']:
+            p=self.root/f'runs/overfit_{jid}';p.mkdir(exist_ok=True);(p/'manifest.json').write_text(json.dumps(dict(status='running',updates=500,scores=rows)))
+        state={};run=Mock();self.assertEqual(len(tick(self.root,state,self.registry,dict(python='python'),run)),1)
+        command=run.call_args.args[0];self.assertTrue(command[1].endswith('compare_functional_replay.py'));self.assertIn('--full',command);self.assertIn('--candidate',command)
+        tick(self.root,state,self.registry,dict(python='python'),run);self.assertEqual(run.call_count,1)
+
     def test_summary_waits_for_complete_matched_seed_once(self):
         spec=dict(kind='summary',jobs=['1','2'],steps=[500],seed=2026100191)
         (self.root/'runs/overfit_checkpoint_analyses.json').write_text(json.dumps(dict(comparisons=[spec])))

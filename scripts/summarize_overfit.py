@@ -17,6 +17,13 @@ def main():
             if len(controls)!=4 or {r['bucket'] for r in controls}!={128,256,384,512} or not all(r['initial_exact'] for r in controls):raise ValueError('initial summary controls failed')
             if len(gradients)!=m['updates'] or [r['step'] for r in gradients]!=list(range(1,m['updates']+1)) or any(not np.isfinite(r['norm']) or r['norm']<=0 for r in gradients):raise ValueError('summary gradient accounting failed')
             d['summary_adapter']=dict(arm=adapter['arm'],parameters=adapter['parameters'],initial_sha256=adapter['initial_sha256'],initial_exact=True,positive_gradient_updates=len(gradients),buckets=sorted({r['bucket'] for r in gradients}))
+        if c.get('functional_replay'):
+            replay=m['functional_replay'];controls=replay['controls'];updates=replay['updates']
+            if len(controls)!=4 or {r['bucket'] for r in controls}!={128,256,384,512} or any(r['max_velocity_error']>1e-6 or r['replay_loss']>1e-12 for r in controls):raise ValueError('initial replay field controls failed')
+            keys=('primary_gradient_norm','replay_gradient_norm','effective_weight','replay_to_primary_ratio','replay_loss')
+            if len(updates)!=m['updates'] or [r['step'] for r in updates]!=list(range(1,m['updates']+1)) or any(not np.isfinite(r[k]) or r[k]<0 for r in updates for k in keys) or any(r['primary_gradient_norm']<=0 or r['replay_to_primary_ratio']>.250001 or r['effective_weight']>1 for r in updates):raise ValueError('replay gradient accounting failed')
+            if not replay['reference_unchanged'] or replay['verified_update']!=m['updates'] or replay['reference_initial_sha256']!=replay['reference_final_sha256']:raise ValueError('replay reference changed')
+            d['functional_replay']=dict(reference_unchanged=True,reference_sha256=replay['reference_final_sha256'],families=replay['families'],positive_updates=sum(r['replay_gradient_norm']>0 for r in updates),maximum_gradient_ratio=max(r['replay_to_primary_ratio'] for r in updates),mean_replay_loss=float(np.mean([r['replay_loss'] for r in updates])),buckets=sorted({r['bucket'] for r in updates}))
         if c.get('trainable_tail_blocks') is not None:
             d['training_subset']=m['training_subset']
             if not d['training_subset']['frozen_unchanged']:raise ValueError('frozen parameters changed')
@@ -73,6 +80,9 @@ def main():
     if 'summary_adapter' in d:
         lines[4]=('Forty-update training-resource and gradient profile on reliable32 balanced teacher labels. No sample-quality evaluation in this profile.' if c.get('profile_only') else 'Reliable32 training families; matched256D feature adapters, CFG1 only, Euler25/AE3 and32 samples per family. Teacher contact states are predictions, not measured biological states. All geometry failures retained.')
         adapter=d['summary_adapter'];lines+=['',f"Pretrained-summary feasibility arm: {adapter['arm']}; jointly trained zero-output residual adapter with{adapter['parameters']} parameters. Initial conditioning exact in all four buckets; positive adapter gradients at{adapter['positive_gradient_updates']} updates. Compare only matched feature arms before inferring information gain."]
+    if 'functional_replay' in d:
+        r=d['functional_replay'];lines+=['',f"Functional replay on{r['families']} disjoint native-training families; initial field controls pass, frozen reference unchanged:{r['reference_unchanged']}. Positive replay-gradient updates:{r['positive_updates']}; maximum replay/primary gradient ratio:{r['maximum_gradient_ratio']:.6f}. Primary activations are freed before replay; no decoder or coordinate repair in the auxiliary objective."]
+        if c.get('profile_only'):lines[4]='Forty-update resource/gradient profile: balanced427 primary labels plus original-field replay on390 other training families. No sample-quality evaluation in this profile.'
     if d['target_estimator']=='posterior':
         lines+=['',f"Target estimator: posterior mean plus detached conditional variance. Logged mean variance: {d.get('logged_posterior_variance_mean')}; logged mean variance/loss fraction: {d.get('logged_posterior_floor_fraction')}. These sparse logs are diagnostic, not an estimate of gradient-variance reduction. Time-bin errors still use sampled-label targets."]
     if 'training_subset' in d:

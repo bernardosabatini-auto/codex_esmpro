@@ -1,0 +1,17 @@
+{
+  "hypothesis": "Constrain adaptation of the inherited generative field on disjoint native-training families, while retaining unchanged balanced427 teacher-mode learning. This may prevent geometry regressions that occurred despite better native CA-lDDT. It does not assume those regressions are proven catastrophic forgetting.",
+  "replay_selection": "All390 families from the existing512 native training selection whose family is absent from the427 teacher corpus. No selection on student, geometry, native-tuning or external outcomes. Locked tests remain unscored.",
+  "primary": "Exact same original initialization,427-family balanced labels, proportional bucket schedule, seeds, target/label/Gaussian/time/dropout draws, learning rate, optimizer, EMA and2000 updates as49814858/49815018.",
+  "seeds": [2026100171, 2026100181],
+  "updates": 2000,
+  "evaluation_steps": [500, 2000],
+  "replay": {"batch": 2, "bucket_schedule": "cycle128/256/384/512", "maximum_gradient_ratio": 0.25, "maximum_weight": 1.0, "rng_offset": 701, "order_offset": 702},
+  "objective": "Protein-mean MSE between adapted and frozen-original velocities at the exact same x,t,ESM,mask,condition-drop and frozen-original self-conditioning. Independent replay Gaussian bridges from cached native latent to noise, standard logit-normal times,0.1condition dropout,0.5self-conditioning. Cached native latents define probe points, not supervised replay targets. Teacher velocity, pair and self-condition tensors detached; no decoder or coordinate repair in replay.",
+  "gradient_rule": "Weight<=1, clipped so replay parameter-gradient norm<=0.25 of primary flow gradient. Combined parameter gradient clipped with unchanged norm1. Independent replay generators never consume primary streams. This is a declared gradient-combination rule, not a fixed scalar loss.",
+  "profile": {"updates": 40, "maximum_reserved_gib": 80, "maximum_training_seconds": 240, "minutes": 15, "initial_velocity_max_abs": 0.000001, "minimum_positive_replay_updates": 30},
+  "controls": "Original reference weights match initial trainable model exactly and remain unchanged. All4length buckets have initial replay loss<=1e-12/maxvelocityerror<=1e-6. Finite replay losses/gradients, explicit ratio accounting, all primary target/label/LR logs match frozen controls. No hidden model or precision change.",
+  "capacity": "Both seeds at500/2000 on unchanged64-family training panel. Recall lower paired-family95% bound versus the same-step full427 control must exceed-0.05 and validity loss must not exceed0.01. Report absolute gains versus initialization and all old/new cohorts too.",
+  "transfer": "Only endpoints retaining capacity at both seeds get the unchanged64-family native screen for both heads, originalCFG2 versus candidateCFG1. CA-lDDT lowerCI>-0.005 and validity difference>=-0.01. Each individually qualified head then gets the frozen48-family external ensemble. Native/external success is mandatory for promotion; all failed seeds retained.",
+  "resources": "OneRTX40-update profile before two bounded RTX training runs. Runtime determined from profile with evaluation/headroom, total<=8 running+pending GPUs across hardware. No plain longer-training extension after both427 native validity failures.",
+  "deadline_utc": "2026-10-02T15:00:00+00:00"
+}

@@ -84,6 +84,21 @@ def main():
             from latentfold.training_subset import configure_tail,frozen_digest
             m['training_subset']=configure_tail(model,c['trainable_tail_blocks'])
             m['training_subset']['initial_frozen_sha256']=frozen_digest(model)
+        replay_bank=None
+        if c.get('functional_replay'):
+            from functional_replay import ReplayBank,replay_loss,state_digest,controlled_replay_backward
+            if c.get('corpus_kind')!='expansion' or summary_protocol or c.get('local_geometry') or c.get('trainable_tail_blocks') is not None:raise ValueError('invalid functional replay scope')
+            if sha(c['replay_checkpoint'])!=c['replay_checkpoint_sha256']:raise ValueError('replay checkpoint changed')
+            replay_bank=ReplayBank(c,records);reference,_=load_legacy(c['replay_checkpoint']);reference.cuda().eval().requires_grad_(False)
+            original_digest=state_digest(reference)
+            if state_digest(model)!=original_digest:raise ValueError('replay reference differs from initial model')
+            m['functional_replay']=dict(reference_initial_sha256=original_digest,controls=[],updates=[],families=len(replay_bank.records))
+            with torch.no_grad(),inference_precision('fp32'):
+                for index in range(4):
+                    _,rz,re,rm=replay_bank.batch(index);loss,stats=replay_loss(model,reference,rz,re,rm,generator=replay_bank.generator)
+                    if stats['max_velocity_error']>1e-6 or stats['replay_loss']>1e-12:raise ValueError('initial replay field mismatch')
+                    m['functional_replay']['controls'].append(dict(bucket=rz.shape[1],**stats));del rz,re,rm,loss
+            replay_bank.reset(c['seed'])
         trainable=[p for p in model.parameters() if p.requires_grad]
         decoder=load_proteinae(a.source/'ProteinAE_v1',a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt',steps=c['decoder_steps']).cuda()
         torch.manual_seed(c['seed'])
@@ -154,7 +169,16 @@ def main():
                             esm=condition(model,records,ids,esm,mask)
                         loss,info=flow_loss(model,z,esm,mask,FlowConfig(),generator=rng,return_state=True,**posterior_args)
                         if not torch.isfinite(loss):raise FloatingPointError('nonfinite loss')
-                        if c.get('local_geometry'):
+                        if replay_bank:
+                            def replay_objective():
+                                replay_ids,rz,re,rm=replay_bank.batch(step)
+                                auxiliary,stats=replay_loss(model,reference,rz,re,rm,generator=replay_bank.generator)
+                                stats.update(bucket=rz.shape[1],ids_sha256=hashlib.sha256('\n'.join(replay_ids).encode()).hexdigest())
+                                return auxiliary,stats
+                            recipe=replay_bank.recipe
+                            stats=controlled_replay_backward(model,loss,replay_objective,weight=recipe['maximum_weight'],max_ratio=recipe['maximum_gradient_ratio'])
+                            m['functional_replay']['updates'].append(dict(step=step+1,**stats))
+                        elif c.get('local_geometry'):
                             from latentfold.local_geometry import endpoint_geometry
                             from latentfold.training import controlled_backward
                             auxiliary,aux_stats=endpoint_geometry(decoder,info['state'],ids,[records[i]['length'] for i in ids],c['local_geometry'],step)
@@ -192,6 +216,9 @@ def main():
                     subset['frozen_unchanged']=subset['initial_frozen_sha256']==subset['final_frozen_sha256']==subset['ema_frozen_sha256']
                     subset['verified_update']=end
                     if not subset['frozen_unchanged']:raise ValueError('frozen parameters changed')
+                if replay_bank:
+                    stats=m['functional_replay'];stats['reference_final_sha256']=state_digest(reference);stats['reference_unchanged']=stats['reference_final_sha256']==stats['reference_initial_sha256'];stats['verified_update']=end
+                    if not stats['reference_unchanged']:raise ValueError('frozen replay reference changed')
                 if not c.get('profile_only'):
                     torch.save(dict(ema={k:v.cpu() for k,v in ema.items()},arch=architecture['architecture'],extra_arch=architecture['extra_architecture'],model=architecture['model'],experiment=c),a.output/f'ema_{end}.ckpt');evaluate(end)
         if c.get('trainable_tail_blocks') is not None:

@@ -17,7 +17,7 @@ def main():
         with h5py.File(c['fragments']) as fr,h5py.File(run/'evaluation_2000.h5') as f:
             for cohort in ('train','development'):
                 for mode in ('conditioned','null'):
-                    if set(f[cohort+'/'+mode])!=set(fr[cohort]):raise ValueError('Incomplete inventory')
+                    if set(f[cohort+'/'+mode])!=set(c['evaluation_train_ids'] if cohort=='train' and 'evaluation_train_ids' in c else fr[cohort]):raise ValueError('Incomplete inventory')
                     for ident,g in f[cohort+'/'+mode].items():
                         q=fr[cohort+'/'+ident+'/conditions/f30_center'];bb=g['backbone'][:];valid=backbone_geometry(bb)['coarse_valid']
                         if len(bb)!=4:raise ValueError('Expected four fixed noises')

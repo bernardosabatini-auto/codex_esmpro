@@ -22,6 +22,11 @@ def analyze(run):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed continuation source')
         controls=m['warm_controls']
         if len(controls)!=(32 if c['profile_only'] else 384) or any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in controls):raise ValueError('Warm-start parity failed')
+    if c.get('expanded_fragment_data'):
+        if not warm or sha(c['expanded_protocol'])!=c['expanded_protocol_sha256']:raise ValueError('Invalid expanded continuation')
+        parent_config=json.loads(Path(c['warm_parent_manifest']).read_text())['config']
+        with h5py.File(parent_config['fragments']) as original:
+            if sorted(original['train'])!=c['evaluation_train_ids']:raise ValueError('Changed capacity panel')
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     if c.get('variant')=='geometry':
@@ -42,7 +47,7 @@ def analyze(run):
     if len(m['initial_controls'])!=(32 if c['profile_only'] else 128) or len(m['sampling_controls'])!=4 or any(r['original_max_abs']>1e-5 or r['batched_max_abs']>1e-4 for r in m['sampling_controls']):raise ValueError('Incomplete sampler controls')
     summaries=[];audited=0
     with h5py.File(c['fragments']) as src,h5py.File(c['initial_predictions']) as initial,h5py.File(c['warm_predictions'] if warm else c['initial_predictions']) as historical:
-        expected={(cohort,mode,ident,k) for cohort in ('train','development') for ident in src[cohort] for mode in ('conditioned','null') for k in range(4) if not c['profile_only'] or cohort=='development' and ident in c['control_ids']}
+        expected={(cohort,mode,ident,k) for cohort in ('train','development') for ident in src[cohort] for mode in ('conditioned','null') for k in range(4) if (not c['profile_only'] or cohort=='development' and ident in c['control_ids']) and (cohort!='train' or 'evaluation_train_ids' not in c or ident in c['evaluation_train_ids'])}
         if [e['step'] for e in m['evaluations']]!=[0]+c['evaluation_steps']:raise ValueError('Missing evaluation')
         for e in m['evaluations']:
             index={(r['cohort'],r['mode'],r['target_id'],r['slot']):r for r in e['scores']}

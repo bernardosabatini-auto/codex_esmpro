@@ -11,10 +11,13 @@ from latentfold.fragment_conditioning import fragment_features
 def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error','Incomplete'))
-    c=m['config']
+    c=m['config'];expanded=c.get('expanded_fragment_data',False);expected_proteins=128 if expanded else 32
+    if expanded:
+        from prepare_fragment_expansion import audit_sources
+        audit_sources(c)
     for key in ('protocol','training_manifest','training_labels','development_manifest','development_predictions','selection','decoder_checkpoint'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
-    if sha(run/'fragments.h5')!=m['fragments_sha256'] or len(m['records'])!=288 or len(m['controls'])!=32 or len(m['development'])!=16:raise ValueError('Incomplete data audit')
+    if sha(run/'fragments.h5')!=m['fragments_sha256'] or len(m['records'])!=9*expected_proteins or len(m['controls'])!=expected_proteins or len(m['development'])!=16:raise ValueError('Incomplete data audit')
     expected_controls={r['id'] for r in c['training_targets']}
     if {r['target_id'] for r in m['controls']}!=expected_controls or any(r['coordinate_max_abs']>1e-4 or r['latent_rmse']>1e-4 for r in m['controls']):raise ValueError('Failed pose controls')
     records=[]
@@ -41,8 +44,15 @@ def analyze(run):
             for key,old in [('fragment','fragment'),('latent','fragment_latent'),('roundtrip','fragment_roundtrip')]:
                 if not np.array_equal(q[key][:],dev[ident+'/'+old][:]):raise ValueError('Existing isolated-fragment arrays changed')
     fraction=float(np.mean(np.asarray(records)<=.5))
-    if m['training_gate_passed']!=(fraction>=.9):raise ValueError('Data gate mismatch')
-    return dict(status='complete',training_gate_passed=fraction>=.9,training_proteins=32,training_fragments=288,development_fragments=16,mean_fragment_roundtrip_drms=float(np.mean(records)),maximum_fragment_roundtrip_drms=float(np.max(records)),fraction_under_half_A=fraction,pose_controls=32,elapsed_seconds=m['elapsed_seconds'],peak_reserved_GiB=m['peak_reserved_GiB'],manifest_sha256=sha(path),fragments_sha256=m['fragments_sha256'])
+    new_fraction=float(np.mean([r['roundtrip_drms']<=.5 for r in m['records'] if r['target_id'] not in c['base_training_ids']])) if expanded else fraction
+    if expanded:
+        with h5py.File(c['base_fragments']) as old,h5py.File(run/'fragments.h5') as new:
+            for ident in c['base_training_ids']:
+                def check(name,obj):
+                    if isinstance(obj,h5py.Dataset) and not np.array_equal(obj[:],new['train/'+ident+'/'+name][:]):raise ValueError('Original training fragment arrays changed')
+                old['train/'+ident].visititems(check)
+    if m['training_gate_passed']!=(fraction>=.9 and new_fraction>=.9):raise ValueError('Data gate mismatch')
+    return dict(status='complete',training_gate_passed=fraction>=.9 and new_fraction>=.9,training_proteins=expected_proteins,training_fragments=9*expected_proteins,development_fragments=16,mean_fragment_roundtrip_drms=float(np.mean(records)),maximum_fragment_roundtrip_drms=float(np.max(records)),fraction_under_half_A=fraction,pose_controls=expected_proteins,elapsed_seconds=m['elapsed_seconds'],peak_reserved_GiB=m['peak_reserved_GiB'],manifest_sha256=sha(path),fragments_sha256=m['fragments_sha256'])
 
 
 def main():

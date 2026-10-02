@@ -21,12 +21,22 @@ def main():
     a=p.parse_args();c=json.loads(a.config.read_text())
     for key in ('protocol','training_manifest','training_labels','development_manifest','development_predictions','selection','decoder_checkpoint'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
+    expanded=c.get('expanded_fragment_data',False)
+    if expanded:
+        from prepare_fragment_expansion import audit_sources
+        audit_sources(c)
+    expected_proteins=128 if expanded else 32
     a.output.mkdir(parents=True,exist_ok=False);start=time.monotonic();m=dict(status='running',config=c,records=[],controls=[],development=[],reference_validity=[]);atomic_json(a.output/'manifest.json',m)
     try:
         torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
         decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval().requires_grad_(False)
         with torch.no_grad(),inference_precision('fp32'),h5py.File(c['training_labels']) as src,h5py.File(c['development_predictions']) as dev,h5py.File(a.output/'fragments.h5','x') as out:
+            old=None
+            if expanded:
+                old=h5py.File(c['base_fragments']);bm=json.loads(Path(c['base_manifest']).read_text());m['records']=list(bm['records']);m['controls']=list(bm['controls']);m['reference_validity']=list(bm['reference_validity'])
             for row in c['training_targets']:
+                if expanded and row['id'] in c['base_training_ids']:
+                    old.copy(old['train/'+row['id']],out.require_group('train'),name=row['id']);continue
                 ident=row['id'];bb=src[ident]['reference_backbone'][:];z=src[ident]['reference_z'][:];n=len(bb);g=out.create_group('train/'+ident);g.create_dataset('reference_backbone',data=bb);g.create_dataset('reference_z',data=z);g.attrs['family']=row['family'];g.attrs['length']=n
                 valid=bool(backbone_geometry(bb[None])['coarse_valid'][0]);m['reference_validity'].append(dict(target_id=ident,coarse_valid=valid))
                 if not valid:raise ValueError('Previously audited training backbone changed geometry')
@@ -42,11 +52,14 @@ def main():
                             rotation=np.array([[0,-1,0],[1,0,0],[0,0,1]],np.float32);posed,_=canonical_fragment(raw@rotation+np.array([11,7,-3],np.float32));zc=F.layer_norm(encode_backbone(decoder,torch.from_numpy(posed)[None].cuda(),mask),(8,));control=dict(target_id=ident,coordinate_max_abs=float(np.max(abs(posed-fragment))),latent_rmse=float((zc-codes).square().mean().sqrt()));m['controls'].append(control)
                             if control['coordinate_max_abs']>1e-4 or control['latent_rmse']>1e-4:raise ValueError('Fragment pose control failed')
                 out.flush();atomic_json(a.output/'manifest.json',m);print('encoded',ident,flush=True)
+            if old is not None:old.close()
             for row in c['development_rows']:
                 ident=row['target_id'];n=row['length'];k=max(8,int(.3*n));st=(n-k)//2;g=out.create_group('development/'+ident);q=g.create_group('conditions/f30_center');q.create_dataset('fragment',data=dev[ident+'/fragment'][:]);q.create_dataset('latent',data=dev[ident+'/fragment_latent'][:]);q.create_dataset('roundtrip',data=dev[ident+'/fragment_roundtrip'][:]);q.attrs['start']=st;q.attrs['sequence']=row['sequence'][st:st+k];g.attrs['family']=row['family'];g.attrs['length']=n;fragment_features(torch.from_numpy(q['latent'][:]),q.attrs['sequence'],length=n,start=st);m['development'].append(dict(target_id=ident,length=n,start=st,fragment_length=k))
-        if len(m['records'])!=288 or len(m['controls'])!=32 or len(m['development'])!=16:raise ValueError('Incomplete fragment corpus')
+        if len(m['records'])!=9*expected_proteins or len(m['controls'])!=expected_proteins or len(m['development'])!=16:raise ValueError('Incomplete fragment corpus')
         fraction=float(np.mean([r['roundtrip_drms']<=.5 for r in m['records']]))
-        m.update(status='complete',fragment_roundtrip_fraction_under_half_A=fraction,training_gate_passed=fraction>=.9,fragments_sha256=sha(a.output/'fragments.h5'),peak_reserved_GiB=torch.cuda.max_memory_reserved()/2**30)
+        new_fraction=float(np.mean([r['roundtrip_drms']<=.5 for r in m['records'] if r['target_id'] not in c['base_training_ids']])) if expanded else fraction
+        if expanded:m['new_fragment_roundtrip_fraction_under_half_A']=new_fraction
+        m.update(status='complete',fragment_roundtrip_fraction_under_half_A=fraction,training_gate_passed=fraction>=.9 and new_fraction>=.9,fragments_sha256=sha(a.output/'fragments.h5'),peak_reserved_GiB=torch.cuda.max_memory_reserved()/2**30)
     except BaseException as error:m.update(status='failed',error=f'{type(error).__name__}: {error}');raise
     finally:m['elapsed_seconds']=time.monotonic()-start;atomic_json(a.output/'manifest.json',m)
 

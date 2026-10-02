@@ -45,6 +45,11 @@ def main():
         for key in ('warm_protocol','warm_parent_manifest','warm_parent_report','warm_predictions'):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed warm-start source')
         if c['arm']!='full' or c.get('variant')!='geometry' or c.get('auxiliary_motif') or c.get('total_prior_updates')!=2000:raise ValueError('Wrong warm-start arm')
+    if c.get('expanded_fragment_data'):
+        if not warm or sha(c['expanded_protocol'])!=c['expanded_protocol_sha256']:raise ValueError('Invalid expanded continuation')
+        parent_config=json.loads(Path(c['warm_parent_manifest']).read_text())['config']
+        with h5py.File(parent_config['fragments']) as original:
+            if sorted(original['train'])!=c['evaluation_train_ids']:raise ValueError('Changed original capacity panel')
     geometry=c.get('variant')=='geometry'
     if c.get('distance_precision')=='fp64':
         if not geometry or sha(c['geometry_precision_protocol'])!=c['geometry_precision_protocol_sha256'] or sha(c['pose_diagnostic_report'])!=c['pose_diagnostic_report_sha256'] or not json.loads(Path(c['pose_diagnostic_report']).read_text())['corrected_precision_profile_qualified']:raise ValueError('Unqualified precision correction')
@@ -83,7 +88,7 @@ def main():
         bucket_ids={n:sorted(ident for (cohort,ident),v in data.items() if cohort=='train' and (v['length']+127)//128*128==n) for n in (128,256,384,512)}
         def evaluate(step):
             saved_rng=torch.cuda.get_rng_state();raw={k:v.detach().cpu().clone() for k,v in model.state_dict().items()};araw={k:v.detach().cpu().clone() for k,v in adapter.state_dict().items()};model.load_state_dict(ema);adapter.load_state_dict(adapter_ema);model.eval();adapter.eval();tick=time.monotonic();scores=[]
-            keys=[key for key in sorted(data) if not c['profile_only'] or key[0]=='development' and key[1] in c['control_ids']]
+            keys=[key for key in sorted(data) if (not c['profile_only'] or key[0]=='development' and key[1] in c['control_ids']) and (key[0]!='train' or 'evaluation_train_ids' not in c or key[1] in c['evaluation_train_ids'])]
             with torch.no_grad(),inference_precision('fp32'),h5py.File(c['initial_predictions']) as initial,h5py.File(c['warm_predictions'] if warm else c['initial_predictions']) as historical,h5py.File(a.output/f'evaluation_{step}.h5','x') as out:
                 for cohort,ident in keys:
                     v=data[(cohort,ident)];q=v['conditions']['f30_center'];n=v['length'];mask=torch.ones(4,n,dtype=torch.bool,device='cuda');features=q['features'][None].expand(4,-1,-1).cuda();keep=q['keep'][None].expand(4,-1).cuda();seed=2026100211 if cohort=='development' else 2026100232

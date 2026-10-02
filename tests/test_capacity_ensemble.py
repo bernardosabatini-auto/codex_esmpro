@@ -10,6 +10,9 @@ class QualificationTests(unittest.TestCase):
         cap=dict(step=500,matched=True,capacity_checks=dict(aligned_teacher=dict(passed=True)))
         transfer=dict(summaries=dict(aligned_teacher_balanced_cfg1=dict(quality_passed=True)))
         self.assertEqual(qualified(cap,transfer,'aligned_teacher_balanced',1),'aligned_teacher_balanced_cfg1')
+        final=copy.deepcopy(cap);final['step']=2000
+        self.assertEqual(qualified(final,transfer,'aligned_teacher_balanced',1,step=2000),'aligned_teacher_balanced_cfg1')
+        with self.assertRaises(ValueError):qualified(cap,transfer,'aligned_teacher_balanced',1,step=2000)
         for kind in ('capacity','transfer','step','matched','guidance','head'):
             c=copy.deepcopy(cap);t=copy.deepcopy(transfer);head='aligned_teacher_balanced';guidance=1
             if kind=='capacity':c['capacity_checks']['aligned_teacher']['passed']=False

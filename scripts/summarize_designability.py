@@ -54,7 +54,9 @@ def analyze(run):
             diversity.append(dict(head=head,mode=mode,scope=scope,pairs=len(pairs),mean_pairwise_fixed_tm=float(np.mean(pairs)) if pairs else None))
     comparisons=[]
     for mode in ('unconditional','motif_u1','motif_u3'):
-        families=sorted({r['family'] for r in results if r['mode']==mode});rng=np.random.default_rng(2026100212);ix=rng.integers(0,len(families),(10000,len(families)))
+        families=sorted({r['family'] for r in results if r['mode']==mode})
+        if not families:continue
+        rng=np.random.default_rng(2026100212);ix=rng.integers(0,len(families),(10000,len(families)))
         for metric in ('sc_tm','designable','joint_motif_success'):
             if metric=='joint_motif_success' and mode=='unconditional':continue
             d=np.array([np.mean([r[metric] for r in results if r['head']=='reflow10' and r['mode']==mode and r['family']==f])-np.mean([r[metric] for r in results if r['head']=='original50' and r['mode']==mode and r['family']==f]) for f in families]);comparisons.append(dict(mode=mode,metric=metric,difference=float(d.mean()),family_interval=np.quantile(d[ix].mean(1),[.025,.975]).tolist()))

@@ -1,0 +1,8 @@
+{
+  "purpose": "Measure useful constrained generation after the fixed noise-guidance pilot, retaining all eight cases and all three methods.",
+  "coverage": "28 backbones: initial/guided/random for four fixed families and two seeds, plus four experimental positive controls. No geometry or contact filtering. All 224 refolds required.",
+  "assay": "ProteinMPNN CA-only v_48_020, eight sequences per backbone, temperature .1, seed 1; guarded ESMFold2Fast FP32, three loops, 50 steps, one sample per sequence. Fixed-correspondence USalign. Designable if best-of-eight scTM>.5; all four experimental controls must pass, with repeatable folding.",
+  "primary": "Joint success requires CA contact within 1A of 8A, unchanged full-backbone coarse validity, and designability. Report every component, all attempts, and pairwise similarity among successful outputs with pair counts. Four families cannot establish population success rates.",
+  "cost": "Report generation/controller and assay costs separately, including failed candidates. Random selection uses 32 additional draws. Do not claim equal compute, unchanged prior or one-sequence multistability.",
+  "resources": "One RTX,15 minutes,780 second worker cap,64GiB RAM; exclude own previously failed ECC node. Deadline and eight-GPU guard unchanged."
+}

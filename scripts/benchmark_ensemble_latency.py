@@ -48,7 +48,7 @@ def main():
                             for k in range(count):
                                 noise[k,:n]=target_noise([ident],[n],8,seed=c['seed'],sample_index=k,device='cuda')[0]
                                 dn[k,:4*n]=target_noise([ident],[4*n],3,seed=c['seed'],sample_index=0,stream='decoder',device='cuda')[0]*decoder.fm.scale_ref
-                            z=sample(model,esm.repeat(count,1,1),mask.repeat(count,1),SampleConfig(steps=c['candidate_steps'] if kind=='candidate' else 25,guidance=c.get('candidate_guidance',1) if kind=='candidate' else 2,solver=c.get('candidate_solver','euler') if kind=='candidate' else 'euler'),noise=noise,conditioning_ids=[ident]*count)
+                            z=sample(model,esm.repeat(count,1,1),mask.repeat(count,1),SampleConfig(steps=c['candidate_steps'] if kind=='candidate' else 25,guidance=c.get('candidate_guidance',1) if kind=='candidate' else 2,solver=c.get('candidate_solver','euler') if kind=='candidate' else 'euler',time_power=c.get('candidate_time_power',1) if kind=='candidate' else 1),noise=noise,conditioning_ids=[ident]*count)
                             _,bb=decoder(z,mask.repeat(count,1),noise=dn,return_backbone=True)
                             return bb[:,:n].cpu().numpy()
                         features=fast_features(row['sequence']);indices=backbone_indices(features,n);captured={};chunk=min(count,16)

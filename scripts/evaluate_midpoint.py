@@ -4,7 +4,7 @@ from pathlib import Path
 import h5py,numpy as np,torch
 from latentfold.checkpoints import load_legacy
 from latentfold.decoder import load_proteinae
-from latentfold.flow import SampleConfig,sample,target_noise
+from latentfold.flow import SampleConfig,sample,target_noise,sampling_name
 from latentfold.precision import inference_precision
 from latentfold.metrics import ca_metrics
 from latentfold.ensemble_metrics import backbone_geometry
@@ -13,7 +13,7 @@ from profile_gpu import Telemetry,atomic_json
 
 
 def setting_name(setting):
-    return f"{setting['solver']}_{setting['steps']}_cfg{setting['guidance']}"
+    return sampling_name(setting)
 
 
 def main():
@@ -25,11 +25,21 @@ def main():
     selection=json.loads(Path(c['selection']).read_text());protocol=json.loads(Path(c['protocol']).read_text());prior=json.loads(Path(c['baseline_manifest']).read_text());rows=selection['tuning']
     if len(rows)!=64 or len({r['family'] for r in rows})!=64 or set(r['id'] for r in rows)&set(r['id'] for r in selection['train']):raise ValueError('invalid tuning split')
     checkpoint=a.source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt'
-    if sha(checkpoint)!=c['checkpoint_sha256'] or prior['checkpoint']['sha256']!=c['checkpoint_sha256'] or prior['config']['evaluation_seed']!=c['evaluation_seed']:raise ValueError('baseline mismatch')
+    if c.get('inference_checkpoint'):
+        identity=c['inference_checkpoint'];checkpoint=Path(identity['path'])
+        if identity['source_sha256']!=c['checkpoint_sha256'] or not identity['tensor_values_verified'] or sha(checkpoint)!=identity['sha256']:raise ValueError('inference checkpoint changed')
+    elif sha(checkpoint)!=c['checkpoint_sha256']:raise ValueError('checkpoint changed')
+    if prior['checkpoint']['sha256']!=c['checkpoint_sha256'] or prior['config']['evaluation_seed']!=c['evaluation_seed']:raise ValueError('baseline mismatch')
     baseline={(r['target_id'],r['sample']):r for r in prior['scores'] if r['step']==0 and r['sampling_steps']==25}
     if len(baseline)!=192 or {i for i,k in baseline}!={r['id'] for r in rows}:raise ValueError('prior baseline incomplete')
+    previous={}
+    if c.get('additional_control_manifest'):
+        if sha(c['additional_control_manifest'])!=c['additional_control_manifest_sha256']:raise ValueError('additional solver control changed')
+        additional=json.loads(Path(c['additional_control_manifest']).read_text())
+        if additional['status']!='complete' or additional['checkpoint_sha256']!=c['checkpoint_sha256'] or additional['config']['selection_sha256']!=c['selection_sha256'] or additional['config']['evaluation_seed']!=c['evaluation_seed']:raise ValueError('incompatible additional control')
+        previous={(r['setting'],r['target_id'],r['sample']):r for r in additional['scores']}
     a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
-    start=time.monotonic();telemetry=None;m=dict(status='running',config=c,checkpoint_sha256=c['checkpoint_sha256'],training_updates_executed=0,scores=[],controls=[],batches=[],scope='Original weights,64 tuning families,3 seeds; AFDB predicted references. No independent test scoring.')
+    start=time.monotonic();telemetry=None;m=dict(status='running',config=c,checkpoint_sha256=c['checkpoint_sha256'],loaded_checkpoint=c.get('inference_checkpoint',dict(path=str(checkpoint),sha256=c['checkpoint_sha256'])),training_updates_executed=0,scores=[],controls=[],batches=[],scope='Original weights,64 tuning families,3 seeds; AFDB predicted references. No independent test scoring.')
     atomic_json(a.output/'manifest.json',m)
     try:
         records={}
@@ -70,6 +80,8 @@ def main():
                             for k,x in enumerate(pred):
                                 score=dict(setting=label,target_id=ident,sample=k,**ca_metrics(x[:,1],r['ca']),**{key:float(value[k]) for key,value in geometry.items()})
                                 m['scores'].append(score)
+                                prior_score=previous.get((label,ident,k))
+                                if prior_score and any(abs(score[key]-prior_score[key])>1e-6 for key in ('ca_lddt','coarse_valid')):raise ValueError('additional solver baseline differs from prior run')
                                 if label=='euler_25_cfg2' and any(abs(score[key]-baseline[(ident,k)][key])>1e-6 for key in ('ca_lddt','coarse_valid')):raise ValueError('Euler baseline differs from prior run')
                         del z,bb,esm,mask,noise,dn
                 atomic_json(a.output/'manifest.json',m);print('scored',label,flush=True)

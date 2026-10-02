@@ -1,0 +1,43 @@
+{
+  "purpose": "Bounded follow-up after uniform Euler20 passes CA-lDDT but loses2/192 valid samples versus Euler25; test22 intervals and whether step placement rather than interval count preserves geometry.",
+  "checkpoint": "Original459M EMA checkpoint; no new training or selected fine-tuned weights.",
+  "panel": "Existing64 tuning families, all three existing evaluation seeds; original34 and reserved17 remain untouched.",
+  "settings": [
+    {
+      "solver": "euler",
+      "steps": 25,
+      "guidance": 2
+    },
+    {
+      "solver": "euler",
+      "steps": 20,
+      "guidance": 2
+    },
+    {
+      "solver": "euler",
+      "steps": 22,
+      "guidance": 2
+    },
+    {
+      "solver": "euler",
+      "steps": 20,
+      "guidance": 2,
+      "time_power": 0.75
+    },
+    {
+      "solver": "euler",
+      "steps": 20,
+      "guidance": 2,
+      "time_power": 1.25
+    }
+  ],
+  "cost_accounting": "Midpoint evaluates the velocity twice per interval. CFG2 requires two network forwards per velocity evaluation. Thus midpoint8/10 use16/20 velocity evaluations and32/40 network forwards; Euler25 CFG2 uses25/50. Pair preparation, decoder and complete resident timing must also be counted.",
+  "self_conditioning": "Unchanged Euler self-conditioning. The failed midpoint method is not retried.",
+  "controls": "Euler default remains unchanged. Same Gaussian and decoder noise for every setting, strict FP32, three decoder steps, sample-batch invariance checks for each length bucket and setting, complete coverage required. Uniform Euler20 must also reproduce the completed first solver screen.",
+  "quality_screen": "Against fresh Euler25 CFG2, mean paired CA-lDDT difference must have95% family lower bound above-0.005 and coarse-valid fraction loss must be no more than0.01. Report every setting, including failed controls. Reference backbones are AFDB predictions, not experimental native structures.",
+  "next": "Choose the lowest forward-count passing nonbaseline setting; ties prefer uniform grid, then protocol order. A pass only permits the existing48-family ensemble screen, followed by matched resident latency if that also passes. No threshold relaxation; if every setting fails, stop this bounded grid search.",
+  "resources": "One H200,15-minute cap for the initial quality screen; keep project pending-plus-running total<=8 and deadline2026-10-02T15:00:00Z.",
+  "schedule": "t_i=(i/N)^power. Power0.75 makes late intervals smaller;1.25 makes early intervals smaller as a directional control. This is a global fixed grid, not per-protein tuning. No assumption of a stiff endpoint is treated as established.",
+  "previous_screen": "reports/midpoint_49728184.md; every cheaper setting failed. Keep all previous outcomes and unchanged quality thresholds.",
+  "checkpoint_export": "CPU-extracted EMA-only checkpoint. All469 tensors must match the original bit-for-bit; record original and exported SHA256. Hash the1.86GB export on the GPU node instead of the7.43GB optimizer-containing source. Euler20/25 output reproduction remains mandatory."
+}

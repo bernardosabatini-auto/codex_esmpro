@@ -35,12 +35,20 @@ class SampleConfig:
     guidance: float = 2.0
     project: bool = True
     solver: str = 'euler'
+    time_power: float = 1.0
 
     def __post_init__(self):
         if type(self.steps) is not int or self.steps < 1 or not math.isfinite(self.guidance):
             raise ValueError("invalid sampling settings")
+        if not math.isfinite(self.time_power) or self.time_power<=0:
+            raise ValueError('time power must be finite and positive')
         if self.solver not in ('euler','midpoint'):
             raise ValueError('unknown flow solver')
+
+
+def sampling_name(setting):
+    name=f"{setting['solver']}_{setting['steps']}_cfg{setting['guidance']:g}"
+    return name if setting.get('time_power',1)==1 else name+f"_power{setting['time_power']:g}"
 
 
 def validate_batch(esm, mask, z=None):
@@ -173,6 +181,7 @@ def sample(net, esm, mask, config, *, noise, cache_condition=True, conditioning_
     kwargs = {"pair": net.compute_pair(static_esm, static_mask)} if hasattr(net, "compute_pair") else {}
     x, sc = noise.clone(), None
     ts = torch.linspace(0, 1, config.steps + 1, device=esm.device)
+    if config.time_power != 1:ts=ts.pow(config.time_power)
     drop = torch.ones(len(esm), dtype=torch.bool, device=esm.device)
     cond_kwargs, uncond_kwargs = kwargs, kwargs
     if cache_condition:

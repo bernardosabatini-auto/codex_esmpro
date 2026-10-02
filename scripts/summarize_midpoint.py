@@ -3,6 +3,7 @@ import argparse,json
 from pathlib import Path
 import numpy as np
 from latentfold.teacher_states import paired_change
+from latentfold.flow import sampling_name
 from prepare_overfit import sha
 from summarize_comparison import hardware
 
@@ -19,12 +20,12 @@ def main():
             values=[r for r in m['scores'] if r['setting']==name]
             if len(values)!=192 or {r['target_id'] for r in values}!=set(families) or any(sorted(r['sample'] for r in values if r['target_id']==i)!=[0,1,2] for i in families):raise ValueError('incomplete setting')
             return {k:{i:float(np.mean([r[k] for r in values if r['target_id']==i])) for i in families} for k in ('ca_lddt','coarse_valid')}
-        expected_controls={(f"{s['solver']}_{s['steps']}_cfg{s['guidance']}",length) for s in settings for length in (128,256,384,512)}
+        expected_controls={(sampling_name(s),length) for s in settings for length in (128,256,384,512)}
         if {(r['setting'],r['length']) for r in m['controls']}!=expected_controls or any(not np.isfinite(r['ca_rmsd']) or not np.isfinite(r['ca_lddt']) or r['ca_rmsd']>.2 or r['ca_lddt']<.99 for r in m['controls']):raise ValueError('missing or failed batching controls')
         if any(not np.isfinite(r[k]) for r in m['scores'] for k in ('ca_lddt','coarse_valid')):raise ValueError('nonfinite quality scores')
         baseline=scores('euler_25_cfg2')
         for setting in settings:
-            name=f"{setting['solver']}_{setting['steps']}_cfg{setting['guidance']}";values=scores(name)
+            name=sampling_name(setting);values=scores(name)
             comparisons={k:paired_change(values[k],baseline[k],families=families) for k in values}
             nfe=setting['steps']*(2 if setting['solver']=='midpoint' else 1)
             d['summaries'][name]=dict(**setting,velocity_evaluations=nfe,network_forwards=nfe*(2 if setting['guidance']!=1 else 1),metrics=comparisons,passed=bool(comparisons['ca_lddt']['ci95'][0]>-.005 and comparisons['coarse_valid']['difference']>=-.01),measured_batch_seconds=sum(r['seconds'] for r in m['batches'] if r['setting']==name))

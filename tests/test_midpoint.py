@@ -1,7 +1,7 @@
 import math
 import unittest
 import torch
-from latentfold.flow import SampleConfig,sample
+from latentfold.flow import SampleConfig,sample,sampling_name
 
 
 class Field(torch.nn.Module):
@@ -27,6 +27,17 @@ class MidpointTests(unittest.TestCase):
         torch.testing.assert_close(value,torch.full_like(value,2.7))
         torch.testing.assert_close(model.calls[1][0],torch.tensor([.5]))
         torch.testing.assert_close(model.calls[1][1],torch.full((1,2,8),2.))
+
+    def test_nonuniform_grid_uses_interval_widths(self):
+        model=Field().eval();power=.75;steps=4
+        value=sample(model,torch.zeros(1,2,3),torch.ones(1,2,dtype=torch.bool),SampleConfig(steps=steps,guidance=1,project=False,time_power=power),noise=torch.ones(1,2,8),cache_condition=False)
+        grid=torch.linspace(0,1,steps+1).pow(power)
+        torch.testing.assert_close(value,torch.ones_like(value)*torch.prod(1+grid.diff()))
+        torch.testing.assert_close(torch.cat([t for t,sc in model.calls]),grid[:-1])
+        self.assertEqual(sampling_name(dict(solver='euler',steps=20,guidance=2,time_power=.75)),'euler_20_cfg2_power0.75')
+        self.assertEqual(sampling_name(dict(solver='euler',steps=25,guidance=2.)), 'euler_25_cfg2')
+        for bad in (0,-1,float('nan'),float('inf')):
+            with self.assertRaises(ValueError):SampleConfig(time_power=bad)
 
     def test_guidance_call_count_and_endpoint_not_evaluated(self):
         model=Field();self.run_field(model,8,'midpoint',guidance=2)

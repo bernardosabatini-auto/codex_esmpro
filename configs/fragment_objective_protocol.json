@@ -1,0 +1,18 @@
+{
+  "purpose": "If completed direct-distance conditioning remains insufficient, explicitly supervise decoded motif shape while bounding its effect on the pretrained flow prior.",
+  "prerequisite": "CorrectedFP64geometry run49911511must complete and pass technical/output audits. Proceed only if its2000update conditioned training joint fraction<.5or development joint fraction<.25. Preserve baseline results and its full designability assay; this is a new objective comparison, not a replacement endpoint.",
+  "auxiliary": {
+    "seed": 2026100235,
+    "maximum_examples": 2,
+    "minimum_time": 0.25,
+    "maximum_time": 0.75,
+    "maximum_weight": 1.0,
+    "maximum_gradient_ratio": 0.5
+  },
+  "objective": "Decode layer-normalized x_t+(1-t)*velocity with frozenAE3on up to2nondropped examples per update, selected independently among t in[.25,.75]. Minimize protein-mean squared proper-rotation motifCA RMSD to supplied fragment atoms. No scaffold target enters auxiliary loss. SVDalignment usesFP64and detached optimum rotation; tested envelope derivative avoids unstable SVDbackprop. Native full-chain latents remain the ordinary flow targets.",
+  "gradient_control": "Reuse controlled_backward: bound auxiliary adapter-parameter gradient norm to at most.5times flow gradient norm, maximum scalar weight1; log every norm, weight, selected slot and auxiliary loss. No skipped optimizer updates. Generator/decoder frozen. Independent subset/decoder noise and saved/restored global RNG preserve original flow draw traces.",
+  "training": "Fresh original checkpoint and identical token/distance adapter initialization;FP64distance input,FP32network/decoder; unchanged32families/288fragments,seed,batches,optimizer,LRschedule,EMA and2000updates. Matched against completed49911511; all2000data/noise/time/dropout/history draws must agree. Profile40updates before full allocation and verify frozen weights, controls and bounded gradients.",
+  "evaluation": "Unchanged50Euler/AE3,32training/16development families,four samples,conditioned/null branches,500diagnostic and2000primary; no clamp,retry or output filtering. Report motif RMS, joint success, raw validity, diversity and reference similarity. Primary improvement: lower95percent family interval for candidate-minus-baseline training joint success>0 and development valid-fraction difference lower interval>=-.05. Report development motif-joint change without claiming generalization from sparse successes.",
+  "designability": "Every technical completion receives the unchanged36backbone288refold fixed-motif assay. Success requires one SAME valid refold with global scTM>.5 and motif dRMS/proper-rotation RMSD<=1A. Decoded motif supervision is not a designability surrogate or proof; measured refolds decide practical usefulness.",
+  "resources": "OneRTX40update profile; peak<=75GiB; full walltime from measured training/evaluation cost. At most8registered ownGPUs. No objective-weight grid and no distributed training."
+}

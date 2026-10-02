@@ -43,6 +43,10 @@ def main():
     geometry=c.get('variant')=='geometry'
     if c.get('distance_precision')=='fp64':
         if not geometry or sha(c['geometry_precision_protocol'])!=c['geometry_precision_protocol_sha256'] or sha(c['pose_diagnostic_report'])!=c['pose_diagnostic_report_sha256'] or not json.loads(Path(c['pose_diagnostic_report']).read_text())['corrected_precision_profile_qualified']:raise ValueError('Unqualified precision correction')
+    if c.get('auxiliary_motif'):
+        if not geometry or c['arm']!='adapter_only' or c.get('distance_precision')!='fp64' or sha(c['motif_objective_protocol'])!=c['motif_objective_protocol_sha256'] or sha(c['motif_baseline_report'])!=c['motif_baseline_report_sha256']:raise ValueError('Unqualified motif objective recipe')
+        expected=json.loads(Path(c['motif_objective_protocol']).read_text())['auxiliary']
+        if c['auxiliary_motif']!=expected:raise ValueError('Changed motif objective parameters')
     if geometry:
         for baseline in c['baseline_reports']:
             if sha(baseline['path'])!=baseline['sha256']:raise ValueError('Changed baseline evidence')
@@ -110,7 +114,13 @@ def main():
                     coordinates=coordinates.cuda() if geometry else None
                     z,features,keep,mask=[x.cuda() for x in (z,features,keep,mask)];factor=min((step+1)/100,1)*(.1+.9*.5*(1+math.cos(math.pi*step/1999)))
                     for group in optimizer.param_groups:group['lr']=group['base_lr']*factor
-                    optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates);loss.backward();anorm=torch.linalg.vector_norm(torch.stack([p.grad.norm() for p in aps if p.grad is not None]));norm=torch.nn.utils.clip_grad_norm_(parameters,1.,error_if_nonfinite=True)
+                    optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates,return_state=bool(c.get('auxiliary_motif')))
+                    if c.get('auxiliary_motif'):
+                        from latentfold.fragment_objective import endpoint_fragment_objective
+                        from latentfold.training import controlled_backward
+                        recipe_aux=c['auxiliary_motif'];cpu_rng=torch.get_rng_state();cuda_rng=torch.cuda.get_rng_state();auxiliary,stats=endpoint_fragment_objective(decoder,info['state'],ids,[data[('train',i)]['length'] for i in ids],coordinates,keep,step=step,seed=recipe_aux['seed'],maximum_examples=recipe_aux['maximum_examples'],minimum_time=recipe_aux['minimum_time'],maximum_time=recipe_aux['maximum_time']);torch.set_rng_state(cpu_rng);torch.cuda.set_rng_state(cuda_rng);stats.update(controlled_backward(adapter,loss,auxiliary,weight=recipe_aux['maximum_weight'],max_ratio=recipe_aux['maximum_gradient_ratio'],loss_scale=1.));m.setdefault('motif_objective_updates',[]).append(dict(step=step+1,**stats));del auxiliary,stats
+                    else:loss.backward()
+                    anorm=torch.linalg.vector_norm(torch.stack([p.grad.norm() for p in aps if p.grad is not None]));norm=torch.nn.utils.clip_grad_norm_(parameters,1.,error_if_nonfinite=True)
                     if not torch.isfinite(loss) or not torch.isfinite(anorm) or anorm<=0 or norm<=0:raise FloatingPointError('Invalid flow loss/adapter gradient')
                     optimizer.step()
                     with torch.no_grad():

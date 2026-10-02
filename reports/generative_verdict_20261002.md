@@ -51,3 +51,23 @@ The inherited refinement recipe retains one self-conditioning estimate across in
 ## Pair-free unconditional generation is not materially faster in this profile
 
 The corrected r4b pair-free checkpoint and original pair model both produce64/64coarse-valid backbones on the same16families/four noises. All128outputs and8CFG0/null controls pass; the64original outputs reproduce the historical archive. Generation-only times are11.06s versus10.78s, peak3.83/3.84GiB. The unconditional sampler already skips sequence-conditioned pair computation. Therefore the reported3.5xtraining-step benefit cannot be carried over to this path. These one-pass timings do not establish a small speed difference, and no pair-free designability assay has been run. See [corrected pair-free profile](pairfree_generation_49880198.md).
+
+
+## Explicit isolated-fragment training: first completed comparison
+
+The new open-ended generation campaign trained a zero-initialized fragment adapter on32existing training proteins with nine standalone fragments each. Inputs were only cropped fragment latents, supplied motif amino acids and placement; no scaffold sequence, ESM embedding or output-latent clamping. Adapter-only and full-network arms used identical initialization, data and random draws for2000updates. All2304saved predictions were audited.
+
+Neither arm passed its prespecified capacity gate. Adapter-only had0/128training joint successes. Full-network had6/128with conditioning versus1/128with the fragment dropped: a3.9percentage-point difference with paired-family95%interval[0,8.6]. Both produced0/64development joint successes. Lower average motif error is not adequate constraint retention.
+
+The subsequent fixed-motif ProteinMPNN/refolding assays each retained36backbones and288refolds. The same single refold had to match the scaffold globally, pass geometry and preserve the motif under both distance RMS and proper-rotation CA RMSD thresholds of1A.
+
+| Conditioner | Valid globally agreeing refold, motif sequence fixed | Strict motif/global/geometry success |
+|---|---:|---:|
+| Token adapter only |2/8|0/8|
+| Token adapter plus full network |4/8|0/8|
+
+These are four-family development feasibility results. The difference in global designability is uncertain, and neither method solved motif scaffolding. Shared control sequences were identical; refolds differed slightly numerically (maximum CA RMSD0.00967A,lDDT1), within the established teacher repeatability tolerance, with the same control decisions. Experimental scaffolds gave4/4valid global refolds and3/4strict successes; fixing their motif amino acids in a separate32refold calibration still gave3/4strict successes, with a different failing family. Thresholds and failed cases were retained.
+
+A direct intramotif-distance conditioner is being tested next. Its first run stopped at500updates on a numerical pose control. A frozen-checkpoint diagnostic reproduced the failure and separated FP32coordinate rounding from exact rotation: FP64distance calculation plus exact rigid transforms produced identical latents on all four controls, while rounding changed backbone CA RMSD by at most0.001166A without changing validity. The failed run remains failed; a corrected40update profile passed unchanged tolerances and a fresh2000update restart is underway. No quality claim is made for that unfinished run.
+
+See [training comparison](fragment_training_comparison_2000.md), [paired refolding](trained_fragment_designability_comparison.md), [fixed native positives](fragment_fixed_positive_49906292.md), and [numerical diagnostic](fragment_geometry_pose_49908661.md).

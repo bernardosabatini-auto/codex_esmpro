@@ -66,7 +66,7 @@ def prepare_fragment_condition(net, adapter, features, keep, mask, dropped, *, c
     return esm, (token, pool, *prepared[2:])
 
 
-def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator, coordinates=None):
+def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator, coordinates=None, return_state=False):
     """Protein-weighted flow matching; fragment dropout preserves a null branch."""
     if target.shape != (*mask.shape, 8) or target.requires_grad or not torch.isfinite(target).all():
         raise ValueError('Fixed finite full-structure latent targets required')
@@ -88,7 +88,9 @@ def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator,
     loss = (((velocity - (target-noise)).square().mean(-1)*mask).sum(1)/mask.sum(1)).mean()
     if not torch.isfinite(loss):
         raise FloatingPointError('Nonfinite fragment flow loss')
-    return loss, dict(noise=noise.detach(), t=t.detach(), dropped=dropped.detach(), self_conditioned=use_history)
+    info=dict(noise=noise.detach(), t=t.detach(), dropped=dropped.detach(), self_conditioned=use_history)
+    if return_state:info['state']=dict(x=x,velocity=velocity,t=t,dropped=dropped,mask=mask)
+    return loss,info
 
 
 @torch.no_grad()

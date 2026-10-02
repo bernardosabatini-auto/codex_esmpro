@@ -23,6 +23,11 @@ def analyze(run):
         if sha(c['geometry_protocol'])!=c['geometry_protocol_sha256'] or len(m['geometry_controls'])!=(8 if c.get('distance_precision')=='fp64' else 4)*(len(c['evaluation_steps'])+1) or any(r['pose_latent_max_abs']>1e-4 for r in m['geometry_controls']):raise ValueError('Geometry conditioner controls failed')
     if c.get('distance_precision')=='fp64':
         if sha(c['geometry_precision_protocol'])!=c['geometry_precision_protocol_sha256'] or sha(c['pose_diagnostic_report'])!=c['pose_diagnostic_report_sha256']:raise ValueError('Changed precision correction evidence')
+    if c.get('auxiliary_motif'):
+        if sha(c['motif_objective_protocol'])!=c['motif_objective_protocol_sha256'] or sha(c['motif_baseline_report'])!=c['motif_baseline_report_sha256']:raise ValueError('Changed objective provenance')
+        rows=m['motif_objective_updates']
+        if len(rows)!=c['updates'] or [r['step'] for r in rows]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['motif_mse']) or r['aux_to_flow_ratio']>c['auxiliary_motif']['maximum_gradient_ratio']+1e-7 or r['flow_parameter_grad_norm']<=0 for r in rows):raise ValueError('Incomplete/unbounded motif gradients')
+        if sum(r['motif_examples'] for r in rows)<c['updates'] or not any(r['aux_parameter_grad_norm']>0 for r in rows):raise ValueError('Insufficient motif objective exposure')
     if m['updates']!=c['updates'] or len(m['training'])!=c['updates'] or m['frozen_initial']!=m['frozen_final']:raise ValueError('Incomplete/frozen-weight failure')
     if [r['step'] for r in m['training']]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['flow_loss']) or r['adapter_gradient_norm']<=0 for r in m['training']):raise ValueError('Invalid training trace')
     if any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in m['initial_controls']):raise ValueError('Failed initial controls')

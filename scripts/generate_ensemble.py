@@ -21,6 +21,10 @@ def main():
     if c.get('solver_screen_manifest') and file_identity(Path(c['solver_screen_manifest']),hash_contents=True)['sha256']!=c['solver_screen_manifest_sha256']:raise ValueError('solver quality screen changed')
     for field in ('transfer_screen_manifest','training_manifest','capacity_report'):
         if c.get(field) and file_identity(Path(c[field]),hash_contents=True)['sha256']!=c[field+'_sha256']:raise ValueError(f'{field} changed')
+    if c.get('hardware_qualification_report'):
+        path=Path(c['hardware_qualification_report'])
+        if file_identity(path,hash_contents=True)['sha256']!=c['hardware_qualification_report_sha256'] or not json.loads(path.read_text())['cross_hardware']['passed']:raise ValueError('hardware qualification failed or changed')
+        path=Path(c['panel'])
     primary=c.get('primary_guidance',2)
     if primary not in (1,2):raise ValueError('unsupported primary guidance')
     rows=json.loads(path.read_text())['development']

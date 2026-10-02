@@ -1,0 +1,26 @@
+{
+  "purpose": "External generalization of both existing427-family checkpoints under unchanged bounded retries; compare against the same original selected ensemble after exact native original identity passes.",
+  "native_run": "runs/bounded_retry_native_49846151",
+  "heads": [
+    "original",
+    "seed2026100171_expansion",
+    "seed2026100181_expansion"
+  ],
+  "panel": "All48 unchanged external development families. Existing16 eligible two-state families determine state coverage; MD and NMR controls remain included under their existing definitions. Original34 and reserved17 remain unscored.",
+  "samples": 32,
+  "attempts": 4,
+  "sampler": "Same FP32 Euler25/AE3 and external evaluation seed as existing original/compact ensembles. OriginalCFG2, adaptedCFG1. Latent noise varies; decoder noise remains fixed at index0. Output slot k uses latent index k+32*a on attempt a=0..3; accept first reference-free coarse-valid draw. Initially valid outputs never change. Exhausted slots return original draw k. This matches the external latent-noise arm; native tests separately varied both noise streams.",
+  "conditioning": "Original and broader heads use existing expanded conditioning. Qualified compact500 uses its already validated compact conditioning implementation. All comparisons report actual measured work and preserve controls; no implicit speedup claim for broader heads.",
+  "controls": "All48 single-versus-batch controls require CA-RMSD<=0.2A and CA-lDDT>=0.99. Original and compact500 raw-first32 are additionally checked against their historical external backbones at these tolerances with exactly identical per-draw coarse validity. Raw reference-state prefixes at1/4/16/32 and1/2/3A must match the historical parent. All attempted failures, accepted indices and fallback counts stored.",
+  "metrics": "Unchanged ensemble_scoring_protocol.json applied separately to raw32 and selected32. Report coarse validity on all48, oracle nearest-reference CA-lDDT on reference-bearing families, frozen2A state coverage and paired-family intervals on all16 eligible families, and MD W1 using every selected output. Report retries, attempted draws, per-target initial/retry generation seconds and peak memory; no end-to-end latency claim.",
+  "decision": "Compare each selected adapted pipeline against selected original. Existing sampling quality requires CA lower95% difference bound>-0.005, validity difference>=-0.01, and coverage difference>=0. Training diversity additionally requires coverage gain>=0.1 with positive lower95% bound, plus both broader seeds replicating the gain. Native qualification is already required. Report MD distributions regardless of gate; do not ignore a worsening MD result. Qualified sampling still requires matched end-to-end timing before promotion. No adaptive cap/threshold/guidance grid.",
+  "resources": "Two separate singleRTX runs,15minutes each,780second worker caps. Reuse the unchanged original48-family raw/selected ensemble only after the new native screen exactly reproduces its shared selected original control. <=8 own running+pending GPUs; CPU state scoring automatic;15UTC deadline.",
+  "reuse_protocol": "configs/retry_ensemble_protocol.json",
+  "reuse_protocol_sha256": "5c1cd5e89830373173c6f0c24f1b782909347dde9e12db0fac6903c075a073d4",
+  "reused_controls": {
+    "original": {
+      "run": "runs/retry_ensemble_49844758",
+      "manifest_sha256": "97c591d5a541d1c9da5cdd750e90c4128231322c9743357790f924d379bbecfb"
+    }
+  }
+}

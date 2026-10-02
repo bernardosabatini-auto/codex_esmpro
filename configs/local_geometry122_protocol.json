@@ -1,0 +1,23 @@
+{
+  "purpose": "Test whether direct decoded local-geometry penalties prevent the validity regression of full122 balanced training without losing teacher-mode capacity or native accuracy.",
+  "rationale": "Full122 training improves separate native CA accuracy but increases clashes; decoder steps, restricted tail adaptation, and fixed checkpoint blending failed. Bounded output repair failed because removing clashes disturbed angles/handedness. The earlier geometry pilot used reference pair distances and signed CA volume, not direct peptide/clash barriers. This is one distinct fixed objective, not a weight grid.",
+  "seeds": [2026100171, 2026100181],
+  "updates": 2000,
+  "evaluation_steps": [500, 2000],
+  "local_geometry": {
+    "minimum_time": 0.75,
+    "maximum_examples": 2,
+    "peptide_interval": [1.2, 1.5],
+    "clash_distance": 3.0,
+    "maximum_ca_gap": 4.2,
+    "weight": 1.0,
+    "maximum_gradient_ratio": 0.1,
+    "noise_seed": 2026100201
+  },
+  "objective": "Protein-mean sums of squared peptide interval violations, squared nonlocal CA repulsion violations (sequence separation>2), and squared excess adjacent CA gaps, each divided by protein length. Decode projected estimated endpoint z=x+(1-t)*v with frozen FP32 ProteinAE3. At most2 uniformly selected t>=0.75 non-dropped examples; independent deterministic decoder noise/subset stream. Keep original flow draws and data schedules. Bound auxiliary parameter-gradient norm to10% of flow before original total-gradient clipping; fixed max scalar weight1. No trainable decoder or ESM.",
+  "controls": "Same full-network initialization, balanced122 labels, target order, LR/EMA, AdamW and evaluation noise as full controls49753133/49753251. Separate optimizer-gradient accumulation is part of the intervention and may change floating-point rounding. Initial scores must agree within1e-5 and all state assignments exactly on matched hardware. All122 families are training. Original34/reserved17 stay unscored.",
+  "profile": "40 updates on oneRTX with all four bucket lengths. Require finite nonzero flow gradients, finite auxiliary gradients, some positive auxiliary contribution in every bucket, ratio<=0.1, peak reserved<=80GiB before fullRTX runs. If memory does not fit, assess H200 separately; do not alter batches silently.",
+  "evaluation": "Retain every seed and endpoint. Training-mode recall versus same-seed full balanced control: lower95% family interval>-0.05 and validity difference>=-0.01 to retain capacity. This is a fixed practical noninferiority criterion, not proof of equal distributions. Separate64-family native check at500/2000 uses original unchanged CA and geometry gates, both seeds reported. Only each quality-qualified head advances to48-family external ensembles; report both seeds, never select a best seed. True success requires external valid-state coverage gain with positive family interval and unchanged quality gates, then matched full-pipeline timing.",
+  "resources": "SingleGPU profile10min. Full two-seed training duration set from measured profile, subject to eight total running+pending and15:00UTC deadline. No distributed training. Do not extend training merely to raise utilization.",
+  "limitations": "Coarse geometry loss is not an atomistic force field. A loss decrease is not success; assess unchanged inference, teacher diversity, native quality, and external coverage. Local penalties could reduce diversity or distort structures; preserve failed outcomes. No output repair."
+}

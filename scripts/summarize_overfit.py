@@ -15,6 +15,12 @@ def main():
         if c.get('trainable_tail_blocks') is not None:
             d['training_subset']=m['training_subset']
             if not d['training_subset']['frozen_unchanged']:raise ValueError('frozen parameters changed')
+        if c.get('local_geometry'):
+            rows=m.get('local_geometry_updates',[])
+            if len(rows)!=m['updates'] or {r['step'] for r in rows}!=set(range(1,m['updates']+1)):raise ValueError('incomplete local geometry gradient accounting')
+            keys=('flow_parameter_grad_norm','aux_parameter_grad_norm','effective_geometry_weight','aux_to_flow_ratio','geometry_loss')
+            if any(not np.isfinite(r[k]) or r[k]<0 for r in rows for k in keys) or any(r['flow_parameter_grad_norm']<=0 or r['aux_to_flow_ratio']>.100001 for r in rows):raise ValueError('invalid local geometry gradients')
+            d['local_geometry']=dict(updates=len(rows),active_updates=sum(r['geometry_count']>0 for r in rows),positive_gradient_updates=sum(r['aux_parameter_grad_norm']>0 for r in rows),maximum_aux_to_flow_ratio=max(r['aux_to_flow_ratio'] for r in rows),mean_geometry_loss=float(np.mean([r['geometry_loss'] for r in rows])),active_buckets=sorted({r['length'] for r in rows if r['aux_parameter_grad_norm']>0}))
         if not c.get('profile_only'):
             families=audited_families(c)
             guidance_settings=c.get('evaluation_guidance',(1,2));targets=len(families)
@@ -58,6 +64,8 @@ def main():
         lines+=['',f"Target estimator: posterior mean plus detached conditional variance. Logged mean variance: {d.get('logged_posterior_variance_mean')}; logged mean variance/loss fraction: {d.get('logged_posterior_floor_fraction')}. These sparse logs are diagnostic, not an estimate of gradient-variance reduction. Time-bin errors still use sampled-label targets."]
     if 'training_subset' in d:
         subset=d['training_subset'];lines+=['',f"Tail adaptation: last {subset['tail_blocks']} blocks and output layers; {subset['trainable_parameters']:,}/{subset['total_parameters']:,} trainable parameters. Frozen raw and EMA parameters unchanged: {subset['frozen_unchanged']}."]
+    if 'local_geometry' in d:
+        aux=d['local_geometry'];lines+=['',f"Direct local-geometry objective: {aux['active_updates']}/{aux['updates']} updates had eligible late-time examples; {aux['positive_gradient_updates']} had positive auxiliary gradients. Maximum auxiliary/flow gradient norm ratio {aux['maximum_aux_to_flow_ratio']:.6f}; active buckets {aux['active_buckets']}. Mean logged geometry loss {aux['mean_geometry_loss']:.6f}. These are optimization diagnostics, not inference-quality evidence."]
     lines+=['','This is a training-capacity experiment. No model promotion or unseen-family accuracy claim is possible from these scores.']
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 

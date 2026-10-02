@@ -43,6 +43,9 @@ def main():
     if distribution not in ('empirical','balanced') or (distribution=='balanced' and (c['arm']=='reference' or estimator=='posterior')):raise ValueError('unsupported label distribution/estimator')
     if distribution=='balanced' and sha(c['followup_protocol'])!=c['followup_protocol_sha256']:raise ValueError('balanced protocol changed')
     if c['evaluation_steps'][-1]!=c['updates']:raise ValueError('invalid budget')
+    if c.get('local_geometry'):
+        recipe=json.loads(Path(c['protocol']).read_text())
+        if sha(c['protocol'])!=c['protocol_sha256'] or recipe['local_geometry']!=c['local_geometry'] or not expanded or distribution!='balanced' or c.get('trainable_tail_blocks') is not None or estimator!='sampled':raise ValueError('invalid local geometry scope')
     if not c.get('profile_only'):
         profile=json.loads(Path(c['profile_report']).read_text())
         if sha(c['profile_report'])!=c['profile_report_sha256'] or profile['status']!='complete' or not profile['profile_only'] or profile['max_reserved_gib']>c.get('maximum_profile_gib',110):raise ValueError('capacity gate failed')
@@ -123,7 +126,15 @@ def main():
                         progress=step/max(c['updates']-1,1);lr=c['learning_rate']*min((step+1)/c['warmup_updates'],1)*(.1+.9*.5*(1+math.cos(math.pi*progress)));optimizer.param_groups[0]['lr']=lr;optimizer.zero_grad(set_to_none=True)
                         loss,info=flow_loss(model,z,esm,mask,FlowConfig(),generator=rng,return_state=True,**posterior_args)
                         if not torch.isfinite(loss):raise FloatingPointError('nonfinite loss')
-                        loss.backward();norm=torch.nn.utils.clip_grad_norm_(trainable,1.,error_if_nonfinite=True)
+                        if c.get('local_geometry'):
+                            from latentfold.local_geometry import endpoint_geometry
+                            from latentfold.training import controlled_backward
+                            auxiliary,aux_stats=endpoint_geometry(decoder,info['state'],ids,[records[i]['length'] for i in ids],c['local_geometry'],step)
+                            aux_stats.update(controlled_backward(model,loss,auxiliary,weight=c['local_geometry']['weight'],max_ratio=c['local_geometry']['maximum_gradient_ratio'],loss_scale=1.))
+                            m.setdefault('local_geometry_updates',[]).append(dict(step=step+1,length=length,**aux_stats))
+                            del auxiliary,aux_stats
+                        else:loss.backward()
+                        norm=torch.nn.utils.clip_grad_norm_(trainable,1.,error_if_nonfinite=True)
                         if norm<=0:raise FloatingPointError('zero gradient')
                         optimizer.step()
                         with torch.no_grad():

@@ -13,9 +13,6 @@ export PYTHONPATH="$PWD/src" PYTHONDONTWRITEBYTECODE=1
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 PYTHON=/n/home08/bsabatini/.conda/envs/proteinae/bin/python
-NSYS=/n/sw/helmod-rocky8/apps/Core/cuda/13.3.1-fasrc01/cuda/bin/nsys
 RUN="runs/ensemble_latency_${SLURM_JOB_ID}"
-exec "$NSYS" profile --trace=nvtx --sample=none --cpuctxsw=none \
- --gpu-metrics-devices=cuda-visible --gpu-metrics-frequency=100 --export=sqlite --output="${RUN}_nsight" \
- "$PYTHON" -u scripts/benchmark_ensemble_latency.py --source /n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae \
+exec "$PYTHON" -u scripts/benchmark_ensemble_latency.py --source /n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae \
  --config runs/compact_latency_config.json --output "$RUN"

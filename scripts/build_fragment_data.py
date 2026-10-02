@@ -25,7 +25,7 @@ def main():
     if expanded:
         from prepare_fragment_expansion import audit_sources
         audit_sources(c)
-    expected_proteins=128 if expanded else 32
+    expected_proteins=c.get('training_protein_count',128) if expanded else 32
     a.output.mkdir(parents=True,exist_ok=False);start=time.monotonic();m=dict(status='running',config=c,records=[],controls=[],development=[],reference_validity=[]);atomic_json(a.output/'manifest.json',m)
     try:
         torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)

@@ -11,7 +11,7 @@ from latentfold.fragment_conditioning import fragment_features
 def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error','Incomplete'))
-    c=m['config'];expanded=c.get('expanded_fragment_data',False);expected_proteins=128 if expanded else 32
+    c=m['config'];expanded=c.get('expanded_fragment_data',False);expected_proteins=c.get('training_protein_count',128) if expanded else 32
     if expanded:
         from prepare_fragment_expansion import audit_sources
         audit_sources(c)
@@ -47,10 +47,11 @@ def analyze(run):
     new_fraction=float(np.mean([r['roundtrip_drms']<=.5 for r in m['records'] if r['target_id'] not in c['base_training_ids']])) if expanded else fraction
     if expanded:
         with h5py.File(c['base_fragments']) as old,h5py.File(run/'fragments.h5') as new:
-            for ident in c['base_training_ids']:
-                def check(name,obj):
-                    if isinstance(obj,h5py.Dataset) and not np.array_equal(obj[:],new['train/'+ident+'/'+name][:]):raise ValueError('Original training fragment arrays changed')
-                old['train/'+ident].visititems(check)
+            def check(name,obj):
+                other=new[name]
+                if dict(obj.attrs)!=dict(other.attrs):raise ValueError('Original fragment attributes changed')
+                if isinstance(obj,h5py.Dataset) and not np.array_equal(obj[:],other[:]):raise ValueError('Original fragment arrays changed')
+            old.visititems(check)
     if m['training_gate_passed']!=(fraction>=.9 and new_fraction>=.9):raise ValueError('Data gate mismatch')
     return dict(status='complete',training_gate_passed=fraction>=.9 and new_fraction>=.9,training_proteins=expected_proteins,training_fragments=9*expected_proteins,development_fragments=16,mean_fragment_roundtrip_drms=float(np.mean(records)),maximum_fragment_roundtrip_drms=float(np.max(records)),fraction_under_half_A=fraction,pose_controls=expected_proteins,elapsed_seconds=m['elapsed_seconds'],peak_reserved_GiB=m['peak_reserved_GiB'],manifest_sha256=sha(path),fragments_sha256=m['fragments_sha256'])
 

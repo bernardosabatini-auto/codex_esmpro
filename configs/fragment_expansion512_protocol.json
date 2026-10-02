@@ -1,0 +1,17 @@
+{
+  "purpose": "Test whether additional structural variety extends the transfer improvement observed from32to128proteins without the9foldcost actual-rollout objective.",
+  "prerequisite": "128plain continuation49951202 reduced development meanmotifdRMS3.387to1.962A, pairedfamilyCI[-1.735,-1.112], and yielded4/8validglobalrefolds in49961674. Strict retention remains zero; this is a new data-size test, not a successful model claim.",
+  "training_proteins": 512,
+  "bucket_counts": {
+    "128": 24,
+    "256": 168,
+    "384": 160,
+    "512": 160
+  },
+  "base_data_run": "fragment_data_49945596",
+  "selection": "Preserve all128existing proteins and all original16development inputs exactly. Add128proteins each from256/384/512buckets, noadditionalshortproteins available. Same auditedunused native-reference pool, confidence>=.8,referenceCAerror<=.02A,encodingparityRMSE<=.05,coarsevalid,standardAA, family/sequence deduplication and existing quarantine. Rank SHA256(2026100242:id); no output-based selection and no newteacher inference.",
+  "encoding": "Nine standalone fragments per newprotein, original recipe/seed, all512posecontrols, originalarrays/attributesbitwise, at least90percent newfragmentdRMS<=.5A; noqualityfiltering.",
+  "training": "Same parent49929751EMA+adapter, freshseed2026100241,2000updates, batches/LRs/EMA/precision as128control49951202; targets change, primarynoise/time/drop/history/globalRNG match. Original32capacity and16development evaluation at0/500/2000. Fortyupdateprofile beforefulltraining.",
+  "evaluation": "Strict proper-rotation raw motifretention and unchanged288refold assay aftertechnicalcompletion; compareagainst128control atmatched exposure. Onlytrainingdata breadth changes, length bucket sampling remainsfixed; moreproteins within longerbuckets is partofthiscontrast.",
+  "resources": "OneRTX dataallocation15minutes, fixedmaximumwork780seconds; profilebeforefulltraining, eightownGPUcap."
+}

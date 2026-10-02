@@ -21,8 +21,9 @@ def main():
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     recipe=json.loads(Path(c['protocol']).read_text())
     if c['samples']!=recipe['labels_per_length'] or c['lengths']!=recipe['lengths'] or c['seed']!=recipe['label_seed'] or c['batch']!=16:raise ValueError('Wrong label recipe')
-    a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85);start=time.monotonic();telemetry=None;m=dict(status='running',config=c,controls=[],batches=[],lengths=[],training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
+    a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);start=time.monotonic();telemetry=None;m=dict(status='running',config=c,controls=[],batches=[],lengths=[],training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
     try:
+        torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
         model,_=load_legacy(Path(c['checkpoint']),trusted_pickle=True);model.cuda().eval().requires_grad_(False);decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval();telemetry=Telemetry(a.output,True)
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'pairs.h5','x') as f:
             for n in c['lengths']:

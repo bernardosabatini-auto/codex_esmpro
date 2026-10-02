@@ -2,6 +2,7 @@
 #SBATCH --job-name=ep_uncond_labels
 #SBATCH --account=kempner_bsabatini_lab
 #SBATCH --partition=kempner_rtx
+#SBATCH --exclude=holygpu7c2313
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem=64G

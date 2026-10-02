@@ -8,6 +8,7 @@ from prepare_overfit import sha
 
 
 def analyze(run):
+    if not (run/'manifest.json').exists():return dict(status='failed',error='Missing manifest: worker failed during startup. See the registered job log; no label generation qualified.')
     m=json.loads((run/'manifest.json').read_text())
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error','Incomplete'))
     c=m['config']

@@ -1,5 +1,5 @@
 """Reject unregistered IDs before issuing any manual scheduler query."""
-import argparse,json
+import argparse,json,subprocess
 from pathlib import Path
 from watch_jobs import job_ids,scheduler_states
 
@@ -23,10 +23,16 @@ def resolve(jobs, *, ids=None, scripts=None):
 
 def main():
     p=argparse.ArgumentParser(description=__doc__);g=p.add_mutually_exclusive_group(required=True)
-    g.add_argument('--ids',nargs='+');g.add_argument('--scripts',nargs='+');a=p.parse_args()
+    g.add_argument('--ids',nargs='+');g.add_argument('--scripts',nargs='+');p.add_argument('--allocation',action='store_true');a=p.parse_args()
     root=Path(__file__).resolve().parents[1];jobs=json.loads((root/'runs/jobs.json').read_text())['jobs']
     ids=resolve(jobs,ids=a.ids,scripts=a.scripts)
-    print(json.dumps(scheduler_states(ids),indent=2))
+    result=scheduler_states(ids)
+    if a.allocation:
+        output=subprocess.run(['sacct','-n','-P','-j',','.join(ids),'--format=JobIDRaw,NodeList'],capture_output=True,text=True,check=True,timeout=30).stdout
+        for line in output.splitlines():
+            fields=line.split('|')
+            if len(fields)>=2 and fields[0] in ids:result.setdefault(fields[0],{})['nodes']=fields[1]
+    print(json.dumps(result,indent=2))
 
 
 if __name__=='__main__':main()

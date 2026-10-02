@@ -1,0 +1,9 @@
+{
+  "purpose": "Bounded RTX PRO6000 Blackwell compatibility check before using this architecture for substantial work.",
+  "settings": [{"solver": "euler", "steps": 25, "guidance": 2}],
+  "checkpoint": "Original459M EMA, CPU-verified compact exact-weight export.",
+  "panel": "Existing64 tuning families,three fixed samples each; no new selection or locked-test access.",
+  "controls": "Strict FP32,decoder3,same cached embeddings and flow/decoder seeds as H200. Existing batch/single controls for all four lengths and per-sample CA-lDDT/coarse validity agreement within1e-6 versus the frozen H200 baseline. Fail closed on incompatibility or changed outputs; preserve failures.",
+  "resources": "One RTX PRO6000 Blackwell,10-minute cap; observed same-shape H200 peak32.03GiB. Project total across all types<=8. Installed PyTorch2.11+cu130 includes sm_120 kernels; no package installation.",
+  "interpretation": "A pass supports moving this tested inference workload to RTX; it does not validate training, ESMC extraction, other precision modes or scientific speedups. Report elapsed time, measured memory and model-range counters. This single allocation is not a matched latency benchmark."
+}

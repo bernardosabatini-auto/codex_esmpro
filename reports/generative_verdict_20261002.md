@@ -1,0 +1,49 @@
+# Generative capability: what survives a stricter assay
+
+The model can generate diverse, plausible backbones and preserve a supplied motif in generated coordinates. We have not yet demonstrated useful isolated-fragment scaffolding under a sequence-design/refolding test that also checks the motif itself. These experiments use development panels; no locked tests were scored.
+
+## Contact guidance through initial noise
+
+The original50-step flow and frozen decoder pass forward identity, directional finite differences and checkpointed/direct gradient controls. Eight fixed cases compare up to12normalized-gradient updates against the best contact match among33random candidates, using only the supplied contact objective for selection. Every generated failure is retained.
+
+| Method | Contact within1A | Full-backbone valid | Best8designable | Generated joint success | Joint success also retained after refolding | Generation/search seconds |
+|---|---:|---:|---:|---:|---:|---:|
+| Initial single sample | 0/8 | 8/8 | 6/8 | 0/8 | 0/8 | 3.49 |
+| Noise guidance | 5/8 | 8/8 | 6/8 | 4/8 | 2/8 | 168.06 |
+| Random candidate selection | 3/8 | 8/8 | 6/8 | 3/8 | 3/8 | 41.27 |
+
+Guidance is numerically valid but does not earn its cost for this contact task. The matching6/8designability counts are too small to prove no regression. Generation timing excludes model loading, numerical controls and designability assays; no end-to-end speed claim. Peak reserved GPU memory was8.34GiB. See [generation](noise_guidance_49863415.md), [224refold assay](noise_designability_49863726.md) and [constraint retention](refold_constraint_retention_20261002.md).
+
+## Isolated fragments expose a real limitation
+
+The earlier motif codes came from complete structures. We instead cropped each motif first, canonicalized using only that fragment and encoded it as a standalone chain. Same original50step/RePaint3recipe,16families/four paired seeds, unchanged noise streams; all controls passed.
+
+| Motif code source | Motif dRMS | Motif within1A | Full-backbone valid |
+|---|---:|---:|---:|
+| Complete native structure | .390A | 64/64 | 43/64 |
+| Isolated fragment | .417A | 64/64 | 26/64 |
+
+Validity drops26.6percentage points; paired-family95%interval[-42.2,-12.5]. This comparison changes context, frame and encoder positions together; it cannot attribute the loss to one of them. Standalone fragment roundtrips average.124A distance RMS, so failure is not simply inability to reconstruct the supplied fragment. All57nonlocal CA clash pairs in isolated outputs involve motif–scaffold contacts;39of68CA gaps are at motif boundaries. See [generation](isolated_motif_49864561.md) and [failure localization](fragment_failure_diagnostic_20261002.md).
+
+On the fixed four-family/two-seed ProteinMPNN panel, free sequence design gives3/8joint successes for full-context codes and2/8for isolated codes. Requiring the SAME designed sequence to refold with acceptable global agreement, valid geometry and motif dRMS<=1A reduces both to0/8. A global scTM>.5does not establish local motif preservation. See [160refold assay](fragment_designability_49865077.md).
+
+## Fixing the motif sequence is necessary to test, but is insufficient here
+
+We repeated the identical20backbone assay, fixing only the supplied motif amino acids in ProteinMPNN; all scaffold positions remained freely designed. All160refolds, fixed residues, positive controls and repeatability controls were audited.
+
+| Motif code source | Strict joint, free sequence design | Strict joint, motif residues fixed |
+|---|---:|---:|
+| Full context | 0/8 | 2/8 |
+| Isolated fragment | 0/8 | 0/8 |
+
+This is a small feasibility result, not a population success rate or experimental validation. It strengthens the need to assess constraint retention after sequence design, and leaves the practical isolated-fragment task unsolved. See [matched fixed-sequence assay](fixed_motif_designability_49866072.md).
+
+## Noise-space motif optimization also failed
+
+None of264existing random candidates matched these isolated motifs within1A. A frozen eight-case experiment therefore starts from each case's best random candidate and optimizes initial noise through the original flow using a motif distance-matrix objective. It uses the same12update/line-search recipe, unchanged numerical controls and no motif-code insertion. Any follow-up must retain the fixed motif sequence and the strict same-sequence refolding gate. No outcome-driven parameter grid is authorized by this protocol.
+
+The completed eight-case test passed every numerical check but reached0/8motifs within1A. Mean motif dRMS changed4.463→4.380A, with both starts and endpoints8/8coarse-valid. Accounting for initial random search, cost increased41.27→342.30seconds. The frozen recipe is closed without a designability follow-up or parameter grid. See [motif noise guidance](motif_noise_guidance_49867032.md).
+
+## Next mechanistic comparison
+
+The inherited refinement recipe retains one self-conditioning estimate across inner refinements. A predeclared matched ablation will refresh it after each inner evaluation, keeping all weights, noise, times, fragment codes and evaluation counts fixed. This tests a specific sampler mechanism; it is not a claim that the inherited implementation is wrong. Promotion requires a positive paired-family lower confidence bound for raw joint success before the fixed-sequence design/refold assay. See `configs/motif_history_protocol.json`.

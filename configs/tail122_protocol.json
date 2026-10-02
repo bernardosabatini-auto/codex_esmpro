@@ -1,0 +1,14 @@
+{
+  "purpose": "Test whether restricting adaptation prevents the tuning geometry degradation from full-network balanced teacher training while retaining learned mode recall.",
+  "intervention": "Freeze all parameters except the last four DiT blocks and output adaptive normalization/projection. Conditioning, pair track, pair-bias projection, input projection, time embedding, position embedding and earlier blocks remain frozen. Hash every frozen state tensor before and after training and in EMA. Keep model training mode and existing dropout/noise behavior.",
+  "control": "Existing full-network balanced122 runs at seeds2026100171 and2026100181. Same source initialization, labels, target schedule, label choices, noise, optimization hyperparameters and evaluation. Clipping acts on the trainable subset and is part of the intervention. Do not claim that this isolates a particular representation's causal role.",
+  "trainable_tail_blocks": 4,
+  "seeds": [2026100171, 2026100181],
+  "updates": 2000,
+  "evaluation_steps": [500, 2000],
+  "profile": "First40 updates cycling all four length buckets, balanced prior, one RTX,10minute allocation. Require finite nonzero gradients, unchanged frozen raw/EMA hashes, correct trainable names/counts and peak reserved<=80GiB before full training. No profiler counters requested due observed shared-node counter conflict; synchronized training times and allocated-device telemetry remain available.",
+  "evaluation": "Retain fresh full122 training ensembles at0/500/2000, CFG1,32samples, FP32 Euler25 decoder3. Both seeds retained. Independently score every endpoint on separate64 tuning families with original quality/validity thresholds. Only qualified settings advance to48-family generative evaluation. Do not select a favorable seed or relax thresholds.",
+  "analysis": "Within each seed compare tail versus full balanced training and versus initialization with paired family bootstrap; verify matching configs, target/label/LR logs and initial predictions. Report all122/original32/additional90 as training cohorts. Reduced training cost and reduced geometry damage are distinct hypotheses. Mode learning on training labels is not unseen structural diversity.",
+  "resources": "Two single RTX full runs at most,120minute allocation each and114minute work cap after successful profile. Global eightGPU running-plus-pending limit and2026-10-02 15:00UTC deadline apply. Full initial ensembles are recomputed for provenance; do not silently reuse baseline predictions.",
+  "quarantine": "Original34 and reserved17 remain unscored. All labels/source data read-only. This adaptive experiment follows negative broader500 geometry and decoder integration results."
+}

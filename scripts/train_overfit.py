@@ -64,8 +64,13 @@ def main():
         ckpt=a.source/'data/phase1_dataset/last_pf_459M_p128x8_long512_scratch.ckpt';m['initial_checkpoint_sha256']=sha(ckpt)
         if c.get('checkpoint_sha256') and c['checkpoint_sha256']!=m['initial_checkpoint_sha256']:raise ValueError('initial checkpoint changed')
         model,architecture=load_legacy(ckpt,trusted_pickle=True);model.cuda().train();model.checkpoint_blocks=True;model.pair.checkpoint_blocks=True
+        if c.get('trainable_tail_blocks') is not None:
+            from latentfold.training_subset import configure_tail,frozen_digest
+            m['training_subset']=configure_tail(model,c['trainable_tail_blocks'])
+            m['training_subset']['initial_frozen_sha256']=frozen_digest(model)
+        trainable=[p for p in model.parameters() if p.requires_grad]
         decoder=load_proteinae(a.source/'ProteinAE_v1',a.source/'ProteinAE_v1/checkpoints/ae_r1_d8_v1.ckpt',steps=c['decoder_steps']).cuda()
-        torch.manual_seed(c['seed']);ema={k:v.detach().clone() for k,v in model.state_dict().items()};optimizer=torch.optim.AdamW(model.parameters(),lr=c['learning_rate'],betas=(.9,.95),weight_decay=.01,foreach=False)
+        torch.manual_seed(c['seed']);ema={k:v.detach().clone() for k,v in model.state_dict().items()};optimizer=torch.optim.AdamW(trainable,lr=c['learning_rate'],betas=(.9,.95),weight_decay=.01,foreach=False)
         order=np.random.default_rng(c['seed']);labels_rng=np.random.default_rng(c['seed']+1);rng=torch.Generator(device='cuda').manual_seed(c['seed']);queues={k:[] for k in buckets};telemetry=Telemetry(a.output,True)
         def evaluate(step):
             model.eval();raw={k:v.detach().cpu().clone() for k,v in model.state_dict().items()};model.load_state_dict(ema);state_cpu=torch.get_rng_state();state_gpu=torch.cuda.get_rng_state();evaluated_controls=set()
@@ -118,7 +123,7 @@ def main():
                         progress=step/max(c['updates']-1,1);lr=c['learning_rate']*min((step+1)/c['warmup_updates'],1)*(.1+.9*.5*(1+math.cos(math.pi*progress)));optimizer.param_groups[0]['lr']=lr;optimizer.zero_grad(set_to_none=True)
                         loss,info=flow_loss(model,z,esm,mask,FlowConfig(),generator=rng,return_state=True,**posterior_args)
                         if not torch.isfinite(loss):raise FloatingPointError('nonfinite loss')
-                        loss.backward();norm=torch.nn.utils.clip_grad_norm_(model.parameters(),1.,error_if_nonfinite=True)
+                        loss.backward();norm=torch.nn.utils.clip_grad_norm_(trainable,1.,error_if_nonfinite=True)
                         if norm<=0:raise FloatingPointError('zero gradient')
                         optimizer.step()
                         with torch.no_grad():
@@ -141,6 +146,10 @@ def main():
                 m['batches'].append(dict(nvtx_range=name,stage='training',seconds=seconds,updates=end-begin,peak_reserved_bytes=torch.cuda.max_memory_reserved()))
                 if not c.get('profile_only'):
                     torch.save(dict(ema={k:v.cpu() for k,v in ema.items()},arch=architecture['architecture'],extra_arch=architecture['extra_architecture'],model=architecture['model'],experiment=c),a.output/f'ema_{end}.ckpt');evaluate(end)
+        if c.get('trainable_tail_blocks') is not None:
+            subset=m['training_subset'];subset['final_frozen_sha256']=frozen_digest(model);subset['ema_frozen_sha256']=frozen_digest(model,ema)
+            subset['frozen_unchanged']=subset['initial_frozen_sha256']==subset['final_frozen_sha256']==subset['ema_frozen_sha256']
+            if not subset['frozen_unchanged']:raise ValueError('frozen parameters changed')
         m['status']='complete'
     except BaseException as e:m.update(status='failed',error=f'{type(e).__name__}: {e}');raise
     finally:

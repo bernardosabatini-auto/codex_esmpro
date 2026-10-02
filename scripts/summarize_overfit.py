@@ -12,6 +12,9 @@ def main():
     d['label_distribution']=c.get('label_distribution','empirical')
     if m['status']=='complete':
         if m['updates']!=c['updates']:raise ValueError('incomplete training')
+        if c.get('trainable_tail_blocks') is not None:
+            d['training_subset']=m['training_subset']
+            if not d['training_subset']['frozen_unchanged']:raise ValueError('frozen parameters changed')
         if not c.get('profile_only'):
             families=audited_families(c)
             guidance_settings=c.get('evaluation_guidance',(1,2));targets=len(families)
@@ -53,6 +56,8 @@ def main():
             lines+=['',f"SM issue: {h['collection_mean_percent'].get('SM Issue [Throughput %]')}% within measured collection ranges; {h['whole_capture_mean_percent'].get('SM Issue [Throughput %]')}% over the entire capture. For full runs collection ranges include evaluation. Short-profile startup is not amortized."]
     if d['target_estimator']=='posterior':
         lines+=['',f"Target estimator: posterior mean plus detached conditional variance. Logged mean variance: {d.get('logged_posterior_variance_mean')}; logged mean variance/loss fraction: {d.get('logged_posterior_floor_fraction')}. These sparse logs are diagnostic, not an estimate of gradient-variance reduction. Time-bin errors still use sampled-label targets."]
+    if 'training_subset' in d:
+        subset=d['training_subset'];lines+=['',f"Tail adaptation: last {subset['tail_blocks']} blocks and output layers; {subset['trainable_parameters']:,}/{subset['total_parameters']:,} trainable parameters. Frozen raw and EMA parameters unchanged: {subset['frozen_unchanged']}."]
     lines+=['','This is a training-capacity experiment. No model promotion or unseen-family accuracy claim is possible from these scores.']
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 

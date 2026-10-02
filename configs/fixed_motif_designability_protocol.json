@@ -1,0 +1,8 @@
+{
+ "purpose":"Test whether preserving the supplied motif amino-acid sequence during ProteinMPNN design improves refolded motif retention on the same saved scaffolds.",
+ "coverage":"Same20backbones and names as fragment_designability_49865077:8isolated,8full-context,4experimental controls. All160refolds and all failed raw scaffolds retained; no regenerated structures or outcome selection.",
+ "intervention":"For generated scaffolds only, supply native residues of the centered30percent fragment at the prescribed positions and fix them in ProteinMPNN. All other input residues remain alanine placeholders and are freely designed. Experimental positive controls remain free-design. Supply no native scaffold residues. Verify parsed sequence and every output sequence against every fixed position.",
+ "assay":"Same CA-only ProteinMPNN v_48_020,8sequences,T.1,seed1; same names and teacher seed formula; guarded FP32 teacher3loops50steps1sample. Dependencies, backbone bytes and target coverage must match previous assay. All4positive controls and teacher repeatability pass before interpretation.",
+ "primary":"Same-sequence strict joint success: original scaffold passes motif dRMS<=1A and full-backbone geometry; at least one of its eight designed sequences refolds with scTM>.5 to that scaffold, motif dRMS<=1A to supplied fragment, and valid full-backbone geometry. Report original easier assay separately; do not rescue failed raw scaffolds. This is a four-family development feasibility comparison.",
+ "resources":"OneRTX15minutes,780second cap,64GiBhost,excludepreviousECCnode. EightGPU/deadline guard."
+}

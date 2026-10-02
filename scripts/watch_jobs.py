@@ -96,6 +96,49 @@ def notify(root, state, key, message, config):
                 out.write(json.dumps(event)+'\n')
 
 
+def refresh_analysis_monitoring(root, query=scheduler_states):
+    """Perform a real owned-job poll while a long CPU audit is in progress."""
+    root = Path(root)
+    registry = json.loads((root/'runs/jobs.json').read_text())
+    state_path = root/'runs/watch/state.json'
+    state = json.loads(state_path.read_text()) if state_path.exists() else {}
+    ids = [i for job in registry['jobs']
+           if not state.get('jobs', {}).get(job['id'], {}).get('handled')
+           and not (job.get('state') in TERMINAL and not job.get('completion_action'))
+           for i in job_ids(job)]
+    if len(ids) != len(set(ids)):
+        raise ValueError('duplicate registry ownership')
+    rows = query(ids) if ids else {}
+    # Query failure propagates; never refresh freshness merely for being alive.
+    write_json(root/'runs/watch/heartbeat.json', dict(
+        checked_at=stamp(), status='ok', host=socket.gethostname(),
+        outstanding_jobs=[i for i in ids if rows.get(i, {}).get('state') not in TERMINAL],
+        outstanding_local_units=state.get('outstanding_local_units', []),
+        cpu_analysis_in_progress=True))
+
+
+def run_monitored_analysis(command, *, root, env, log, timeout=240):
+    deadline = time.monotonic() + timeout
+    with subprocess.Popen(command, cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT) as child:
+        try:
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise subprocess.TimeoutExpired(command, timeout)
+                try:
+                    code = child.wait(timeout=min(30, remaining))
+                except subprocess.TimeoutExpired:
+                    refresh_analysis_monitoring(root)
+                    continue
+                if code:
+                    raise subprocess.CalledProcessError(code, command)
+                return
+        finally:
+            if child.poll() is None:
+                child.kill()
+                child.wait()
+
+
 def followup(root, job, config):
     action = job.get('completion_action')
     if action not in ('summarize_comparison', 'summarize_hybrid', 'summarize_geometry', 'summarize_training_profile', 'summarize_holdout', 'summarize_pilot', 'summarize_external', 'summarize_quality', 'summarize_online', 'summarize_recovery','summarize_checkpoint','summarize_efficiency','summarize_consensus','summarize_optimizer','summarize_optimizer_state','summarize_kernels','summarize_matched_online','summarize_roundtrip','summarize_layers','summarize_state_roundtrip','summarize_ensemble','summarize_teacher_ensemble','summarize_layer_probe','summarize_conditioning','summarize_distill_data','summarize_latent_pose','summarize_distillation','summarize_ensemble_latency','summarize_label_audit','summarize_reflow_data','summarize_reflow','summarize_reflow_eval','summarize_overfit_labels','summarize_overfit','summarize_oracle_transport','summarize_teacher_recurrence','summarize_midpoint','summarize_overfit_native','summarize_tensor_precision','summarize_expanded_native','summarize_compact_condition','summarize_decoder_steps','summarize_compact_native','summarize_student_extension','summarize_expansion_data','summarize_expansion_native','summarize_confidence_chunks','summarize_latent_repair','summarize_cuda_graph','summarize_teacher_summary','summarize_summary_features','summarize_replay_native','summarize_bounded_retry_native','summarize_retry_ensemble','summarize_retry_prefix','summarize_generative_pilot','summarize_designability','summarize_unconditional_labels','summarize_unconditional_reflow','summarize_noise_guidance','summarize_noise_designability','summarize_isolated_motif','summarize_fragment_designability','summarize_fixed_motif_designability','summarize_motif_noise_guidance','summarize_motif_history','summarize_conditional_coupling','summarize_conditional_coupling_pair','summarize_conditional_coupling_native','summarize_fragment_data','summarize_fragment_training','summarize_trained_fragment_designability','summarize_fragment_fixed_positive','summarize_fragment_geometry_pose','summarize_fragment_guidance','summarize_fragment_feedback','summarize_roundtrip_designability','summarize_fragment_frame','summarize_fragment_target_frame','summarize_fragment_frame_calibration','summarize_fragment_frame_confirmation','summarize_fragment_strict_followup','summarize_fragment_repetition'):
@@ -114,8 +157,7 @@ def followup(root, job, config):
     env = dict(os.environ, CUDA_VISIBLE_DEVICES='', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1',
                OPENBLAS_NUM_THREADS='1', PYTHONPATH=str(root/'src'))
     with (root/'runs/watch'/f"analysis_{job['id']}.log").open('a') as log:
-        subprocess.run(command, cwd=root, env=env, stdout=log, stderr=subprocess.STDOUT,
-                       timeout=240, check=True)
+        run_monitored_analysis(command, root=root, env=env, log=log, timeout=240)
     if action in ('summarize_ensemble','summarize_teacher_ensemble','summarize_retry_ensemble') and json.loads(report.with_suffix('.json').read_text()).get('status')=='complete':
         from start_state_scoring import start
         start(root,job['id'])

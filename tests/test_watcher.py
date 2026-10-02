@@ -116,7 +116,7 @@ class WatcherTests(unittest.TestCase):
         (self.root/'reports').mkdir()
         (self.root/'reports/retry_prefix_123.json').write_text('{"status":"complete"}')
         job=dict(id='123', completion_action='summarize_retry_prefix')
-        with patch.object(watch.subprocess, 'run'), patch('start_state_scoring.start') as start:
+        with patch.object(watch, 'run_monitored_analysis'), patch('start_state_scoring.start') as start:
             result=watch.followup(self.root, job, dict(python='python'))
         start.assert_not_called()
         self.assertTrue(result.endswith('retry_prefix_123.md'))
@@ -125,7 +125,7 @@ class WatcherTests(unittest.TestCase):
         (self.root/'reports').mkdir()
         for prefix in ['roundtrip_designability','fragment_frame','fragment_target_frame']:
             job=dict(id='123',completion_action='summarize_'+prefix)
-            with patch.object(watch.subprocess,'run') as run,patch('start_state_scoring.start') as start:
+            with patch.object(watch,'run_monitored_analysis') as run,patch('start_state_scoring.start') as start:
                 result=watch.followup(self.root,job,dict(python='python'))
             command=run.call_args.args[0]
             self.assertTrue(command[1].endswith('summarize_'+prefix+'.py'))

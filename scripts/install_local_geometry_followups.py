@@ -22,7 +22,10 @@ Environment=CUDA_VISIBLE_DEVICES=
 Environment=OMP_NUM_THREADS=1
 Environment=MKL_NUM_THREADS=1
 Environment=OPENBLAS_NUM_THREADS=1
+Environment=PYTHONPATH={root}/src
 Environment=LD_LIBRARY_PATH=/n/home08/bsabatini/.conda/envs/proteinae/lib
+StandardOutput=append:{root}/runs/watch/local_geometry_followups.log
+StandardError=append:{root}/runs/watch/local_geometry_followups.log
 CPUQuota=100%
 MemoryMax=2G
 TimeoutStartSec=300

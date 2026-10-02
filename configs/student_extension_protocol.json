@@ -1,0 +1,12 @@
+{
+  "purpose": "Distinguish rare-state sampling from missing student modes using a bounded128-sample extension of the two qualified pipelines.",
+  "rationale": "All16 state-eligible development families have two frozen reference states. Original and compactbalanced500 recover both states in1/16 atK32; teacher achieves3/16 atK32 and7/16 atK128. The earlier student16-to32 coverage plateau makes this a bounded capacity diagnostic, not a promised improvement or unrestricted K search.",
+  "pipelines": ["original", "compact500"],
+  "families": 16,
+  "samples": 128,
+  "sample_batch": 32,
+  "sampling": "OriginalCFG2 and compact balanced500CFG1; strictFP32 Euler25/decoder3. Same parent seed and latent-noise indices0..127, decoder noise fixed at parent index0. Chunk32 preserves the original first32. No resampling, rejection or new model weights. Use cached final-layer ESMC embeddings; cost is generation-only, not sequence-to-structure latency.",
+  "controls": "Require all16 first32 backbones to match their qualified parent at every sample under CA-RMSD<=0.2A and CA-lDDT>=0.99, and identical per-sample coarse validity. CPU state scoring must reproduce the parent's K1/4/16/32 coverage exactly at all1/2/3A thresholds. Fail rather than discard mismatches.",
+  "analysis": "Report coverage, families recovering both states, first-hit sample index for each state, validity, and oracle nearest-reference CA-lDDT atK1/4/16/32/64/128. Compare128-minus32 per family and against the existing teacher128. Retain all failures. No significance-based stopping orK256 extension. More samples alone do not establish improved model generalization or equilibrium populations.",
+  "resources": "Two separate singleRTX jobs,15minutes each,780second work caps, memory bounded by the already qualified32-sample chunks. Global eight-GPU/deadline guard and exact own-job monitoring apply. Original34 and reserved17 remain unscored."
+}

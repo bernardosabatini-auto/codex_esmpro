@@ -1,0 +1,9 @@
+{
+  "purpose": "Separate accuracy transfer for both priors and both optimization seeds of reliable122 training at each declared500/2000 endpoint. The training protocol already requires both endpoints; capacity failures remain visible and do not suppress this diagnostic.",
+  "heads": ["original", "seed2026100171_empirical", "seed2026100171_balanced", "seed2026100181_empirical", "seed2026100181_balanced"],
+  "guidance_by_head": {"original": [2], "seed2026100171_empirical": [1], "seed2026100171_balanced": [1], "seed2026100181_empirical": [1], "seed2026100181_balanced": [1]},
+  "seeds": [2026100171, 2026100181],
+  "evaluation": "The same frozen64 tuning families, three paired samples, Euler25/decoder3, strict FP32. Original CFG2 must reproduce the frozen baseline. Each head has an exact-length versus padded-batch control per length bucket,0.2A/0.99. No locked-test scoring. All960 predictions and20 controls required.",
+  "analysis": "Report all four trained settings versus original CFG2, and balanced minus empirical within each seed. Family bootstrap intervals unadjusted. Quality qualification needs CA-lDDT difference lower95% bound>-0.005 and valid-fraction difference>=-0.01. Report both seeds; no best-seed substitution. A replicated quality claim requires both balanced seeds to pass. Experimental-state ensemble evaluation remains separate and only reference-quality-qualified settings may advance.",
+  "resources": "One H100,15-minute cap,780-second work cap. Five settings instead of the former ten; previous ten-setting H100 run12:44, peak memory compatible. GPU cap8 across types. No training or package changes."
+}

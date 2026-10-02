@@ -1,0 +1,40 @@
+{
+  "purpose": "Test one fixed50/50 interpolation of each full balanced122 final EMA checkpoint with its shared original initialization, after both final models improve CA-lDDT but fail native geometry. No alpha grid, new optimizer updates, validation fitting or sample filtering.",
+  "heads": [
+    "original",
+    "seed2026100171_full",
+    "seed2026100171_blend",
+    "seed2026100181_full",
+    "seed2026100181_blend"
+  ],
+  "guidance_by_head": {
+    "original": [
+      2
+    ],
+    "seed2026100171_full": [
+      1
+    ],
+    "seed2026100171_blend": [
+      1
+    ],
+    "seed2026100181_full": [
+      1
+    ],
+    "seed2026100181_blend": [
+      1
+    ]
+  },
+  "seeds": [
+    2026100171,
+    2026100181
+  ],
+  "evaluation": "The same frozen64 tuning families, three paired samples, Euler25/decoder3, strict FP32. Original CFG2 must reproduce the frozen baseline. Each head has an exact-length versus padded-batch control per length bucket,0.2A/0.99. No locked-test scoring. All960 predictions and20 controls required.",
+  "analysis": "Keep both seeds and full-weight controls. Same64-family/three-sample tuning screen and unchanged CA-lDDT lower95% difference>-0.005 and validity difference>=-0.01 versus originalCFG2. Report blend minus full within seed and retain every outcome. Only native-qualified blends advance to48-family external ensembles; full-network training-capacity scores do not certify blended weights. No independent-test scoring or promotion from tuning alone.",
+  "resources": "One H200,15minute allocation and780second work cap; matched five-head evaluation with already qualified architecture/memory. EightGPU project cap across hardware. No training, package changes or hardware-counter collection.",
+  "comparison_arms": [
+    "full",
+    "blend"
+  ],
+  "alpha": 0.5,
+  "provenance": "CPU FP32 torch.lerp of all floating EMA tensors at alpha0.5, identical nonfloating states, normalized identical architectures, exact original and trained source hashes. Save new checkpoints separately, verify reload, retain originals unchanged. The original compact EMA identity must trace to the same initialization used by both training runs."
+}

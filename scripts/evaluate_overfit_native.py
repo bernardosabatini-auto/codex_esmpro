@@ -37,7 +37,8 @@ def main():
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'predictions.h5','x') as out:
             for head in c['heads']:
                 if sha(head['checkpoint'])!=head['checkpoint_sha256']:raise ValueError('checkpoint changed')
-                if head.get('training_manifest') and sha(head['training_manifest'])!=head['training_manifest_sha256']:raise ValueError('checkpoint provenance changed')
+                for field in ('training_manifest','blend_manifest'):
+                    if head.get(field) and sha(head[field])!=head[field+'_sha256']:raise ValueError('checkpoint provenance changed')
                 model,_=load_legacy(Path(head['checkpoint']),trusted_pickle=True);model.cuda().eval().requires_grad_(False);torch.manual_seed(c['seed'])
                 for guidance in protocol.get('guidance_by_head',{}).get(head['name'],[1,2]):
                     group=out.require_group(head['name']).create_group(f'cfg{guidance}')

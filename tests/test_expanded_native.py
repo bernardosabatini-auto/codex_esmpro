@@ -39,5 +39,15 @@ class ExpandedNativeTests(unittest.TestCase):
         for r in rows[:2]:r['coarse_valid']=0
         d=analyze(self.m);self.assertFalse(d['replicated_quality_passed']);self.assertTrue(d['summaries']['seed2026100171_tail_cfg1']['quality_passed'])
 
+    def test_fixed_blend_scope_and_quality_gate(self):
+        c=self.m['config'];protocol=json.loads(Path('configs/blend_native_protocol.json').read_text())
+        names=dict(zip([h['name'] for h in c['heads']],protocol['heads']))
+        for r in self.m['scores']+self.m['controls']:r['head']=names[r['head']]
+        c.update(heads=[dict(name=h) for h in protocol['heads']],blend_alpha=.5,training_checkpoint_step=2000)
+        p=Path(c['protocol']);p.write_text(json.dumps(protocol));c['protocol_sha256']=sha(p)
+        d=analyze(self.m);self.assertTrue(d['replicated_quality_passed']);self.assertIn('blend_effects',d)
+        c['blend_alpha']=.75
+        with self.assertRaises(ValueError):analyze(self.m)
+
 
 if __name__=='__main__':unittest.main()

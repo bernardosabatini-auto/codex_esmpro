@@ -1,0 +1,35 @@
+{
+  "purpose": "Train explicit isolated-fragment conditioning and evaluate useful designability under a strict same-refold motif/global/geometry criterion.",
+  "representation": "Input only independently cropped/canonicalized/encoded fragment latents, supplied fragment amino acids and their placement in a requested chain length. Features:8latent+20aminoacid+1mask. Zero features outside supplied fragment. No ESM embedding, scaffold sequence, full-context motif encoding or latent output clamping. Full-chain training targets retain inherited cached canonical coordinates/latents.",
+  "training_data": "Initial capacity study uses the existing audited32training proteins/reference_backbones/reference_z in overfit_labels_49693246; all32reference backbones pass coarse geometry. Nine fragments per protein: fractions.2/.3/.4 at left/center/right placements. This is training capacity, not generalization. No teacher ensemble labels or new label selection.",
+  "development": "Existing16experimental generative development families, same centered30percent isolated fragments and four generation noises as isolated_motif49864561. Exact copied fragment codes and known original controls. Disjoint training/development families; original34/reserved17 locked tests unscored.",
+  "adapter": {
+    "hidden": 256,
+    "initialization": "zero output weights and bias; hidden linear standard seeded initialization",
+    "routing": "add to learned-null token condition at fragment residues, recompute masked full-chain mean condition; preserve original null pair biases"
+  },
+  "arms": [
+    "adapter_only",
+    "full"
+  ],
+  "training": "Both start identical original459M weights and adapter seed; identical data/fragment/noise/time/dropout/self-conditioning/LR traces. Adapter-only freezes all base weights. Full trains shared trunk/null conditioning, freezes unused sequence conditioner and pair-track parameters. AdamW(.9,.95),weight_decay.01,clip1,EMA.99,logit-normal times,fragment dropout.1,self-conditioning.5. AdapterLR3e-4,full-trunkLR1e-5,warmup100,cosine2000to.1floor. FP32, no distributed training.",
+  "seed": 2026100231,
+  "updates": 2000,
+  "evaluation_steps": [
+    500,
+    2000
+  ],
+  "profile_updates": 40,
+  "batches": {
+    "128": 64,
+    "256": 32,
+    "384": 16,
+    "512": 8
+  },
+  "evaluation": "Original50Euler/AE3 throughout; no refinement, clamp, retry or geometry filtering. Evaluate conditioned and fragment-dropped branches at same weights/noises. All32training center30motifs and16development motifs, four samples each; retain all outputs. Initial adapter must reproduce original null sampler and saved development unconditional backbones. Fragment pose, crop-only inputs, batching and saved-output metric checks required.",
+  "capacity_gate": "At primary2000, conditioned-minus-null joint raw motif<=1A AND coarse-valid rate lower95%paired-family interval>0 on32training families. Report500 diagnostically, never replace primary endpoint after seeing outcomes. Report absolute motif precision, raw validity, inter-sample diversity, reference similarity and both training arms. Capacity passes do not qualify designability.",
+  "designability": "For every technically completed arm, test all four fixed development control families x first two generation seeds without filtering, plus original isolated-clamp and null controls and experimental positive backbones. ProteinMPNN CA-only v48_020,T.1,seed1,eight sequences/backbone; fix only supplied motif amino acids. Guarded FP32 teacher3loops50steps1sample; all attempts retained. Strict success requires raw motif<=1A and coarse geometry AND one SAME designed-sequence refold with scTM>.5 to generated backbone, motif<=1A to supplied fragment and valid geometry. Reproducible positive controls required.",
+  "optimization": "First establish conditioning learnability and measured refold success. Then choose evidence-directed motif/interface losses or designability supervision, each with matched controls and bounded gradient accounting. Never equate geometry, ProteinMPNN likelihood or a teacher proxy with measured designability; reserve independent families for confirmation of a frozen recipe.",
+  "resources": "Dataset preparation oneRTX10minutes; first40update full profile oneRTX with a bounded allocation. Require finite updates, unchanged frozen weights, numerical controls and measured memory headroom before matched full arms. Runtime allocations follow measured profile plus evaluation/startup allowance. At most8registered ownGPUs running+pending; exclude holygpu7c2313; continue until user interruption.",
+  "data_gate": "Before training: exact copied full targets; all32reference backbones coarse-valid; all32center30 fragment rigid-pose controls coordinate/latent error<=1e-4; all288fragment arrays finite; at least90percent fragment decoder roundtrips dRMS<=.5A; all16development fragments/latents byte-identical to audited isolated inputs. No failure filtering."
+}

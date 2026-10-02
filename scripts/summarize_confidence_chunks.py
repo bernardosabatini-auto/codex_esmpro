@@ -12,7 +12,7 @@ def main():
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n');lines=['# Teacher confidence chunking','',f"Status: {d['status']}; qualified: {d['qualified']}.",'','Same16 structure draws; only confidence computation chunked by4. Saved full-confidence comparisons cross hardware. No same-hardware latency ratio, full AE-pipeline qualification, changed active data jobs or student-quality claim.']
     if d['status']=='complete':
         lines+=['',f"Measured hardware: {d['gpu']}. This does not qualify an untested GPU architecture.",'',f"Peak reserved{d['max_reserved_gib']:.3f}GiB, allocated{d['max_allocated_gib']:.3f}GiB; measured{d['measured_seconds']:.2f}s; worker wall{d['elapsed_seconds']:.2f}s."]
-        for r in d['records']:lines+=['',f"{r['id']}: passed{r['passed']}, CA-RMSDmax{r['max_ca_rmsd']:.6g}, pLDDT-RMSE{r['confidence_rmse']:.6g}; geometry/core/eligibility/eligible-state identity {r['validity_exact']}/{r['confident_mask_exact']}/{r['eligibility_exact']}/{r['states_exact']}."]
+        for r in d['records']:lines+=['',f"{r['id']}: passed{r['passed']}, CA-RMSDmax{r['max_ca_rmsd']:.6g}, CA-lDDTmin{r['min_ca_lddt']:.6g}, pLDDT-RMSE{r['confidence_rmse']:.6g}, pLDDT-maxerror{r['confidence_max_abs']:.6g}; geometry/core/eligibility/eligible-state identity {r['validity_exact']}/{r['confident_mask_exact']}/{r['eligibility_exact']}/{r['states_exact']}."]
     else:lines+=['',d['error']]
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')
 

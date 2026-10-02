@@ -1,5 +1,5 @@
 """Expand only a qualified fixed profile; disjoint new families, identical recipe."""
-import argparse,json,math
+import argparse,json
 from pathlib import Path
 from expansion_data import profile_rows
 from prepare_overfit import sha
@@ -32,13 +32,13 @@ def main():
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('changed frozen data input')
     groups=partition(selection['train'],[r['id'] for r in c['targets']]);paths=[];estimates=[]
     # Conservative bucket-wise worst observed seconds per new family, plus
-    # measured loading/control overhead, with50% margin. Bound each at60minutes.
+    # measured loading/control overhead, with50% margin. Bound each at90minutes.
     rates={b:sum(max(x['seconds'] for x in m['batches'] if x['phase']==phase and x.get('bucket')==b and not x.get('control',False)) for phase in ('teacher','encode_audit')) for b in (128,256,384,512)}
     embedding_rate=max(x['seconds']/x['batch'] for x in m['batches'] if x['phase']=='embedding')
     for index,rows in enumerate(groups):
         estimate=1.5*(sum(rates[r['bucket']]+embedding_rate for r in rows)+m['elapsed_seconds'])
-        if estimate>3300:raise ValueError('measured throughput does not fit a55minute work budget')
-        config=dict(c,phase='expansion',shard=index,targets=[dict(r,control=False) for r in rows],work_cap_seconds=3300,profile_manifest=str(a.profile.resolve()),profile_manifest_sha256=sha(a.profile))
+        if estimate>5040:raise ValueError('measured throughput does not fit an84minute work budget')
+        config=dict(c,phase='expansion',shard=index,targets=[dict(r,control=False) for r in rows],work_cap_seconds=5040,profile_manifest=str(a.profile.resolve()),profile_manifest_sha256=sha(a.profile))
         path=a.output.with_name(f'{a.output.stem}_{index}.json');path.write_text(json.dumps(config,indent=2)+'\n');paths.append(str(path));estimates.append(estimate)
     print(json.dumps(dict(configs=paths,counts=[len(x) for x in groups],conservative_seconds=estimates,reuse_profile_targets=len(c['targets']))))
 

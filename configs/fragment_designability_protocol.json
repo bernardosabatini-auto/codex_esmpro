@@ -1,0 +1,7 @@
+{
+ "purpose":"Matched designability of isolated-fragment scaffolds versus full-context motif3, on the fixed four-family/two-seed profile, all failures retained.",
+ "coverage":"20backbones:8isolated,8full-context and4experimental positive controls. All160refolds required. No geometry, motif or designability filtering.",
+ "assay":"ProteinMPNN CA-only v_48_020,8sequences per backbone,T.1,seed1. Guarded FP32 ESMFold2Fast3loops50steps1sample per sequence. Fixed-correspondence USalign,best8scTM>.5;all4experimental positive controls and numerical repeatability must pass.",
+ "primary":"Joint motif success requires fragment CA-distance-matrix RMS<=1A, unchanged full-backbone coarse validity and designability. Pairwise fixed-correspondence TM among all outputs and successful outputs with pair counts. Four-family feasibility scope; no one-sequence multistability or experimental-validation claim.",
+ "resources":"OneRTX15minutes,780secondworker cap,64GiBhost,excludeECCnode. Stop by15UTC,eightGPUcap."
+}

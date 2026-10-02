@@ -19,10 +19,13 @@ def main():
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     for dep in c['dependencies']+c['teacher_artifacts']:
         if sha(dep['path'])!=dep['sha256']:raise ValueError('Changed dependency '+dep['path'])
-    expected_count={'generative_pilot':52,'noise_contact':28}.get(c.get('assay','generative_pilot'))
+    expected_count={'generative_pilot':52,'noise_contact':28,'isolated_motif':20}.get(c.get('assay','generative_pilot'))
     if c['num_sequences']!=8 or c['temperature']!=.1 or expected_count is None or len(c['entries'])!=expected_count:raise ValueError('Unexpected design profile')
     if c.get('assay')=='noise_contact':
         from prepare_noise_designability import audit_inputs
+        audit_inputs(c)
+    if c.get('assay')=='isolated_motif':
+        from prepare_fragment_designability import audit_inputs
         audit_inputs(c)
     a.output.mkdir(parents=True,exist_ok=False);inputs=a.output/'inputs';inputs.mkdir();torch.set_num_threads(4)
     start=time.monotonic();telemetry=None;m=dict(status='running',config=c,records=[],controls=[],sequences={},training_updates_executed=0);atomic_json(a.output/'manifest.json',m)

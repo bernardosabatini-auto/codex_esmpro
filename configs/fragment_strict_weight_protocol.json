@@ -1,0 +1,14 @@
+{
+  "purpose": "Complete-panel strict follow-up of fixed3xlatent motif weighting, with exactly eight designs per generated backbone and no repeated assay of fixed-panel samples.",
+  "sources": [
+    ["plain128", "fragment_training_49951202", "development/conditioned"],
+    ["weighted128", "fragment_training_50019364", "development/conditioned"]
+  ],
+  "covered_assays": [
+    ["weighted128", "runs/trained_fragment_designability_latent_weight.json", "trained_fragment_designability_50029204", "fragment_fixed_positive_49906292"]
+  ],
+  "expected_backbones": 2,
+  "screening": "Recompute all64raw samples per arm. Count all raw failures as strict failures. The weighted1CB9slot0raw match is already included in the unchanged fixed assay; reuse its exact eight refolds. Reuse its previously audited fixed-motif native control. Only the1BFYslot2raw match and its native fixed-motif control require new refolds.",
+  "audit": "Bind covered fixed-assay configuration and exact arrays before scheduling. Final combined report requires completed audited fixed assay and native control; recompute all reused raw/refold scores and verify fixed sequences, source hashes, teacher recipe and repeatability. Never combine successes from different refolds. Retain denominator64per arm; distinguish newly executed and reused refolds.",
+  "interpretation": "Exploratory secondary analysis of reused development families. It does not supersede the fixed-panel result, estimate global designability of raw failures, or provide training labels. No additional sequence budget per generated sample."
+}

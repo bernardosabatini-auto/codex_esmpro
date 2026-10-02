@@ -35,6 +35,13 @@ def analyze(run):
                 if abs(tm-index[name,k]['sc_tm'])>1e-7:raise ValueError('Global score mismatch')
                 rows.append(dict(sequence_index=k,sc_tm=tm,coarse_valid=bool(backbone_geometry(x[None])['coarse_valid'][0]),**motif_fit(x,fragment,r['motif_start'])))
             records.append(dict(**r,raw=raw,refolds=rows,**same_refold_success(raw,rows)))
+    covered=[]
+    if c.get('covered_assays'):
+        from prepare_fragment_strict_followup import screen
+        from fragment_fixed_coverage import collect_covered
+        _,selected=screen(c);covered=collect_covered(c,selected);records.extend(covered)
+        wanted={(arm,ident,slot) for arm,ident,slot in selected}|{('native',ident,0) for _,ident,_ in selected}
+        if len(records)!=len(wanted) or {(r['arm'],r['target_id'],r['generation_slot']) for r in records}!=wanted:raise ValueError('Incomplete combined fixed/supplemental coverage')
     positive={r['target_id']:r['strict_joint_success'] for r in records if r['arm']=='native'};summaries=[]
     for s in c['screens']:
         arm=s['arm'];screen=[r for r in c['screen_rows'] if r['arm']==arm];rr=[r for r in records if r['arm']==arm];success=[r for r in rr if r['strict_joint_success']]
@@ -53,7 +60,7 @@ def analyze(run):
                     keep=np.zeros(len(x),dtype=bool);start=left['motif_start'];keep[start:start+len(rawfile['motifs/'+left['target_id']])]=True
                     pairs.append(dict(left=left['generation_slot'],right=right['generation_slot'],global_tm=usalign_coordinates(c['usalign'],x[:,1],y[:,1]),motif_aligned_scaffold_rmsd=scaffold_rmsd(x,y,keep)))
                 diversity.append(dict(arm=s['arm'],successful_backbones=len(success),chosen_first_qualifying_refolds=chosen,pairs=pairs,mean_global_tm=float(np.mean([r['global_tm'] for r in pairs])) if pairs else None,mean_motif_aligned_scaffold_rmsd=float(np.mean([r['motif_aligned_scaffold_rmsd'] for r in pairs])) if pairs else None))
-    return dict(status='complete',successful_refold_diversity=diversity,manifest_sha256=sha(path),refolded_sha256=sha(run/'refolded.h5'),completed_refolds=len(m['records']),native_strict_controls=positive,summaries=summaries,records=records,interpretation='Exploratory raw-screened diagnostic on reused development families; all nonpassing raw samples remain strict failures. This does not replace fixed-panel assays or override failed gates. Overall global designability is not measured, and no development refolds become training labels.',elapsed_seconds=m['elapsed_seconds'])
+    return dict(status='complete',successful_refold_diversity=diversity,manifest_sha256=sha(path),refolded_sha256=sha(run/'refolded.h5'),completed_refolds=len(m['records'])+8*len(covered),newly_executed_refolds=len(m['records']),reused_refolds=8*len(covered),native_strict_controls=positive,summaries=summaries,records=records,interpretation='Exploratory raw-screened diagnostic on reused development families; all nonpassing raw samples remain strict failures. This does not replace fixed-panel assays or override failed gates. Overall global designability is not measured, and no development refolds become training labels.',elapsed_seconds=m['elapsed_seconds'])
 
 
 def main():

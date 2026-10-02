@@ -47,3 +47,7 @@ The completed eight-case test passed every numerical check but reached0/8motifs 
 ## Refinement-history ablation also closed
 
 The inherited refinement recipe retains one self-conditioning estimate across inner refinements. Refreshing it after every inner evaluation, with the same weights, noise, times, isolated-fragment codes and148velocity evaluations, did not help. Raw joint success changed26/64→24/64: difference−0.03125,95%family interval[−0.140625,0.09375]. All64motifs still met1A fidelity. This recipe failed its predeclared gate and received no designability follow-up. See [completed history ablation](motif_history_49868443.md).
+
+## Pair-free unconditional generation is not materially faster in this profile
+
+The corrected r4b pair-free checkpoint and original pair model both produce64/64coarse-valid backbones on the same16families/four noises. All128outputs and8CFG0/null controls pass; the64original outputs reproduce the historical archive. Generation-only times are11.06s versus10.78s, peak3.83/3.84GiB. The unconditional sampler already skips sequence-conditioned pair computation. Therefore the reported3.5xtraining-step benefit cannot be carried over to this path. These one-pass timings do not establish a small speed difference, and no pair-free designability assay has been run. See [corrected pair-free profile](pairfree_generation_49880198.md).

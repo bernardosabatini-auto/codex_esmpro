@@ -16,7 +16,12 @@ def interval(values):
 def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error','Incomplete'),updates=m.get('updates',0),profile_qualified=False)
-    c=m['config']
+    c=m['config'];warm=c.get('warm_start',False)
+    if warm:
+        for key in ('warm_protocol','warm_parent_manifest','warm_parent_report','warm_predictions'):
+            if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed continuation source')
+        controls=m['warm_controls']
+        if len(controls)!=(32 if c['profile_only'] else 384) or any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in controls):raise ValueError('Warm-start parity failed')
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     if c.get('variant')=='geometry':
@@ -36,7 +41,7 @@ def analyze(run):
     if any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in m['initial_controls']):raise ValueError('Failed initial controls')
     if len(m['initial_controls'])!=(32 if c['profile_only'] else 128) or len(m['sampling_controls'])!=4 or any(r['original_max_abs']>1e-5 or r['batched_max_abs']>1e-4 for r in m['sampling_controls']):raise ValueError('Incomplete sampler controls')
     summaries=[];audited=0
-    with h5py.File(c['fragments']) as src,h5py.File(c['initial_predictions']) as initial:
+    with h5py.File(c['fragments']) as src,h5py.File(c['initial_predictions']) as initial,h5py.File(c['warm_predictions'] if warm else c['initial_predictions']) as historical:
         expected={(cohort,mode,ident,k) for cohort in ('train','development') for ident in src[cohort] for mode in ('conditioned','null') for k in range(4) if not c['profile_only'] or cohort=='development' and ident in c['control_ids']}
         if [e['step'] for e in m['evaluations']]!=[0]+c['evaluation_steps']:raise ValueError('Missing evaluation')
         for e in m['evaluations']:
@@ -51,9 +56,10 @@ def analyze(run):
                     for slot in range(4):
                         old=index[(cohort,mode,ident,slot)];metrics=ca_metrics(bb[slot,:,1],ref[:,1])
                         if abs(old['motif_drms']-err[slot])>1e-6 or old['coarse_valid']!=int(geom['coarse_valid'][slot]) or any(abs(old[key]-value)>1e-6 for key,value in metrics.items()):raise ValueError('Saved-score mismatch')
-                        if cohort=='development' and (e['step']==0 or c['arm']=='adapter_only' and mode=='null'):
-                            original=initial['original50/unconditional/'+ident+'/backbone'][slot];control=ca_metrics(bb[slot,:,1],original[:,1])
-                            if control['ca_rmsd']>.2 or control['ca_lddt']<.99 or np.max(abs(z[slot]-initial['original50/unconditional/'+ident+'/latent'][slot]))>1e-5:raise ValueError('Saved historical parity failed')
+                        if (cohort=='development' or warm) and (e['step']==0 or c['arm']=='adapter_only' and mode=='null'):
+                            history_path=f'{cohort}/{mode}/{ident}' if warm else 'original50/unconditional/'+ident
+                            original=historical[history_path+'/backbone'][slot];control=ca_metrics(bb[slot,:,1],original[:,1])
+                            if control['ca_rmsd']>.2 or control['ca_lddt']<.99 or np.max(abs(z[slot]-historical[history_path+'/latent'][slot]))>1e-5:raise ValueError('Saved historical parity failed')
                         audited+=1
             for cohort in sorted({key[0] for key in expected}):
                 families=sorted({r['family'] for r in e['scores'] if r['cohort']==cohort});arms={};paired=[]
@@ -63,7 +69,7 @@ def analyze(run):
                     means=[np.mean([r['coarse_valid'] and r['motif_drms']<=1 for r in e['scores'] if (r['cohort'],r['mode'],r['family'])==(cohort,mode,family)]) for mode in ('conditioned','null')];paired.append(means[0]-means[1])
                 summaries.append(dict(step=e['step'],cohort=cohort,arms=arms,conditioned_minus_null_joint=interval(paired)))
     memory=max(b['peak_reserved_bytes']/2**30 for b in m['batches']);gate=next((r['conditioned_minus_null_joint']['ci95'][0]>0 for r in summaries if r['step']==2000 and r['cohort']=='train'),False)
-    return dict(status='complete',config=c,manifest_sha256=sha(path),updates=m['updates'],audited_predictions=audited,training_seconds=sum(b['seconds'] for b in m['batches']),evaluation_seconds=sum(e['seconds'] for e in m['evaluations']),elapsed_seconds=m['elapsed_seconds'],max_reserved_GiB=memory,profile_qualified=c['profile_only'] and memory<=75,capacity_gate_passed=gate,summaries=summaries,initial_controls=len(m['initial_controls']),sampling_controls=len(m['sampling_controls']))
+    return dict(status='complete',config=c,manifest_sha256=sha(path),updates=m['updates'],total_training_updates=m['updates']+c.get('total_prior_updates',0),audited_predictions=audited,training_seconds=sum(b['seconds'] for b in m['batches']),evaluation_seconds=sum(e['seconds'] for e in m['evaluations']),elapsed_seconds=m['elapsed_seconds'],max_reserved_GiB=memory,profile_qualified=c['profile_only'] and memory<=75,capacity_gate_passed=gate,summaries=summaries,initial_controls=len(m['initial_controls']),sampling_controls=len(m['sampling_controls']))
 
 
 def main():

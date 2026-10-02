@@ -40,6 +40,11 @@ def main():
     a=p.parse_args();c=json.loads(a.config.read_text())
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
+    warm=c.get('warm_start',False)
+    if warm:
+        for key in ('warm_protocol','warm_parent_manifest','warm_parent_report','warm_predictions'):
+            if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed warm-start source')
+        if c['arm']!='full' or c.get('variant')!='geometry' or c.get('auxiliary_motif') or c.get('total_prior_updates')!=2000:raise ValueError('Wrong warm-start arm')
     geometry=c.get('variant')=='geometry'
     if c.get('distance_precision')=='fp64':
         if not geometry or sha(c['geometry_precision_protocol'])!=c['geometry_precision_protocol_sha256'] or sha(c['pose_diagnostic_report'])!=c['pose_diagnostic_report_sha256'] or not json.loads(Path(c['pose_diagnostic_report']).read_text())['corrected_precision_profile_qualified']:raise ValueError('Unqualified precision correction')
@@ -56,7 +61,7 @@ def main():
         for key in ('geometry_full_protocol','geometry_frozen_report','geometry_designability_report'):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed full geometry prerequisite')
     recipe=json.loads(Path(c['protocol']).read_text());dr=json.loads(Path(c['data_report']).read_text())
-    if not dr['training_gate_passed'] or c['arm'] not in recipe['arms'] or c['seed']!=recipe['seed'] or c['batches']!=recipe['batches']:raise ValueError('Wrong recipe or data gate')
+    if not dr['training_gate_passed'] or c['arm'] not in recipe['arms'] or c['seed']!=(json.loads(Path(c['warm_protocol']).read_text())['seed'] if warm else recipe['seed']) or c['batches']!=recipe['batches']:raise ValueError('Wrong recipe or data gate')
     if c['updates']!=(40 if c['profile_only'] else 2000) or c['evaluation_steps']!=([40] if c['profile_only'] else [500,2000]):raise ValueError('Wrong update schedule')
     if not c['profile_only']:
         if sha(c['profile_report'])!=c['profile_report_sha256'] or not json.loads(Path(c['profile_report']).read_text())['profile_qualified']:raise ValueError('Profile not qualified')
@@ -66,7 +71,10 @@ def main():
         model,arch=load_legacy(Path(c['checkpoint']),trusted_pickle=True);model.cuda().train();model.checkpoint_blocks=True
         if c['arm']=='adapter_only':model.requires_grad_(False);frozen=[n for n,_ in model.named_parameters()]
         else:frozen=freeze_unused_conditioning(model)
-        torch.manual_seed(c['seed']);adapter=(FragmentGeometryAdapter(model.d_model,n_layers=len(model.blocks),n_heads=model.n_heads,hidden=recipe['adapter']['hidden'],distance_precision=c.get('distance_precision','fp32')) if geometry else FragmentAdapter(model.d_model,recipe['adapter']['hidden'])).cuda().train();m['frozen_names']=frozen;m['frozen_initial']=frozen_hash(model,frozen);m['adapter_initial']=frozen_hash(adapter,[n for n,_ in adapter.named_parameters()]);m['token_adapter_initial']=frozen_hash(adapter,['hidden.weight','hidden.bias','output.weight','output.bias'])
+        torch.manual_seed(c['seed']);adapter=(FragmentGeometryAdapter(model.d_model,n_layers=len(model.blocks),n_heads=model.n_heads,hidden=recipe['adapter']['hidden'],distance_precision=c.get('distance_precision','fp32')) if geometry else FragmentAdapter(model.d_model,recipe['adapter']['hidden'])).cuda().train()
+        if warm:
+            parent_checkpoint=torch.load(c['checkpoint'],map_location='cpu',weights_only=False,mmap=True);adapter.load_state_dict(parent_checkpoint['fragment_adapter']);del parent_checkpoint
+        m['frozen_names']=frozen;m['frozen_initial']=frozen_hash(model,frozen);m['adapter_initial']=frozen_hash(adapter,[n for n,_ in adapter.named_parameters()]);m['token_adapter_initial']=frozen_hash(adapter,['hidden.weight','hidden.bias','output.weight','output.bias'])
         decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval().requires_grad_(False)
         ema={k:v.detach().clone() for k,v in model.state_dict().items()};adapter_ema={k:v.detach().clone() for k,v in adapter.state_dict().items()}
         trunk=[p for p in model.parameters() if p.requires_grad];aps=list(adapter.parameters());parameters=trunk+aps;groups=[dict(params=aps,lr=3e-4,base_lr=3e-4)]
@@ -76,7 +84,7 @@ def main():
         def evaluate(step):
             saved_rng=torch.cuda.get_rng_state();raw={k:v.detach().cpu().clone() for k,v in model.state_dict().items()};araw={k:v.detach().cpu().clone() for k,v in adapter.state_dict().items()};model.load_state_dict(ema);adapter.load_state_dict(adapter_ema);model.eval();adapter.eval();tick=time.monotonic();scores=[]
             keys=[key for key in sorted(data) if not c['profile_only'] or key[0]=='development' and key[1] in c['control_ids']]
-            with torch.no_grad(),inference_precision('fp32'),h5py.File(c['initial_predictions']) as initial,h5py.File(a.output/f'evaluation_{step}.h5','x') as out:
+            with torch.no_grad(),inference_precision('fp32'),h5py.File(c['initial_predictions']) as initial,h5py.File(c['warm_predictions'] if warm else c['initial_predictions']) as historical,h5py.File(a.output/f'evaluation_{step}.h5','x') as out:
                 for cohort,ident in keys:
                     v=data[(cohort,ident)];q=v['conditions']['f30_center'];n=v['length'];mask=torch.ones(4,n,dtype=torch.bool,device='cuda');features=q['features'][None].expand(4,-1,-1).cuda();keep=q['keep'][None].expand(4,-1).cuda();seed=2026100211 if cohort=='development' else 2026100232
                     noise=torch.cat([target_noise([ident],[n],8,seed=seed,sample_index=k,stream='flow:0',device='cuda') for k in range(4)]);dn=torch.cat([target_noise([ident],[4*n],3,seed=seed,sample_index=k,stream='decoder:0',device='cuda') for k in range(4)])*decoder.fm.scale_ref
@@ -85,13 +93,15 @@ def main():
                     for mode in ('conditioned','null'):
                         z=sample_fragment(model,adapter,features,keep,mask,noise=noise,steps=50,drop_fragment=mode=='null',coordinates=coordinates);_,bb=decoder(z,mask,noise=dn,return_backbone=True);bb=bb.cpu().numpy();geom=backbone_geometry(bb);fragment_bb=bb[:,q['keep'].numpy()];errors=motif_error(fragment_bb,q['fragment'],np.ones(len(q['fragment']),bool));g=out.create_group(f'{cohort}/{mode}/{ident}');g.create_dataset('backbone',data=bb);g.create_dataset('latent',data=z.cpu().numpy())
                         if not np.isfinite(bb).all():raise ValueError('Nonfinite decoded samples')
-                        if step==0 and cohort=='development':
-                            expected=initial['original50/unconditional/'+ident+'/backbone'][:];ez=initial['original50/unconditional/'+ident+'/latent'][:];ev=backbone_geometry(expected)['coarse_valid']
+                        if step==0 and (cohort=='development' or warm):
+                            history_path=f'{cohort}/{mode}/{ident}' if warm else 'original50/unconditional/'+ident
+                            expected=historical[history_path+'/backbone'][:];ez=historical[history_path+'/latent'][:];ev=backbone_geometry(expected)['coarse_valid']
                             for k in range(4):
-                                control=dict(target_id=ident,mode=mode,slot=k,latent_max_abs=float(np.max(abs(z[k].cpu().numpy()-ez[k]))),validity_identical=bool(ev[k]==geom['coarse_valid'][k]),**ca_metrics(bb[k,:,1],expected[k,:,1]));m['initial_controls'].append(control)
+                                control=dict(target_id=ident,mode=mode,slot=k,latent_max_abs=float(np.max(abs(z[k].cpu().numpy()-ez[k]))),validity_identical=bool(ev[k]==geom['coarse_valid'][k]),**ca_metrics(bb[k,:,1],expected[k,:,1]));m.setdefault('warm_controls',[]).append(dict(cohort=cohort,**control)) if warm else None
+                                if cohort=='development':m['initial_controls'].append(control)
                                 if control['latent_max_abs']>1e-5 or control['ca_rmsd']>.2 or control['ca_lddt']<.99 or not control['validity_identical']:raise ValueError('Historical null parity failed')
                         if step==0 and mode=='conditioned' and ident in c['control_ids']:
-                            esm=features.new_zeros(1,n,model.cond_norm.normalized_shape[0]);original=sample_unconditional(model,esm,mask[:1],noise=noise[:1],steps=50);single=sample_fragment(model,adapter,features[:1],keep[:1],mask[:1],noise=noise[:1],coordinates=coordinates[:1] if geometry else None);control=dict(target_id=ident,original_max_abs=float((original-single).abs().max()),batched_max_abs=float((single-z[:1]).abs().max()));m['sampling_controls'].append(control)
+                            esm=features.new_zeros(1,n,model.cond_norm.normalized_shape[0]);original=torch.from_numpy(historical[f'{cohort}/{mode}/{ident}/latent'][:1]).cuda() if warm else sample_unconditional(model,esm,mask[:1],noise=noise[:1],steps=50);single=sample_fragment(model,adapter,features[:1],keep[:1],mask[:1],noise=noise[:1],coordinates=coordinates[:1] if geometry else None);control=dict(target_id=ident,original_max_abs=float((original-(z[:1] if warm else single)).abs().max()),batched_max_abs=float((single-z[:1]).abs().max()));m['sampling_controls'].append(control)
                             if control['original_max_abs']>1e-5 or control['batched_max_abs']>1e-4:raise ValueError('Initial sampler/batch control failed')
                         if geometry and mode=='conditioned' and ident in c['control_ids']:
                             cc=coordinates.double() if c.get('distance_precision')=='fp64' else coordinates;rotations=[('quarter',cc.new_tensor([[0,-1,0],[1,0,0],[0,0,1]]))]

@@ -1,6 +1,7 @@
 """Gate a fresh-optimizer continuation on an improving completed parent."""
 import argparse,json,math
 from pathlib import Path
+import h5py,numpy as np
 from prepare_overfit import sha
 
 
@@ -17,8 +18,15 @@ def main():
         path=root/'configs/fragment_rollout_protocol.json';c.update(rollout_protocol=str(path.resolve()),rollout_protocol_sha256=sha(path),rollout_motif=json.loads(path.read_text())['auxiliary'])
     if a.data_report:
         dd=json.loads(a.data_report.read_text());dm_path=root/'runs'/a.data_report.stem/'manifest.json';dm=json.loads(dm_path.read_text());dc=dm['config']
-        if dd['status']!='complete' or not dd['training_gate_passed'] or dd['training_proteins']!=128 or dd['manifest_sha256']!=sha(dm_path) or not dc.get('expanded_fragment_data') or dc['base_fragments_sha256']!=c['fragments_sha256']:raise ValueError('Unqualified expanded fragment corpus')
-        c.update(expanded_fragment_data=True,evaluation_train_ids=dc['base_training_ids'])
+        if dd['status']!='complete' or not dd['training_gate_passed'] or dd['training_proteins'] not in (128,512) or dd['manifest_sha256']!=sha(dm_path) or not dc.get('expanded_fragment_data'):raise ValueError('Unqualified expanded fragment corpus')
+        with h5py.File(c['fragments']) as original,h5py.File(dm_path.parent/'fragments.h5') as expanded:
+            evaluation_ids=sorted(original['train'])
+            if len(evaluation_ids)!=32 or not set(evaluation_ids)<=set(expanded['train']):raise ValueError('Missing original capacity panel')
+            def check(name,obj):
+                other=expanded[name]
+                if dict(obj.attrs)!=dict(other.attrs) or (isinstance(obj,h5py.Dataset) and not np.array_equal(obj[:],other[:])):raise ValueError('Original capacity/development input changed')
+            original.visititems(check)
+        c.update(expanded_fragment_data=True,training_protein_count=dd['training_proteins'],evaluation_train_ids=evaluation_ids)
         for key,path in [('data_report',a.data_report),('data_manifest',dm_path),('fragments',dm_path.parent/'fragments.h5'),('expanded_protocol',Path(dc['expanded_protocol']))]:c[key]=str(path.resolve());c[key+'_sha256']=sha(path)
     if a.profile:
         pd=json.loads(a.profile.read_text())

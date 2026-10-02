@@ -19,7 +19,7 @@ def main():
     a=p.parse_args();c=json.loads(a.config.read_text());path=Path(c['panel'])
     if hashlib.sha256(path.read_bytes()).hexdigest()!=c['panel_sha256']:raise ValueError('changed panel')
     if c.get('solver_screen_manifest') and file_identity(Path(c['solver_screen_manifest']),hash_contents=True)['sha256']!=c['solver_screen_manifest_sha256']:raise ValueError('solver quality screen changed')
-    for field in ('transfer_screen_manifest','training_manifest','capacity_report','compact_screen_manifest','compact_reference_manifest'):
+    for field in ('transfer_screen_manifest','training_manifest','capacity_report','compact_screen_manifest','compact_reference_manifest','blend_manifest'):
         if c.get(field) and file_identity(Path(c[field]),hash_contents=True)['sha256']!=c[field+'_sha256']:raise ValueError(f'{field} changed')
     if c.get('hardware_qualification_report'):
         path=Path(c['hardware_qualification_report'])

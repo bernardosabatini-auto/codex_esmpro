@@ -121,15 +121,16 @@ class WatcherTests(unittest.TestCase):
         start.assert_not_called()
         self.assertTrue(result.endswith('retry_prefix_123.md'))
 
-    def test_roundtrip_designability_routes_to_cpu_audit(self):
+    def test_generation_diagnostics_route_to_cpu_audit(self):
         (self.root/'reports').mkdir()
-        job=dict(id='123',completion_action='summarize_roundtrip_designability')
-        with patch.object(watch.subprocess,'run') as run,patch('start_state_scoring.start') as start:
-            result=watch.followup(self.root,job,dict(python='python'))
-        command=run.call_args.args[0]
-        self.assertTrue(command[1].endswith('summarize_roundtrip_designability.py'))
-        self.assertIn(str(self.root/'runs/roundtrip_designability_123'),command)
-        self.assertTrue(result.endswith('roundtrip_designability_123.md'));start.assert_not_called()
+        for prefix in ['roundtrip_designability','fragment_frame']:
+            job=dict(id='123',completion_action='summarize_'+prefix)
+            with patch.object(watch.subprocess,'run') as run,patch('start_state_scoring.start') as start:
+                result=watch.followup(self.root,job,dict(python='python'))
+            command=run.call_args.args[0]
+            self.assertTrue(command[1].endswith('summarize_'+prefix+'.py'))
+            self.assertIn(str(self.root/('runs/'+prefix+'_123')),command)
+            self.assertTrue(result.endswith(prefix+'_123.md'));start.assert_not_called()
 
     def test_score_coverage_rejects_duplicates_and_missing(self):
         manifest = dict(status='complete', completed_predictions=2,

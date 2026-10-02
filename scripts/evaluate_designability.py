@@ -19,7 +19,7 @@ def main():
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     for dep in c['dependencies']+c['teacher_artifacts']:
         if sha(dep['path'])!=dep['sha256']:raise ValueError('Changed dependency '+dep['path'])
-    expected_count={'generative_pilot':52,'noise_contact':28,'isolated_motif':20,'fixed_motif':20}.get(c.get('assay','generative_pilot'))
+    expected_count={'generative_pilot':52,'noise_contact':28,'isolated_motif':20,'fixed_motif':20,'trained_fragment':36}.get(c.get('assay','generative_pilot'))
     if c['num_sequences']!=8 or c['temperature']!=.1 or expected_count is None or len(c['entries'])!=expected_count:raise ValueError('Unexpected design profile')
     if c.get('assay')=='noise_contact':
         from prepare_noise_designability import audit_inputs
@@ -30,6 +30,9 @@ def main():
     if c.get('assay')=='fixed_motif':
         from prepare_fixed_motif_designability import audit_fixed_inputs
         audit_fixed_inputs(c)
+    if c.get('assay')=='trained_fragment':
+        from prepare_trained_fragment_designability import audit_inputs
+        audit_inputs(c)
     a.output.mkdir(parents=True,exist_ok=False);inputs=a.output/'inputs';inputs.mkdir();torch.set_num_threads(4)
     start=time.monotonic();telemetry=None;m=dict(status='running',config=c,records=[],controls=[],sequences={},training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
     try:
@@ -44,13 +47,13 @@ def main():
         with (a.output/'mpnn.log').open('w') as log:
             subprocess.run([sys.executable,str(mpnn/'helper_scripts/parse_multiple_chains.py'),'--input_path',str(inputs),'--output_path',str(parsed),'--ca_only'],check=True,stdout=log,stderr=subprocess.STDOUT,timeout=120)
             fixed_args=[]
-            if c.get('assay')=='fixed_motif':
+            if c.get('assay') in ('fixed_motif','trained_fragment'):
                 from fixed_motif_design import fix_parsed_motifs
                 positions=a.output/'fixed_positions.jsonl';fix_parsed_motifs(parsed,positions,c['entries']);fixed_args=['--fixed_positions_jsonl',str(positions)]
             subprocess.run([sys.executable,str(mpnn/'protein_mpnn_run.py'),'--jsonl_path',str(parsed),'--out_folder',str(designs),'--ca_only','--path_to_model_weights',str(mpnn/'ca_model_weights'),'--model_name','v_48_020','--num_seq_per_target','8','--sampling_temp','0.1','--seed','1','--batch_size','1']+fixed_args,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=600)
         m['mpnn_seconds']=time.monotonic()-tick
         for r in c['entries']:m['sequences'][r['name']]=design_sequences(designs/'seqs'/(r['name']+'.fa'),r['length'])
-        if c.get('assay')=='fixed_motif':
+        if c.get('assay') in ('fixed_motif','trained_fragment'):
             from fixed_motif_design import verify_fixed_sequences
             verify_fixed_sequences(m['sequences'],c['entries'])
         if len(list((designs/'seqs').glob('*.fa')))!=len(c['entries']):raise ValueError('Unexpected design coverage')

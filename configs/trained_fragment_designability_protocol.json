@@ -1,0 +1,10 @@
+{
+  "purpose": "Assess trained isolated-fragment generation by the same valid refold retaining the supplied motif and matching the entire generated scaffold.",
+  "panel": "Each technically complete2000update arm: four fixed development control families, first two samples, both conditioned and trained-null outputs. Include original isolated-clamp and original-null controls, both first two samples, and four experimental positives.36backbones,288refolds; retain every raw failure. No capacity-gate filtering.",
+  "sequence_design": "ProteinMPNN CA-onlyv48_020,8sequences/backbone,T.1,seed1. Fix only supplied motif residues for all32generated backbones, including null controls. Experimental positives are freely redesigned. Never supply native scaffold residues.",
+  "refolding": "GuardedFP32 teacher,3loops,50steps,1diffusion sample per designed sequence. Same fixed-correspondence reference-normalized USalign TM. Repeat first sequence of each positive as a numerical control.",
+  "primary": "Raw backbone must have valid coarse geometry and motif distance RMS<=1A AND proper-rotation Kabsch motifCA RMSD<=1A. At least one SAME refold must satisfy full-backbone scTM>.5, valid coarse geometry, motif distance RMS<=1A and proper-rotation motifCA RMSD<=1A. Record the exact successful designed-sequence indices. No taking independent maxima across sequences.",
+  "secondary": "Report legacy dRMS-only joint criterion separately for comparison; valid designability without motif constraints; every per-sequence metric; per-backbone success and family-level intervals; diversity over all raw samples and separately strict-success samples with pair counts. Four-family development feasibility does not establish generalization.",
+  "controls": "All four experimental positives must have a valid globally agreeing refold; four repeated refolds RMSD<=.01A/lDDT>=.999. Failed controls invalidate interpretation, not erase outputs.",
+  "resources": "Existing matched teacher assay measured onRTX; oneRTX bounded20minutes per arm initially, cap8ownGPUs total; no distributed training or package installations. Use actual memory/runtime to revise later allocations."
+}

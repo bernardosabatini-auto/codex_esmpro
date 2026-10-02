@@ -1,0 +1,8 @@
+{
+  "purpose": "Test whether a frozen generator limits use of isolated fragment distances, combining the established full-network learning arm with corrected direct geometry input.",
+  "prerequisite": "Audited corrected frozen-distance2000update run49911511and its288refold assay49919660are complete; raw development joint success and strict refold success remain zero. Token-only full-network49893256is the matched trainable-trunk baseline.",
+  "contrast": "Fresh original weights, same token/distance adapter initialization and FP64distance computation as frozen-distance49911511. Train shared generator trunk and null token at1e-5, adapter at3e-4, exactly as token-only full-network recipe. Freeze unused sequence conditioning and pair parameters. No decoded auxiliary loss in this arm.",
+  "controls": "Identical2000data/noise/time/dropout/history/globalRNG traces to both established baselines; initial384outputs identical. Frozen parameter hashes unchanged within each run. Pose controls at0/500/2000; null branch evaluated without claiming frozen null equivalence after training.",
+  "evaluation": "Unchanged32training proteins,288isolatedfragments and16developmentfamilies,4noises,50Euler/AE3,500diagnostic/2000primary. Compare to token-only full-network to isolate direct distance input, and frozen-distance to isolate trunk adaptation. Primary capacity contrast is conditioned-minus-null training joint success with paired-family lower95percent interval>0; preserve all failures. Every technical completion receives36backbone288refold strict same-refold assay.",
+  "resources": "OneRTX40update profile, peak<=75GiB, measured walltime before2000updates; no distributed training; total<=8own GPUs."
+}

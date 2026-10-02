@@ -8,9 +8,9 @@ from prepare_overfit import sha
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--baseline',type=Path,required=True);p.add_argument('--candidate',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--objective',action='store_true');a=p.parse_args();runs=[a.baseline,a.candidate];ms=[json.loads((r/'manifest.json').read_text()) for r in runs];base,new=ms;configs=[m['config'] for m in ms]
-    if any(m['status']!='complete' or m['updates']!=2000 or m['config']['arm']!='adapter_only' for m in ms) or configs[1].get('variant')!='geometry' or (configs[0].get('variant')!='geometry' if a.objective else configs[0].get('variant') is not None):raise ValueError('Wrong completed arms')
+    if any(m['status']!='complete' or m['updates']!=2000 or m['config']['arm'] not in ('adapter_only','full') for m in ms) or configs[1].get('variant')!='geometry' or (configs[0].get('variant')!='geometry' if a.objective else configs[0].get('variant') is not None):raise ValueError('Wrong completed arms')
     if a.objective and (not configs[1].get('auxiliary_motif') or configs[0].get('auxiliary_motif') or configs[0].get('distance_precision')!=configs[1].get('distance_precision')):raise ValueError('Wrong objective contrast')
-    keys=('protocol_sha256','seed','updates','batches','evaluation_steps','data_report_sha256','data_manifest_sha256','fragments_sha256','checkpoint_sha256','decoder_checkpoint_sha256','initial_manifest_sha256','initial_predictions_sha256')
+    keys=('arm','protocol_sha256','seed','updates','batches','evaluation_steps','data_report_sha256','data_manifest_sha256','fragments_sha256','checkpoint_sha256','decoder_checkpoint_sha256','initial_manifest_sha256','initial_predictions_sha256')
     if any(configs[0][k]!=configs[1][k] for k in keys) or base['frozen_initial']!=new['frozen_initial'] or base['adapter_initial']!=(new['adapter_initial'] if a.objective else new['token_adapter_initial']):raise ValueError('Recipe/initial weight mismatch')
     trace=('step','length','batch','ids','conditions','learning_rate_factor','self_conditioned','noise_sha256','time_sha256','drop_sha256','rng_sha256','global_rng_sha256')
     if len(base['training'])!=2000 or len(new['training'])!=2000:raise ValueError('Incomplete trace')

@@ -23,6 +23,9 @@ def analyze(run):
         if sha(c['geometry_protocol'])!=c['geometry_protocol_sha256'] or len(m['geometry_controls'])!=(8 if c.get('distance_precision')=='fp64' else 4)*(len(c['evaluation_steps'])+1) or any(r['pose_latent_max_abs']>1e-4 for r in m['geometry_controls']):raise ValueError('Geometry conditioner controls failed')
     if c.get('distance_precision')=='fp64':
         if sha(c['geometry_precision_protocol'])!=c['geometry_precision_protocol_sha256'] or sha(c['pose_diagnostic_report'])!=c['pose_diagnostic_report_sha256']:raise ValueError('Changed precision correction evidence')
+    if c.get('variant')=='geometry' and c['arm']=='full':
+        for key in ('geometry_full_protocol','geometry_frozen_report','geometry_designability_report'):
+            if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed full geometry evidence')
     if c.get('auxiliary_motif'):
         if sha(c['motif_objective_protocol'])!=c['motif_objective_protocol_sha256'] or sha(c['motif_baseline_report'])!=c['motif_baseline_report_sha256']:raise ValueError('Changed objective provenance')
         rows=m['motif_objective_updates']

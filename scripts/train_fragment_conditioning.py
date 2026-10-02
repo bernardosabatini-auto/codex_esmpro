@@ -50,7 +50,11 @@ def main():
     if geometry:
         for baseline in c['baseline_reports']:
             if sha(baseline['path'])!=baseline['sha256']:raise ValueError('Changed baseline evidence')
-    if geometry and (sha(c['geometry_protocol'])!=c['geometry_protocol_sha256'] or c['arm']!='adapter_only'):raise ValueError('Changed geometry recipe')
+    if geometry and sha(c['geometry_protocol'])!=c['geometry_protocol_sha256']:raise ValueError('Changed geometry recipe')
+    if geometry and c['arm']!='adapter_only':
+        if c['arm']!='full' or c.get('auxiliary_motif'):raise ValueError('Undeclared geometry arm')
+        for key in ('geometry_full_protocol','geometry_frozen_report','geometry_designability_report'):
+            if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed full geometry prerequisite')
     recipe=json.loads(Path(c['protocol']).read_text());dr=json.loads(Path(c['data_report']).read_text())
     if not dr['training_gate_passed'] or c['arm'] not in recipe['arms'] or c['seed']!=recipe['seed'] or c['batches']!=recipe['batches']:raise ValueError('Wrong recipe or data gate')
     if c['updates']!=(40 if c['profile_only'] else 2000) or c['evaluation_steps']!=([40] if c['profile_only'] else [500,2000]):raise ValueError('Wrong update schedule')

@@ -1,0 +1,12 @@
+{
+  "purpose": "Complete the two-by-two weights/steps diagnostic after original50 and reflow10 generation. Reflow used condition_dropout=0; distinguish loss from fewer integration steps versus changed weights before considering unconditional distillation.",
+  "parent_run": "runs/generative_pilot_49855378",
+  "samples": 4,
+  "seed": 2026100211,
+  "heads": {"original10": 10, "reflow50": 50},
+  "modes": {"unconditional": 1, "motif_u1": 1, "motif_u3": 3},
+  "controls": "Same frozen16 complete experimental development families, reference encodings, noise addresses, FP32 null-only path, AE3 and all eight actual CFG0 controls. Preserve parent results unchanged. No geometry filtering/retries, independent tests or altered seeds.",
+  "analysis": "Four-cell descriptive diagnostic for unconditional validity and motif accuracy/validity; paired-family intervals. Geometry does not establish designability. Reflow50 versus original50 isolates checkpoint effects at matched steps; original10 versus original50 isolates step effects at fixed weights. No causal biological claim.",
+  "decision": "No automatic training or designability promotion. Use the completed fixed-budget ProteinMPNN profile and this diagnostic to select a defensible next hypothesis. No additional step or seed grid.",
+  "resources": "OneRTX10minutes,480second worker cap,64GiB hostRAM;8ownGPU cap and15UTC deadline. Reuse validated generation worker and complete auditing."
+}

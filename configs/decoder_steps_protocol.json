@@ -1,0 +1,11 @@
+{
+  "purpose": "Determine whether extra ProteinAE integration reduces geometry failures of broader122-family student checkpoints at fixed latent samples, rather than changing training or filtering failed samples.",
+  "heads": ["original", "seed2026100171_empirical", "seed2026100171_balanced", "seed2026100181_empirical", "seed2026100181_balanced"],
+  "guidance_by_head": {"original": [2], "seed2026100171_empirical": [1], "seed2026100171_balanced": [1], "seed2026100181_empirical": [1], "seed2026100181_balanced": [1]},
+  "seeds": [2026100171, 2026100181],
+  "decoder_steps": [3, 5, 10],
+  "evaluation": "Same64 tuning families, three paired samples, Euler25 and strict FP32. Generate each latent batch once and reuse identical decoder noise for3/5/10 steps. The3-step scores must reproduce every frozen source-native sample to1e-6; compare paired backbones as well. Every head/decoder/length needs an unpadded single versus production-batch control at0.2A/0.99. All2880 predictions and60 controls required; invalid samples retained. Both seeds and both priors remain visible, no best-seed selection. No locked tests.",
+  "analysis": "Compare each setting against original CFG2/decoder3 and its own head/decoder3 using unadjusted family bootstrap. Existing quality margins: CA-lDDT lower95% difference>-0.005 and validity difference>=-0.01. Also report continuous peptide/clash/gap diagnostics and within-seed prior effects. A decoder change may advance only if the full pipeline passes quality; an ensemble-development check and matched end-to-end timing remain necessary. Geometry improvement alone is insufficient.",
+  "timing": "Measure one flow pass per batch separately from each decoder call; one untimed decoder warmup at the first chunk of each length/head/step setting. These are component costs with cached embeddings, not resident sequence-to-structure timing. Retain all latents and backbone predictions in excluded run data for paired diagnosis.",
+  "resources": "One H100,20-minute cap,1080-second work cap,85% allocator ceiling. Earlier five-setting source evaluation took7:14; flow is reused for the extra decoding comparisons. Project total across GPU types<=8. No training or package changes."
+}

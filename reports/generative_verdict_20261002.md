@@ -44,6 +44,6 @@ None of264existing random candidates matched these isolated motifs within1A. A f
 
 The completed eight-case test passed every numerical check but reached0/8motifs within1A. Mean motif dRMS changed4.463→4.380A, with both starts and endpoints8/8coarse-valid. Accounting for initial random search, cost increased41.27→342.30seconds. The frozen recipe is closed without a designability follow-up or parameter grid. See [motif noise guidance](motif_noise_guidance_49867032.md).
 
-## Next mechanistic comparison
+## Refinement-history ablation also closed
 
-The inherited refinement recipe retains one self-conditioning estimate across inner refinements. A predeclared matched ablation will refresh it after each inner evaluation, keeping all weights, noise, times, fragment codes and evaluation counts fixed. This tests a specific sampler mechanism; it is not a claim that the inherited implementation is wrong. Promotion requires a positive paired-family lower confidence bound for raw joint success before the fixed-sequence design/refold assay. See `configs/motif_history_protocol.json`.
+The inherited refinement recipe retains one self-conditioning estimate across inner refinements. Refreshing it after every inner evaluation, with the same weights, noise, times, isolated-fragment codes and148velocity evaluations, did not help. Raw joint success changed26/64→24/64: difference−0.03125,95%family interval[−0.140625,0.09375]. All64motifs still met1A fidelity. This recipe failed its predeclared gate and received no designability follow-up. See [completed history ablation](motif_history_49868443.md).

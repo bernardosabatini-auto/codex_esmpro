@@ -49,5 +49,16 @@ class ExpandedNativeTests(unittest.TestCase):
         c['blend_alpha']=.75
         with self.assertRaises(ValueError):analyze(self.m)
 
+    def test_geometry_keeps_quality_gate(self):
+        c=self.m['config'];protocol=json.loads(Path('configs/local_geometry_native_protocol.json').read_text())
+        names=dict(zip([h['name'] for h in c['heads']],protocol['heads']))
+        for r in self.m['scores']+self.m['controls']:r['head']=names[r['head']]
+        c['heads']=[dict(name=h) for h in protocol['heads']]
+        p=Path(c['protocol']);p.write_text(json.dumps(protocol));c['protocol_sha256']=sha(p)
+        d=analyze(self.m);self.assertTrue(d['replicated_quality_passed']);self.assertIn('geometry_effects',d)
+        rows=[r for r in self.m['scores'] if r['head']=='seed2026100181_geometry']
+        for r in rows[:2]:r['coarse_valid']=0
+        d=analyze(self.m);self.assertFalse(d['replicated_quality_passed'])
+
 
 if __name__=='__main__':unittest.main()

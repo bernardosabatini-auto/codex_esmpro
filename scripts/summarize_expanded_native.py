@@ -22,10 +22,10 @@ def analyze(m):
     values={(h,g):{key:{i:float(np.mean([r[key] for r in rows if (r['head'],r['guidance'],r['target_id'])==(h,g,i)])) for i in families} for key in ('ca_lddt','coarse_valid')} for h,g in settings}
     def compare(a,b):return {k:paired_change(values[a][k],values[b][k],families=families) for k in ('ca_lddt','coarse_valid')}
     arms=protocol.get('comparison_arms',['empirical','balanced'])
-    if arms not in (['empirical','balanced'],['full','tail'],['full','blend']):raise ValueError('unsupported comparison arms')
+    if arms not in (['empirical','balanced'],['full','tail'],['full','blend'],['full','geometry']):raise ValueError('unsupported comparison arms')
     if protocol['heads']!=['original']+[f'seed{seed}_{arm}' for seed in protocol['seeds'] for arm in arms] or len(set(protocol['seeds']))!=2:raise ValueError('both paired seeds required')
     if arms==['full','blend'] and (protocol.get('alpha')!=.5 or c.get('blend_alpha')!=.5 or c['training_checkpoint_step']!=2000):raise ValueError('fixed blend scope changed')
-    effect={'balanced':'prior_effects','tail':'adaptation_effects','blend':'blend_effects'}[arms[1]]
+    effect={'balanced':'prior_effects','tail':'adaptation_effects','blend':'blend_effects','geometry':'geometry_effects'}[arms[1]]
     d=dict(step=c['training_checkpoint_step'],summaries={});d[effect]={}
     for h,g in settings:
         metrics=compare((h,g),('original',2));d['summaries'][h+f'_cfg{g}']=dict(versus_original_cfg2=metrics,quality_passed=bool(metrics['ca_lddt']['ci95'][0]>-.005 and metrics['coarse_valid']['difference']>=-.01))
@@ -55,6 +55,10 @@ def main():
         lines[0]='# Fixed checkpoint interpolation: separate accuracy transfer'
         lines[4]='64 separate tuning families, three paired samples. Full balanced2000 and fixed50/50 blends with initialization at both seeds, CFG1 versus originalCFG2. Euler25/decoder3, strict FP32. All samples retained. Blended weights do not inherit the source model training-capacity qualification. No independent-test scoring; unadjusted family intervals.'
         for seed,r in d['blend_effects'].items():lines+=['',f"Seed{seed}, blend minus full: CA-lDDT {r['ca_lddt']['difference']:+.5f},95% interval {r['ca_lddt']['ci95']}; validity {r['coarse_valid']['difference']:+.5f}."]
+    if 'geometry_effects' in d:
+        lines[0]='# Direct decoded geometry training: separate accuracy transfer'
+        lines[4]='64 separate tuning families, three paired samples. Full balanced122 controls and direct decoded-geometry training at both seeds, CFG1 versus originalCFG2. Euler25/decoder3, strict FP32, all samples retained. No output repair or independent-test scoring. Unadjusted family intervals.'
+        for seed,r in d['geometry_effects'].items():lines+=['',f"Seed{seed}, geometry minus full: CA-lDDT {r['ca_lddt']['difference']:+.5f},95% interval {r['ca_lddt']['ci95']}; validity {r['coarse_valid']['difference']:+.5f}."]
     if 'error' in d:lines+=['',d['error']]
     else:lines+=['',f"Both candidate seeds qualify: {d['replicated_quality_passed']}. External experimental-state ensembles remain a separate test; no model promotion."]
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n');a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n')

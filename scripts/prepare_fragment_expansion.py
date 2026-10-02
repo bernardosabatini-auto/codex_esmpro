@@ -13,6 +13,12 @@ EXTRA_KEYS=('expanded_protocol','base_manifest','base_fragments','pool_inventory
 def audit_sources(c):
     for key in EXTRA_KEYS+('training_manifest','training_labels'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed expanded data source '+key)
+    if c.get('pose_control_precision'):
+        if c['pose_control_precision']!='fp64' or c.get('training_protein_count')!=512:raise ValueError('Undeclared pose correction')
+        for key in ('pose_correction_protocol','pose_cpu_diagnostic'):
+            if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed pose diagnostic')
+        d=json.loads(Path(c['pose_cpu_diagnostic']).read_text())
+        if d['proteins']!=512 or d['maximum_exact_double_pose']>1e-4 or d['maximum_cached_vs_double']>1e-4:raise ValueError('Unqualified CPU pose diagnosis')
     meta=json.loads(Path(c['training_manifest']).read_text());base=json.loads(Path(c['base_manifest']).read_text());oldids={r['id'] for r in base['config']['training_targets']};rows=c['training_targets'];dev=c['development_rows'];protocol=json.loads(Path(c['expanded_protocol']).read_text());count=protocol.get('training_proteins',128);quotas={int(k):v for k,v in protocol.get('bucket_counts',{'128':24,'256':40,'384':32,'512':32}).items()}
     if count not in (128,512) or c.get('training_protein_count',128)!=count:raise ValueError('Undeclared expansion size')
     if meta['status']!='complete' or rows!=meta['targets'] or len(rows)!=count or len({r['id'] for r in rows})!=count or len({r['family'] for r in rows})!=count or c['base_training_ids']!=sorted(oldids):raise ValueError('Invalid expanded inventory')

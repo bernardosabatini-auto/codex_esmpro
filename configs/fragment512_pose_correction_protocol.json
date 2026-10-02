@@ -1,0 +1,6 @@
+{
+  "reason": "Data run49978003failed a rigid-pose coordinate check onAF-A0A7S2VM45-F1-model_v6:FP32 transformed inputs introduce coordinate perturbations, producingcanonicalmaxdifference.0001564A; latentdifference1.90e-6alreadyunderthreshold.",
+  "evidence": "CPUcheck all512references: exactFP64rigidtransform producedbitwiseidentical canonicalcoordinates inall512; existingFP32canonical versusFP64canonical maximum4.292e-5A.",
+  "change": "For newfragments only, construct the control rotation and translation inFP64. Keep the existing FP32canonical input/encoding recipe and all128existing arrays unchanged. Compare exactdoublecanonical control with oldprecisionbaseline under the SAME1e-4coordinate andlatent limits, additionally audit exactdoublecanonical pose difference<=1e-4. All failures preserved; no selection or threshold change.",
+  "data": "Identical512protein selection/config except this controlprecision flag and diagnostic provenance. Rebuild into anewrun; original49978003remainsfailed."
+}

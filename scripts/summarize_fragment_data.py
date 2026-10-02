@@ -20,6 +20,9 @@ def analyze(run):
     if sha(run/'fragments.h5')!=m['fragments_sha256'] or len(m['records'])!=9*expected_proteins or len(m['controls'])!=expected_proteins or len(m['development'])!=16:raise ValueError('Incomplete data audit')
     expected_controls={r['id'] for r in c['training_targets']}
     if {r['target_id'] for r in m['controls']}!=expected_controls or any(r['coordinate_max_abs']>1e-4 or r['latent_rmse']>1e-4 for r in m['controls']):raise ValueError('Failed pose controls')
+    if c.get('pose_control_precision')=='fp64':
+        newcontrols=[r for r in m['controls'] if r['target_id'] not in c['base_training_ids']]
+        if len(newcontrols)!=384 or any(r.get('exact_double_pose_max',float('inf'))>1e-4 for r in newcontrols):raise ValueError('Missing exact pose controls')
     records=[]
     with h5py.File(run/'fragments.h5') as f,h5py.File(c['training_labels']) as src,h5py.File(c['development_predictions']) as dev:
         if set(f)!= {'train','development'} or set(f['train'])!=expected_controls or set(f['development'])!={r['target_id'] for r in c['development_rows']}:raise ValueError('Unexpected corpus coverage')

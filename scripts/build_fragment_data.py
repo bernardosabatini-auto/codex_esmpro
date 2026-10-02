@@ -49,7 +49,10 @@ def main():
                         q=g.create_group('conditions/'+name);q.create_dataset('fragment',data=fragment);q.create_dataset('latent',data=codes[0].cpu().numpy());q.create_dataset('roundtrip',data=rt);q.attrs['start']=st;q.attrs['sequence']=sequence;q.attrs['near_degenerate']=degenerate
                         m['records'].append(dict(target_id=ident,condition=name,start=st,length=k,roundtrip_drms=error))
                         if name=='f30_center':
-                            rotation=np.array([[0,-1,0],[1,0,0],[0,0,1]],np.float32);posed,_=canonical_fragment(raw@rotation+np.array([11,7,-3],np.float32));zc=F.layer_norm(encode_backbone(decoder,torch.from_numpy(posed)[None].cuda(),mask),(8,));control=dict(target_id=ident,coordinate_max_abs=float(np.max(abs(posed-fragment))),latent_rmse=float((zc-codes).square().mean().sqrt()));m['controls'].append(control)
+                            precision=np.float64 if c.get('pose_control_precision')=='fp64' else np.float32;rotation=np.array([[0,-1,0],[1,0,0],[0,0,1]],precision);posed,_=canonical_fragment(raw.astype(precision)@rotation+np.array([11,7,-3],precision));zc=F.layer_norm(encode_backbone(decoder,torch.from_numpy(posed)[None].cuda(),mask),(8,));control=dict(target_id=ident,coordinate_max_abs=float(np.max(abs(posed-fragment))),latent_rmse=float((zc-codes).square().mean().sqrt()));m['controls'].append(control)
+                            if c.get('pose_control_precision')=='fp64':
+                                exact,_=canonical_fragment(raw.astype(np.float64));control['exact_double_pose_max']=float(np.max(abs(exact-posed)))
+                                if control['exact_double_pose_max']>1e-4:raise ValueError('Exact fragment pose failed')
                             if control['coordinate_max_abs']>1e-4 or control['latent_rmse']>1e-4:raise ValueError('Fragment pose control failed')
                 out.flush();atomic_json(a.output/'manifest.json',m);print('encoded',ident,flush=True)
             if old is not None:old.close()

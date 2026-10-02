@@ -14,43 +14,45 @@ def tick(root,state,registry,config,run=subprocess.run):
     # Validate the whole plan before reading any run paths or executing anything.
     for spec in specs:
         ids=spec['jobs'];kind=spec['kind']
-        if kind not in ('empirical','balanced','expanded','tail','local_geometry','expansion') or len(ids)!={'empirical':3,'balanced':5,'expanded':4,'tail':4,'local_geometry':4,'expansion':2}[kind] or len(set(ids))!=len(ids):raise ValueError('invalid checkpoint comparison')
+        if kind not in ('empirical','balanced','expanded','tail','local_geometry','expansion','summary') or len(ids)!={'empirical':3,'balanced':5,'expanded':4,'tail':4,'local_geometry':4,'expansion':2,'summary':2}[kind] or len(set(ids))!=len(ids):raise ValueError('invalid checkpoint comparison')
         if any(not re.fullmatch(r'\d+',i) or i not in jobs or jobs[i].get('completion_action')!='summarize_overfit' for i in ids):raise ValueError('checkpoint comparison must use registered overfit jobs')
-        if spec['steps']!=[500,2000]:raise ValueError('unrecognized checkpoint schedule')
+        if spec['steps']!=([500] if kind=='summary' else [500,2000]):raise ValueError('unrecognized checkpoint schedule')
+        if kind=='summary' and spec.get('seed') not in (2026100191,2026100201):raise ValueError('unrecognized summary seed')
     entries=state.setdefault('overfit_checkpoints',{})
     for spec in specs:
         for step in spec['steps']:
-            key=f"{spec['kind']}_{step}";entry=entries.setdefault(key,{})
+            key=(f"summary_{spec['seed']}_{step}" if spec['kind']=='summary' else f"{spec['kind']}_{step}");entry=entries.setdefault(key,{})
             if entry.get('handled') and entry.get('jobs')!=spec['jobs']:raise ValueError('completed checkpoint plan changed')
             if entry.get('handled') or time.time()<entry.get('retry_after',0):continue
             paths=[root/'runs'/f'overfit_{i}' for i in spec['jobs']]
             if not all((p/'manifest.json').exists() for p in paths):continue
             manifests=[json.loads((p/'manifest.json').read_text()) for p in paths]
             ready=True
+            if spec['kind']=='summary' and any(m['status']!='complete' or m.get('config',{}).get('seed')!=spec['seed'] for m in manifests):continue
             for m in manifests:
                 if m['status'] not in ('running','complete') or m['updates']<step:ready=False;break
                 for checkpoint in (0,step):
-                    for guidance in ([1] if spec['kind'] in ('expanded','tail','local_geometry','expansion') else [1,2]):
+                    for guidance in ([1] if spec['kind'] in ('expanded','tail','local_geometry','expansion','summary') else [1,2]):
                         rows=[r for r in m['scores'] if r['step']==checkpoint and r['guidance']==guidance]
                         targets=64 if spec['kind']=='expansion' else (122 if spec['kind'] in ('expanded','tail','local_geometry') else 32)
                         if len(rows)!=targets or len({r['target_id'] for r in rows})!=targets:ready=False
             if spec['kind']=='tail' and any(not m.get('training_subset',{}).get('frozen_unchanged') or m['training_subset'].get('verified_update',0)<step for m in manifests[2:]):ready=False
             if not ready:continue
-            prefix={'empirical':'overfit','balanced':'overfit_balanced','expanded':'expanded','tail':'tail','local_geometry':'local_geometry','expansion':'expansion'}[spec['kind']]
+            prefix={'empirical':'overfit','balanced':'overfit_balanced','expanded':'expanded','tail':'tail','local_geometry':'local_geometry','expansion':'expansion','summary':f"summary_{spec.get('seed')}"}[spec['kind']]
             report=root/'reports'/f'{prefix}_comparison_{step}'
             frequency=root/'reports'/f'{prefix}_state_frequency_{step}'
-            script={'empirical':'compare_overfit.py','balanced':'compare_overfit_balanced.py','expanded':'compare_expanded.py','tail':'compare_tail.py','local_geometry':'compare_local_geometry.py','expansion':'compare_expansion_training.py'}[spec['kind']]
+            script={'empirical':'compare_overfit.py','balanced':'compare_overfit_balanced.py','expanded':'compare_expanded.py','tail':'compare_tail.py','local_geometry':'compare_local_geometry.py','expansion':'compare_expansion_training.py','summary':'compare_summary_learning.py'}[spec['kind']]
             env=dict(os.environ,CUDA_VISIBLE_DEVICES='',OMP_NUM_THREADS='1',MKL_NUM_THREADS='1',OPENBLAS_NUM_THREADS='1',PYTHONPATH=str(root/'src'))
             entry.update(jobs=spec['jobs'],step=step)
             try:
                 with (root/'runs/watch'/f'checkpoint_{key}.log').open('a') as log:
-                    analyses=[(script,report)] if spec['kind'] in ('expanded','tail','local_geometry','expansion') else [(script,report),('analyze_overfit_states.py',frequency)]
+                    analyses=[(script,report)] if spec['kind'] in ('expanded','tail','local_geometry','expansion','summary') else [(script,report),('analyze_overfit_states.py',frequency)]
                     for name,output in analyses:
                         arguments=['--full',*[str(p) for p in paths[:2]],'--tail' if spec['kind']=='tail' else '--candidate',*[str(p) for p in paths[2:]]] if spec['kind'] in ('tail','local_geometry') else ['--runs',*[str(p) for p in paths]]
                         command=[config['python'],str(root/'scripts'/name),*arguments,'--step',str(step),'--output',str(output)]
                         run(command,cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT,timeout=45,check=True)
                 entry.update(handled=True,report=str(report.with_suffix('.md')),completed_at=time.time())
-                if spec['kind'] not in ('expanded','tail','local_geometry','expansion'):entry['frequency_report']=str(frequency.with_suffix('.md'))
+                if spec['kind'] not in ('expanded','tail','local_geometry','expansion','summary'):entry['frequency_report']=str(frequency.with_suffix('.md'))
                 return [(f'overfit_checkpoint:{key}:complete',f'ESM project {key} checkpoint comparisons ready at {report.with_suffix(".md")}.')]
             except Exception as error:
                 entry.update(error=str(error),retry_after=time.time()+120)

@@ -85,6 +85,19 @@ class CheckpointAnalysisTests(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs['env']['CUDA_VISIBLE_DEVICES'],'')
         tick(self.root,state,self.registry,dict(python='python'),run);self.assertEqual(run.call_count,1)
 
+    def test_summary_waits_for_complete_matched_seed_once(self):
+        spec=dict(kind='summary',jobs=['1','2'],steps=[500],seed=2026100191)
+        (self.root/'runs/overfit_checkpoint_analyses.json').write_text(json.dumps(dict(comparisons=[spec])))
+        rows=[dict(step=s,guidance=1,target_id=str(i)) for s in (0,500) for i in range(32)]
+        for jid in spec['jobs']:
+            (self.root/f'runs/overfit_{jid}/manifest.json').write_text(json.dumps(dict(status='complete' if jid=='1' else 'running',updates=500,scores=rows,config=dict(seed=spec['seed']))))
+        state={};run=Mock();self.assertEqual(tick(self.root,state,self.registry,dict(python='python'),run),[])
+        p=self.root/'runs/overfit_2/manifest.json';m=json.loads(p.read_text());m['status']='complete';p.write_text(json.dumps(m))
+        self.assertEqual(len(tick(self.root,state,self.registry,dict(python='python'),run)),1)
+        self.assertTrue(run.call_args.args[0][1].endswith('compare_summary_learning.py'))
+        self.assertEqual(run.call_args.kwargs['env']['CUDA_VISIBLE_DEVICES'],'')
+        tick(self.root,state,self.registry,dict(python='python'),run);self.assertEqual(run.call_count,1)
+
     def test_expansion_requires_complete64_at_both_seeds(self):
         spec=dict(kind='expansion',jobs=['1','2'],steps=[500,2000]);(self.root/'runs/overfit_checkpoint_analyses.json').write_text(json.dumps(dict(comparisons=[spec])))
         rows=[dict(step=s,guidance=1,target_id=str(i)) for s in (0,500) for i in range(64)]

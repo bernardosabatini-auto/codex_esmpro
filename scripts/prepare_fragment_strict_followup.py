@@ -35,8 +35,9 @@ def audit_inputs(c,check_teacher=True):
     protocol=json.loads(Path(c['protocol']).read_text())
     if [(s['arm'],Path(s['manifest']).parent.name,s['prefix']) for s in c['screens']]!=[tuple(s) for s in protocol['sources']]:raise ValueError('Unregistered screening panel')
     rows,selected=screen(c)
-    if rows!=c['screen_rows'] or len(rows)!=256:raise ValueError('Screening denominator changed')
+    if rows!=c['screen_rows'] or len(rows)!=64*len(c['screens']):raise ValueError('Screening denominator changed')
     ids=sorted({key[1] for key in selected});wanted={(arm,i,k) for arm,i,k in selected}|{('native',i,0) for i in ids}
+    if c.get('expected_backbones',4)!=protocol.get('expected_backbones',4) or len(wanted)!=c.get('expected_backbones',4):raise ValueError('Unbudgeted strict followup inventory')
     if len(c['entries'])!=len(wanted) or {(r['arm'],r['target_id'],r['generation_slot']) for r in c['entries']}!=wanted:raise ValueError('Selected/dropped raw match')
     with h5py.File(c['predictions']) as out,h5py.File(c['native_predictions']) as native:
         for r in c['entries']:
@@ -47,8 +48,8 @@ def audit_inputs(c,check_teacher=True):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1]
-    protocol=root/'configs/fragment_strict_followup_protocol.json';spec=json.loads(protocol.read_text());prior=json.loads((root/'runs/trained_fragment_designability_49983356/manifest.json').read_text())['config'];c={k:prior[k] for k in ('num_sequences','temperature','mpnn_seed','seed','mpnn','dependencies','teacher_artifacts','precision','usalign','usalign_sha256')};c.update(assay='fragment_strict_followup',screens=[],work_cap_seconds=480)
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--protocol',type=Path);a=p.parse_args();root=Path(__file__).resolve().parents[1]
+    protocol=(a.protocol or root/'configs/fragment_strict_followup_protocol.json').resolve();spec=json.loads(protocol.read_text());prior=json.loads((root/'runs/trained_fragment_designability_49983356/manifest.json').read_text())['config'];c={k:prior[k] for k in ('num_sequences','temperature','mpnn_seed','seed','mpnn','dependencies','teacher_artifacts','precision','usalign','usalign_sha256')};c.update(assay='fragment_strict_followup',screens=[],work_cap_seconds=480,expected_backbones=spec.get('expected_backbones',4))
     for arm,runname,prefix in spec['sources']:
         run=root/'runs'/runname;manifest=run/'manifest.json';m=json.loads(manifest.read_text());s=dict(arm=arm,prefix=prefix);step=m.get('updates');pred=run/(f'evaluation_{500 if arm in ("plain32","frame32") else step}.h5' if runname.startswith('fragment_training') else 'predictions.h5')
         for key,path in [('manifest',manifest),('report',root/'reports'/(runname+'.json')),('predictions',pred),('fragments',Path(m['config']['fragments']))]:s[key]=str(path);s[key+'_sha256']=sha(path)
@@ -62,7 +63,7 @@ def main():
             item=next(v for key,v in selected.items() if key[1]==i) if arm=='native' else selected[arm,i,k];bb=native['references/'+i+'/backbone'][:] if arm=='native' else item[0];name=f'strict_followup_{index:03d}';out.create_dataset(name,data=bb[None]);entries.append(dict(name=name,head=arm,arm=arm,mode='native' if arm=='native' else 'generated',target_id=i,family=item[4],generation_slot=k,slot=0,length=len(bb),dataset=name,motif_start=item[3],fixed_start=item[3],fixed_sequence=item[2],repeatability_control=arm=='native'))
     c['entries']=entries
     for key,path in [('generation_manifest',Path(c['screens'][1]['manifest'])),('predictions',inputs),('protocol',protocol),('native_predictions',nativepath)]:c[key]=str(path);c[key+'_sha256']=sha(path)
-    audit_inputs(c);a.output.write_text(json.dumps(c,indent=2)+'\n');print('Screened256outputs; selected',len(selected),'rawmatches;',len(entries)*8,'refolds withnativecontrols')
+    audit_inputs(c);a.output.write_text(json.dumps(c,indent=2)+'\n');print('Screened',len(c['screen_rows']),'outputs; selected',len(selected),'rawmatches;',len(entries)*8,'refolds withnativecontrols')
 
 
 if __name__=='__main__':main()

@@ -1,0 +1,20 @@
+{
+  "purpose": "Apply the same complete-panel raw-screened secondary test to the512protein model. Keep its fixed288refoldassay unchanged.",
+  "sources": [
+    [
+      "plain128",
+      "fragment_training_49951202",
+      "development/conditioned"
+    ],
+    [
+      "plain512",
+      "fragment_training_49985054",
+      "development/conditioned"
+    ]
+  ],
+  "selection": "Recompute all64samples perarm: coarsevalid,motifdRMS<=1A,properCA motifRMSD<=1A. Refold EVERY rawmatch; each rawfailure counts as strictfailure. Existing512resultcontainsone1BFYmatchoutsidefixedeightpanel;128baselinecontainsnone. No fullreference-scaffold or refolding-outcome selection.",
+  "assay": "Same8ProteinMPNNseqs,temperature.1seed1, motifresiduesfixed; guardedFP32teacher3loops50steps1sample. Require one SAME validrefold withscTM>.5andbothmotifthresholds. Add corresponding native scaffold with the SAME motifsequence fixed,8designs,andrepeatfirstrefold. Nativepositivecontrolmust itself pass strictcriterion for aqualifiedsuccessclaim.",
+  "scope": "Onefamily feasibility only, selected afterobservingrawfits on reuseddevelopmentdata. This is not independentvalidation, fullcohortglobaldesignability, or a replacementforfailedfixedpanelgates. No changedthresholds, inference hyperparameter sweep, traininglabels, or lockedtests.",
+  "resources": "Onegeneratedbackbone andonefixedmotifnativecontrol,16refolds;oneRTX10minutes. Original4armexploratorydiagnostic remainsunchanged.",
+  "expected_backbones": 2
+}

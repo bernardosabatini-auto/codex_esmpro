@@ -1,0 +1,28 @@
+# Small-ensemble learnability diagnostic
+
+Status: complete; arm: aligned_teacher; profile only: True.
+
+32 training proteins selected for teacher diversity. Teacher-defined contact modes are predictions, not measured biological states. Fresh32-sample ensembles at both CFG settings; all samples retained. Coverage requires feature RMSE<=2A, nearest-contact teacher CA-lDDT>=0.8 and coarse-valid geometry.
+
+| Updates / guidance | Mode recall @32 | Coarse valid | Teacher CA-lDDT | Reference CA-lDDT | State TV (lower better) |
+|---|---:|---:|---:|---:|---:|
+
+Training label distribution: balanced. The state-TV column always compares with the original empirical teacher prior; equal-state-prior TV is reported separately by analyze_overfit_states.py.
+
+Training: 94.19 seconds; peak reserved memory: 64.72 GiB.
+
+Processed 640 protein examples and 153600 padded residue examples: 6.79 examples/s and 1630.74 padded residues/s. Compare batch/length distributions before interpreting throughput differences.
+
+This is a training-capacity experiment. No model promotion or unseen-family accuracy claim is possible from these scores.
+
+Within-sequence coupling audit:
+{
+  "complete_updates": 40,
+  "arm": "optimal",
+  "groups": 80,
+  "mean_independent_cost": 2.003713048253079,
+  "mean_optimal_cost": 1.999260842456416,
+  "mean_applied_cost": 1.999260842456416
+}
+
+Contiguous groups of8same-protein examples; target marginals preserved exactly. Compare only matched grouping/noise recipes; lower transport or training loss is not evidence of improved structural diversity.

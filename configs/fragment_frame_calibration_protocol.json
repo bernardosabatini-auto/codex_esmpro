@@ -1,0 +1,6 @@
+{
+  "purpose": "Attribute failed anchored target reconstruction gate49972080 using original targets under exactly matched decoder noise.",
+  "inventory": "All288training conditions; no exclusions; original failed95percent/.5A gate remains unchanged.",
+  "measurements": "Original cached versus anchored cached latents; identical seed2026100246, target-keyed condition streams, FP32 decoder3 steps. Report global proper CA RMSD, motif proper CA RMSD, coarse validity, paired32-family intervals. No training qualification from this diagnostic.",
+  "budget": "One RTX,10minute allocation; expected about one minute. No teacher labels or refolds."
+}

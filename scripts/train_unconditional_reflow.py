@@ -30,6 +30,9 @@ def main():
     recipe=json.loads(Path(c['protocol']).read_text());rows=json.loads(Path(c['selection']).read_text())['rows'];labels=json.loads(Path(c['labels_manifest']).read_text())
     if labels['status']!='complete' or labels['config']['protocol_sha256']!=c['protocol_sha256'] or labels['config']['checkpoint_sha256']!=c['checkpoint_sha256']:raise ValueError('Invalid source lineage')
     if c['arm'] not in recipe['arms'] or c['seed']!=recipe['training_seed'] or c['batches']!=recipe['batches'] or c['schedule_updates']!=1000 or c['updates']!=(40 if c['profile_only'] else 1000):raise ValueError('Wrong training recipe')
+    for key in ('learning_rate','warmup_updates','ema_decay'):
+        if c[key]!=recipe[key]:raise ValueError('Changed training parameter '+key)
+    if c['evaluation_steps']!=([40] if c['profile_only'] else [500,1000]):raise ValueError('Changed evaluation schedule')
     if not c['profile_only']:
         if sha(c['profile_report'])!=c['profile_report_sha256'] or not json.loads(Path(c['profile_report']).read_text())['profile_qualified']:raise ValueError('Profile not qualified')
     a.output.mkdir(parents=True,exist_ok=False);torch.set_num_threads(4);start=time.monotonic();telemetry=None;m=dict(status='running',config=c,updates=0,training=[],batches=[],evaluations=[],initial_controls=[],sampling_controls=[]);atomic_json(a.output/'manifest.json',m)
@@ -41,7 +44,7 @@ def main():
             for n in recipe['lengths']:data[n]={key:torch.from_numpy(f[str(n)][key][:]) for key in ('noise','endpoint')}
         model,arch=load_legacy(Path(c['checkpoint']),trusted_pickle=True);model.cuda().train();model.checkpoint_blocks=True;frozen=freeze_unused_conditioning(model);m['frozen_names']=frozen;m['frozen_initial']=frozen_hash(model,frozen)
         decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval();ema={k:v.detach().clone() for k,v in model.state_dict().items()};parameters=[p for p in model.parameters() if p.requires_grad];m['trainable_parameters']=sum(p.numel() for p in parameters)
-        optimizer=torch.optim.AdamW(parameters,lr=c['learning_rate'],betas=(.9,.95),weight_decay=.01,foreach=False);order=np.random.default_rng(c['seed']);rng=torch.Generator(device='cuda').manual_seed(c['seed']);queues={n:[] for n in recipe['lengths']};telemetry=Telemetry(a.output,True)
+        torch.manual_seed(c['seed']);optimizer=torch.optim.AdamW(parameters,lr=c['learning_rate'],betas=(.9,.95),weight_decay=.01,foreach=False);order=np.random.default_rng(c['seed']);rng=torch.Generator(device='cuda').manual_seed(c['seed']);queues={n:[] for n in recipe['lengths']};telemetry=Telemetry(a.output,True)
         def evaluate(step):
             raw={k:v.detach().cpu().clone() for k,v in model.state_dict().items()};model.load_state_dict(ema);model.eval();tick=time.monotonic();scores=[]
             with torch.no_grad(),inference_precision('fp32'),h5py.File(c['initial_predictions']) as initial,h5py.File(a.output/f'evaluation_{step}.h5','x') as f:
@@ -74,7 +77,7 @@ def main():
                     optimizer.step()
                     with torch.no_grad():
                         values=model.state_dict();keys=[k for k in ema if ema[k].is_floating_point()];torch._foreach_lerp_([ema[k] for k in keys],[values[k] for k in keys],1-c['ema_decay'])
-                    m['updates']=step+1;m['training'].append(dict(step=step+1,length=n,batch=b,indices=indices,flow_loss=float(loss.detach()),gradient_norm=float(norm),learning_rate=lr,self_conditioned=info['self_conditioned'],time_sha256=hashlib.sha256(info['t'].cpu().numpy().tobytes()).hexdigest(),rng_sha256=hashlib.sha256(rng.get_state().cpu().numpy().tobytes()).hexdigest()))
+                    m['updates']=step+1;m['training'].append(dict(step=step+1,length=n,batch=b,indices=indices,flow_loss=float(loss.detach()),gradient_norm=float(norm),learning_rate=lr,self_conditioned=info['self_conditioned'],time_sha256=hashlib.sha256(info['t'].cpu().numpy().tobytes()).hexdigest(),rng_sha256=hashlib.sha256(rng.get_state().cpu().numpy().tobytes()).hexdigest(),global_rng_sha256=hashlib.sha256(torch.cuda.get_rng_state().cpu().numpy().tobytes()).hexdigest()))
                     if (step+1)%20==0:atomic_json(a.output/'manifest.json',m);print('update',step+1,'loss',float(loss.detach()),flush=True)
                     del z,noise,mask,loss
                 torch.cuda.synchronize();m['batches'].append(dict(begin=begin,end=end,seconds=time.monotonic()-tick,peak_reserved_bytes=torch.cuda.max_memory_reserved()));m['frozen_final']=frozen_hash(model,frozen)

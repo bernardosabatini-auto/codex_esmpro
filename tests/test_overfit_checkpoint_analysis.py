@@ -85,5 +85,16 @@ class CheckpointAnalysisTests(unittest.TestCase):
         self.assertEqual(run.call_args.kwargs['env']['CUDA_VISIBLE_DEVICES'],'')
         tick(self.root,state,self.registry,dict(python='python'),run);self.assertEqual(run.call_count,1)
 
+    def test_expansion_requires_complete64_at_both_seeds(self):
+        spec=dict(kind='expansion',jobs=['1','2'],steps=[500,2000]);(self.root/'runs/overfit_checkpoint_analyses.json').write_text(json.dumps(dict(comparisons=[spec])))
+        rows=[dict(step=s,guidance=1,target_id=str(i)) for s in (0,500) for i in range(64)]
+        for jid in spec['jobs']:
+            (self.root/f'runs/overfit_{jid}/manifest.json').write_text(json.dumps(dict(status='running',updates=500,scores=rows if jid=='1' else rows[:-1])))
+        state={};run=Mock();self.assertEqual(tick(self.root,state,self.registry,dict(python='python'),run),[])
+        (self.root/'runs/overfit_2/manifest.json').write_text(json.dumps(dict(status='running',updates=500,scores=rows)))
+        self.assertEqual(len(tick(self.root,state,self.registry,dict(python='python'),run)),1)
+        command=run.call_args.args[0];self.assertTrue(command[1].endswith('compare_expansion_training.py'));self.assertIn('--runs',command)
+        tick(self.root,state,self.registry,dict(python='python'),run);self.assertEqual(run.call_count,1)
+
 
 if __name__=='__main__':unittest.main()

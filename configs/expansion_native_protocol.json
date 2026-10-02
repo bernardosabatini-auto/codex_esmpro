@@ -1,0 +1,9 @@
+{
+  "purpose": "Separate tuning-quality screen for both larger-data balanced-flow seeds, retaining both endpoints regardless of training-capacity outcome.",
+  "seeds": [2026100171, 2026100181],
+  "heads": ["original", "seed2026100171_expansion", "seed2026100181_expansion"],
+  "guidance_by_head": {"original": [2], "seed2026100171_expansion": [1], "seed2026100181_expansion": [1]},
+  "sampling": "Same64 tuning families,3 paired samples, strictFP32 Euler25/decoder3 and frozen seeds/baseline.12 batching controls and576 predictions. No training during evaluation.",
+  "quality": "Unchanged originalCFG2 comparison: family-bootstrap CA-lDDT lower95% interval>-0.005 and coarse-valid difference>=-0.01. Keep invalid samples and all seed/checkpoint outcomes. Neither model is promoted by this screen.",
+  "next": "Only each native-qualified head may advance to unchanged48-family external ensemble panel. Capacity evidence must be complete and reported separately, without adding a retrospective gate. Original34 and reserved17 stay unscored."
+}

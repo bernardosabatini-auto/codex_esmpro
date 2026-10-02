@@ -1,0 +1,9 @@
+{
+  "purpose": "Native-quality transfer after both functional-replay seeds retain training capacity.427 teacher families plus390 disjoint native-training anchor families; no anchor data in the tuning panel.",
+  "seeds": [2026100171, 2026100181],
+  "heads": ["original", "seed2026100171_replay", "seed2026100181_replay"],
+  "guidance_by_head": {"original": [2], "seed2026100171_replay": [1], "seed2026100181_replay": [1]},
+  "sampling": "Unchanged64 tuning families,3paired samples, strictFP32 Euler25/AE3 and frozen baseline/noise.12batching controls and576predictions. No training during evaluation.",
+  "quality": "CA-lDDT paired-family lower95% interval>-0.005 and coarse-valid difference>=-0.01 versus originalCFG2. All invalid samples and both seeds retained. Separately report differences versus the already measured same-step plain427 controls after checking identical original-head scores.",
+  "next": "Each individually qualified head advances to the frozen48-family external ensemble only after both seeds retain capacity. Original34 and reserved17 remain unscored. Neither capacity nor native results alone promote a model."
+}

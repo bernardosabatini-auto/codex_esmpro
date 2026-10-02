@@ -26,9 +26,9 @@ def analyze(run):
             for k in range(c['samples']):
                 expected=target_noise([f'unconditional_train_length{n}'],[n],8,seed=c['seed'],sample_index=k)[0].numpy()
                 if not np.array_equal(noise[k],expected):raise ValueError('Noise provenance mismatch')
-            geometry=backbone_geometry(bb)
-            if not np.array_equal(geometry['coarse_valid'],g['coarse_valid'][:]):raise ValueError('Invalid stored geometry')
-            rows.append(dict(length=n,samples=len(bb),coarse_valid=float(geometry['coarse_valid'].mean())))
+            valid=np.concatenate([backbone_geometry(bb[k:k+32])['coarse_valid'] for k in range(0,len(bb),32)])
+            if not np.array_equal(valid,g['coarse_valid'][:]):raise ValueError('Invalid stored geometry')
+            rows.append(dict(length=n,samples=len(bb),coarse_valid=float(valid.mean())))
     return dict(status='complete',lengths=rows,total_labels=sum(r['samples'] for r in rows),generation_seconds=sum(r['seconds'] for r in m['batches']),max_reserved_gib=max(r['peak_reserved_bytes'] for r in m['batches'])/2**30,controls=m['controls'],pairs_sha256=sha(run/'pairs.h5'),manifest_sha256=sha(run/'manifest.json'))
 
 

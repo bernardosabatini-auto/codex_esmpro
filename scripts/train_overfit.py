@@ -46,6 +46,12 @@ def main():
     if distribution not in ('empirical','balanced') or (distribution=='balanced' and (c['arm']=='reference' or estimator=='posterior')):raise ValueError('unsupported label distribution/estimator')
     if distribution=='balanced' and sha(c['followup_protocol'])!=c['followup_protocol_sha256']:raise ValueError('balanced protocol changed')
     if c['evaluation_steps'][-1]!=c['updates']:raise ValueError('invalid budget')
+    coupling=c.get('conditional_coupling')
+    if coupling:
+        from latentfold.conditional_coupling import couple_targets
+        recipe=json.loads(Path(c['coupling_protocol']).read_text())
+        if sha(c['coupling_protocol'])!=c['coupling_protocol_sha256'] or coupling['group_size']!=recipe['group_size'] or coupling['arm'] not in recipe['arms'] or expanded or estimator!='sampled' or distribution!='balanced' or c['arm']!='aligned_teacher' or any(c.get(k) for k in ('summary_arm','functional_replay','local_geometry','trainable_tail_blocks')):raise ValueError('Invalid coupling scope')
+        if any(v%coupling['group_size'] for v in c['batches'].values()):raise ValueError('Coupling groups must fill batches')
     if c.get('local_geometry'):
         recipe=json.loads(Path(c['protocol']).read_text())
         if sha(c['protocol'])!=c['protocol_sha256'] or recipe['local_geometry']!=c['local_geometry'] or not expanded or distribution!='balanced' or c.get('trainable_tail_blocks') is not None or estimator!='sampled':raise ValueError('invalid local geometry scope')
@@ -114,6 +120,8 @@ def main():
                     if not exact:raise ValueError('summary adapter changes initial condition')
         ema={k:v.detach().clone() for k,v in model.state_dict().items()};optimizer=torch.optim.AdamW(parameters,lr=c['learning_rate'],betas=(.9,.95),weight_decay=.01,foreach=False)
         order=np.random.default_rng(c['seed']);labels_rng=np.random.default_rng(c['seed']+1);rng=torch.Generator(device='cuda').manual_seed(c['seed']);queues={k:[] for k in buckets};telemetry=Telemetry(a.output,True)
+        coupling_rng=torch.Generator(device='cuda').manual_seed(c['seed']+3) if coupling else None
+        if coupling:m['coupling_updates']=[]
         def evaluate(step):
             model.eval();raw={k:v.detach().cpu().clone() for k,v in model.state_dict().items()};model.load_state_dict(ema);state_cpu=torch.get_rng_state();state_gpu=torch.cuda.get_rng_state();evaluated_controls=set()
             with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/f'evaluation_{step}.h5','x') as out:
@@ -152,8 +160,9 @@ def main():
                     for step in range(begin,end):
                         if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('overfit training cap')
                         length=lengths[step];count=c['batches'][str(length)]
-                        while len(queues[length])<count:queues[length].extend(order.permutation(buckets[length]).tolist())
-                        ids=queues[length][:count];del queues[length][:count];esm=torch.zeros(count,length,2560,device='cuda');z=torch.zeros(count,length,8,device='cuda');mask=torch.arange(length,device='cuda')[None]<torch.tensor([records[i]['length'] for i in ids],device='cuda')[:,None];choices=[]
+                        distinct=count//coupling['group_size'] if coupling else count
+                        while len(queues[length])<distinct:queues[length].extend(order.permutation(buckets[length]).tolist())
+                        chosen_ids=queues[length][:distinct];del queues[length][:distinct];ids=[ident for ident in chosen_ids for _ in range(coupling['group_size'])] if coupling else chosen_ids;esm=torch.zeros(count,length,2560,device='cuda');z=torch.zeros(count,length,8,device='cuda');mask=torch.arange(length,device='cuda')[None]<torch.tensor([records[i]['length'] for i in ids],device='cuda')[:,None];choices=[]
                         for k,ident in enumerate(ids):
                             r=records[ident];n=r['length'];choice=draw_teacher(r['valid_indices'],r['state'],labels_rng.random(),distribution);choices.append(choice);esm[k,:n]=r['esm'].cuda();target=r['reference_z'] if c['arm']=='reference' else r['teacher_z_aligned' if c['arm']=='aligned_teacher' else 'teacher_z_pca'][choice];z[k,:n]=target.cuda()
                         posterior_args={}
@@ -167,7 +176,20 @@ def main():
                         if summary_protocol:
                             optimizer.param_groups[1]['lr']=lr*summary_protocol['adapter']['learning_rate']/c['learning_rate']
                             esm=condition(model,records,ids,esm,mask)
+                        if coupling:
+                            initial_noise=torch.randn(z.shape,device='cuda',generator=coupling_rng)
+                            original_targets=z
+                            z,coupling_info=couple_targets(initial_noise,z,mask,ids,group_size=coupling['group_size'],arm=coupling['arm'])
+                            permutation=torch.as_tensor(coupling_info['permutation'],device='cuda')
+                            if not torch.equal(z,original_targets.index_select(0,permutation)):raise ValueError('Coupling target accounting failed')
+                            digest=lambda x:hashlib.sha256(x.detach().cpu().contiguous().numpy().tobytes()).hexdigest()
+                            pairing_trace=dict(step=step+1,ids_sha256=hashlib.sha256('\n'.join(ids).encode()).hexdigest(),labels_sha256=hashlib.sha256(np.asarray(choices,dtype='int64').tobytes()).hexdigest(),noise_sha256=digest(initial_noise),targets_sha256=digest(original_targets),**coupling_info)
+                            posterior_args['initial_noise']=initial_noise
                         loss,info=flow_loss(model,z,esm,mask,FlowConfig(),generator=rng,return_state=True,**posterior_args)
+                        if coupling:
+                            pairing_trace.update(times_sha256=digest(info['state']['t']),dropout_sha256=digest(info['state']['dropped']),flow_rng_sha256=digest(rng.get_state()),global_rng_sha256=digest(torch.cuda.get_rng_state()))
+                            m['coupling_updates'].append(pairing_trace)
+                            del initial_noise,original_targets,permutation
                         if not torch.isfinite(loss):raise FloatingPointError('nonfinite loss')
                         if replay_bank:
                             def replay_objective():

@@ -1,0 +1,15 @@
+{
+ "purpose":"Test whether within-sequence Gaussian/teacher pairing improves learning of multiple teacher states without changing teacher marginals. CPU assignment reduces total transport cost only0.14percent, but this is about39percent of the small within-condition target variance; neither establishes model benefit.",
+ "data":"The same audited reliable32 training proteins and fixed-reference aligned teacher latents in overfit_labels_49693246. Balanced teacher-state draws. No new labels, references, test data or filtering.",
+ "arms":["independent","optimal"],
+ "group_size":8,
+ "pairing":"Every batch comprises contiguous groups of8copies of one protein, with independent balanced teacher draws and fresh Gaussian noise. Both arms receive exactly the same groups, labels and noise. The optimal arm applies an exact bijection minimizing valid-residue latent mean squared noise/target distance within each group; independent retains input order. Every drawn label appears exactly once. No cross-protein assignment or decoder/objective changes.",
+ "training":"Original459M initialization,FP32,AdamW3e-5,betas(.9,.95),weight decay.01,EMA.99,warmup100,cosine500to.1floor,clip1. Default flow loss(time logit-normal,condition dropout.1,self-conditioning.5). Batches32/16/8/8 for128/256/384/512. Fresh pairing noise has its own identical generator; normal flow RNG draws remain consumed in both arms. Log all target/label/noise/time/dropout/global RNG hashes and bijections at every update.",
+ "seed":2026100221,
+ "evaluation_seed":2026100222,
+ "updates":500,
+ "evaluation":"All32training families,32fresh samples each,CFG1,Euler25,AE3,at0and500. Unchanged coarse geometry and contact-state matching. Initial samples must agree across arms before interpreting differences. Existing teacher and native metrics retained; no biological-state or generalization claim.",
+ "profile":"40optimal updates on oneRTX,allfourlengths,resource and bijection controls only. Require complete finite updates,maxreserved<=75GiB and projected full runtime fitting deadline. Full run allocations follow measured profile plus bounded evaluation/startup allowance. No distributed training.",
+ "decision":"Primary paired-family lower95percent bound for optimal-minus-independent recall@32>0; validity delta>=-.01,teacher CA-lDDT delta>=-.005. Candidate must also improve recall versus its initialization with lower95percent bound>0. Otherwise close this recipe. A passing training result requires a separate native/generalization screen and replication before any promotion; do not infer benefit from lower transport or training loss alone.",
+ "resources":"Profile oneRTX10minutes,480secondworker cap,64GiBhost,excludeownECCnode. Full matched arms use oneGPU each with measured allocations,at most8ownrunning+pending,finish by15UTC."
+}

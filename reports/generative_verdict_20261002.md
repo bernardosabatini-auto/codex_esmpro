@@ -72,4 +72,18 @@ A direct intramotif-distance conditioner is being tested next. Its first run sto
 
 See [training comparison](fragment_training_comparison_2000.md), [paired refolding](trained_fragment_designability_comparison.md), [fixed native positives](fragment_fixed_positive_49906292.md), and [numerical diagnostic](fragment_geometry_pose_49908661.md).
 
-The next predeclared comparison adds a decoded proper-rotation motif RMSD loss, with its adapter-parameter gradient bounded to half the flow gradient norm. Its40update profile passed with21.5GiBpeak memory and bounded finite gradients, and2000update job49921479is running. The distance-only model completed the unchanged36backbone/288refold assay:0/8strict successes and2/8valid globally agreeing refolds. This does not improve the token-only adapter designability rate. Raw geometry and lower motif error do not qualify it as successful scaffolding. A single CFG2sampling screen and a separately profiled full-network distance-conditioner comparison test whether sampling strength or a frozen trunk limits retention; no guidance or objective-weight sweep is planned.
+## Decoded motif supervision and stronger guidance did not solve retention
+
+The decoded-motif auxiliary run **49921479** completed 2,000 updates with matched training draws and passing numerical controls. It bounded the auxiliary adapter gradient to half the flow gradient norm. Mean development motif dRMS fell from **3.195 to 3.004 Å**, but joint counts remained **0/128 training and 0/64 development**. Its prespecified improvement gate failed. The unchanged 288-refold assay is proceeding regardless of that failure.
+
+The distance-only model completed its own 288-refold assay: **0/8 strict successes and 2/8 valid globally agreeing refolds**, with the supplied motif residues fixed during sequence design. That is the same global designability count as the token-only adapter, with substantial uncertainty across four families.
+
+A single CFG2 screen also failed: mean motif dRMS improved to **2.329 Å** from 3.195 Å at CFG1, but both produced **0/64 strict raw matches**. CFG2 took 1.90 times as long. All 128 outputs remained coarse-valid. No strength sweep follows. Allowing reflections during a diagnostic alignment did not recover any sub-1 Å fit, so handedness alone does not explain the failures.
+
+The separate full-network distance-conditioner run **49929751** passed its 40-update profile and is training. It tests whether the frozen generator limits how well it can use the fragment geometry.
+
+## Designability optimization will use actual refold measurements
+
+The next planned intervention collects feedback targets from eight existing training families. A qualifying target must be one valid refold that simultaneously fits the fragment and globally agrees with the generated scaffold. Thresholds and minimum label yield are fixed in [the feedback protocol](../configs/fragment_feedback_protocol.json). Development and locked-test proteins are excluded from those labels. A raw motif failure repaired by sequence refolding remains a failed retention sample; it can only become a separately identified training target.
+
+An exploratory ProteinMPNN score diagnostic found no useful within-backbone sequence-ranking signal: mean Spearman correlation 0.010 across 24 generated backbones. Selecting the lowest global score produced **3/24** valid global refolds, versus **5/24** for the first sequence. This does not support likelihood-only training or a cheap designability selector. Results are exploratory and share four development families across three model arms.

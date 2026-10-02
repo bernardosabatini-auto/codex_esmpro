@@ -1,6 +1,6 @@
 # Generative capability: what survives a stricter assay
 
-A supplemental complete-panel screen now has one strict same-refold success among64guided samples, confined to one short protein. Every fixed eight-backbone assay still has zero strict successes. Several models produce globally designable backbones, but reliable fragment retention remains unsolved. Earlier latent-clamping results preserve motifs in generated coordinates and do not resolve this failure. These experiments use development panels; no locked tests were scored.
+Reliable isolated-fragment scaffolding remains unsolved. A supplemental screen found one strict same-refold success among 64 guided samples on one short protein, but the fresh-noise replication gave 0/16 at both guidance settings despite a passing native control. Every fixed eight-backbone assay still has zero strict successes. Global designability and raw motif fit can improve separately without satisfying the joint criterion. Direct atom inputs did not improve strict raw retention; their refolding assay and a fixed latent-loss weighting test are in progress. These are development experiments; locked tests remain unscored.
 
 ## Contact guidance through initial noise
 

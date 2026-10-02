@@ -10,10 +10,16 @@ from latentfold.training_schedule import proportional_schedule
 METRICS=('coverage32','strict_coverage32','valid_fraction','teacher_ca_lddt','reference_ca_lddt','balanced_state_tv')
 EXCEPTIONS={'protocol','protocol_sha256','followup_protocol','followup_protocol_sha256','profile_report','profile_report_sha256','work_cap_seconds','trainable_tail_blocks'}
 
-def matched(full,tail,step):
+def matched(full,tail,step,intervention='tail'):
     a,b=full['config'],tail['config']
-    if step not in (500,2000) or a.get('trainable_tail_blocks') is not None or b.get('trainable_tail_blocks')!=4:raise ValueError('invalid intervention')
-    if {k:v for k,v in a.items() if k not in EXCEPTIONS}!={k:v for k,v in b.items() if k not in EXCEPTIONS}:raise ValueError('unmatched configurations')
+    if intervention not in ('tail','local_geometry') or step not in (500,2000) or a.get('trainable_tail_blocks') is not None or a.get('local_geometry'):raise ValueError('invalid intervention')
+    exceptions=EXCEPTIONS
+    if intervention=='tail':
+        if b.get('trainable_tail_blocks')!=4 or b.get('local_geometry'):raise ValueError('invalid tail intervention')
+    else:
+        if b.get('trainable_tail_blocks') is not None or not b.get('local_geometry'):raise ValueError('invalid geometry intervention')
+        exceptions=EXCEPTIONS|{'local_geometry'}
+    if {k:v for k,v in a.items() if k not in exceptions}!={k:v for k,v in b.items() if k not in exceptions}:raise ValueError('unmatched configurations')
     if a['profile_only'] or a['label_distribution']!='balanced' or a['arm']!='aligned_teacher' or a['evaluation_guidance']!=[1]:raise ValueError('wrong training scope')
     for m in (full,tail):
         c=m['config']
@@ -21,9 +27,17 @@ def matched(full,tail,step):
         for key in ('protocol','followup_protocol','profile_report'):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('changed '+key)
         if m['initial_checkpoint_sha256']!=c['checkpoint_sha256']:raise ValueError('initial checkpoint changed')
-    check=tail.get('training_subset',{})
-    if not check.get('frozen_unchanged') or check.get('verified_update',0)<step:raise ValueError('frozen weight check not ready or failed')
-    if check['initial_frozen_sha256']!=check['final_frozen_sha256'] or check['initial_frozen_sha256']!=check['ema_frozen_sha256']:raise ValueError('frozen hashes differ')
+    if intervention=='tail':
+        check=tail.get('training_subset',{})
+        if not check.get('frozen_unchanged') or check.get('verified_update',0)<step:raise ValueError('frozen weight check not ready or failed')
+        if check['initial_frozen_sha256']!=check['final_frozen_sha256'] or check['initial_frozen_sha256']!=check['ema_frozen_sha256']:raise ValueError('frozen hashes differ')
+    else:
+        recipe=json.loads(Path(b['protocol']).read_text())
+        if b['local_geometry']!=recipe['local_geometry']:raise ValueError('changed auxiliary recipe')
+        rows=[r for r in tail.get('local_geometry_updates',[]) if r['step']<=step]
+        if len(rows)!=step or {r['step'] for r in rows}!=set(range(1,step+1)):raise ValueError('incomplete auxiliary logs')
+        fields=('flow_parameter_grad_norm','aux_parameter_grad_norm','effective_geometry_weight','aux_to_flow_ratio','geometry_loss')
+        if any(not np.isfinite(r[k]) or r[k]<0 for r in rows for k in fields) or any(r['flow_parameter_grad_norm']<=0 or r['aux_to_flow_ratio']>.100001 for r in rows):raise ValueError('auxiliary gradient control failed')
     inventory=json.loads(Path(a['corpus_inventory']).read_text());targets={r['id']:r for r in inventory['targets']};families=audited_families(a)
     if len(targets)!=122 or len(set(families.values()))!=122 or len(set(inventory['capacity_ids']))!=32:raise ValueError('wrong corpus')
     expected=proportional_schedule({k:sum(r['bucket']==k for r in targets.values()) for k in (128,256,384,512)},a['updates'],a['seed']+2)
@@ -38,7 +52,8 @@ def matched(full,tail,step):
     if logs[0]!=logs[1]:raise ValueError('target, label or LR draws differ')
     initial=scored(full,0,1,targets);other=scored(tail,0,1,targets)
     for ident,r in initial.items():
-        if r['assignments']!=other[ident]['assignments'] or any(not np.isclose(r[k],other[ident][k],atol=1e-6,rtol=1e-6) for k in METRICS):raise ValueError('initial predictions differ')
+        tolerance=1e-6 if intervention=='tail' else 1e-5
+        if r['assignments']!=other[ident]['assignments'] or any(not np.isclose(r[k],other[ident][k],atol=tolerance,rtol=1e-6 if intervention=='tail' else 0) for k in METRICS):raise ValueError('initial predictions differ')
     return targets,families,inventory,initial
 
 

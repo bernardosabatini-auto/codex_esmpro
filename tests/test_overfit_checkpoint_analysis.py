@@ -69,5 +69,21 @@ class CheckpointAnalysisTests(unittest.TestCase):
         self.assertEqual(run.call_count,1)
         tick(self.root,state,self.registry,dict(python='python'),run);self.assertEqual(run.call_count,1)
 
+    def test_local_geometry_explicit_cpu_pairs_once(self):
+        spec=dict(kind='local_geometry',jobs=['1','2','3','4'],steps=[500,2000])
+        (self.root/'runs/overfit_checkpoint_analyses.json').write_text(json.dumps(dict(comparisons=[spec])))
+        self.registry['jobs'].append(dict(id='4',completion_action='summarize_overfit'))
+        rows=[dict(step=s,guidance=1,target_id=str(i)) for s in (0,500) for i in range(122)]
+        for jid in spec['jobs']:
+            path=self.root/'runs'/f'overfit_{jid}';path.mkdir(exist_ok=True)
+            (path/'manifest.json').write_text(json.dumps(dict(status='running',updates=500,scores=rows)))
+        state={};run=Mock()
+        self.assertEqual(len(tick(self.root,state,self.registry,dict(python='python'),run)),1)
+        command=run.call_args.args[0]
+        self.assertTrue(command[1].endswith('compare_local_geometry.py'))
+        self.assertIn('--full',command);self.assertIn('--candidate',command)
+        self.assertEqual(run.call_args.kwargs['env']['CUDA_VISIBLE_DEVICES'],'')
+        tick(self.root,state,self.registry,dict(python='python'),run);self.assertEqual(run.call_count,1)
+
 
 if __name__=='__main__':unittest.main()

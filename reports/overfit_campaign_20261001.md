@@ -437,3 +437,7 @@ Refreshed sequence-only expansion audit completed against840 exclusion sequences
 ### 04:57 UTC: student extensions live; manual-query scope correction
 
 Original extension registered49799566 and compact500 registered49799644, both verified RUNNING onRTX alongside the two geometry-training jobs:4project GPUs. Completion action summarizes all128 draws and validates frozen prefixes. A manual status command mistakenly queried one unregistered job ID before the returned compact job ID was read; it exposed a scheduling row only and made no job changes. Corrected current_campaign metadata immediately and re-queried IDs resolved from our registry. Added check_registered_jobs.py to validate membership before any manual scheduler query; two tests reject mistyped/partial IDs, ambiguous script matches and unrelated array tasks. Future manual checks use this helper.
+
+### 04:59 UTC: additional reference verification started onCPU
+
+Started bounded900-second source verification for all1383 sequence-audited unused candidates. The existing verifier now accepts an explicit audited expected count while preserving512/64 defaults and the same exact sequence/residue mapping plus0.02A rigid CA agreement criterion. Expansion inventory must match its completed audit hash and count before fetching. No new labels, embeddings orGPU allocations yet. Output runs/expansion_sources_20261002 remains provisional until complete.

@@ -14,7 +14,12 @@ def main():
     p=argparse.ArgumentParser()
     for name in ('selection','existing','output'):p.add_argument('--'+name,type=Path,required=True)
     p.add_argument('--split',choices=('train','tuning'),default='train')
-    a=p.parse_args();selection=json.loads(a.selection.read_text());rows=selection[a.split];expected=512 if a.split=='train' else 64
+    p.add_argument('--expected-count',type=int)
+    a=p.parse_args();selection=json.loads(a.selection.read_text());rows=selection[a.split];expected=a.expected_count if a.expected_count is not None else (512 if a.split=='train' else 64)
+    if selection.get('status')=='candidate_inventory':
+        audit=json.loads(Path(selection['source_audit']).read_text())
+        if a.split!='train' or audit['status']!='complete' or audit['candidate_manifest_sha256']!=hashlib.sha256(a.selection.read_bytes()).hexdigest() or expected!=audit['candidates']:raise ValueError('expansion audit changed or incomplete')
+    if not 1<=expected<=4096:raise ValueError('invalid expected count')
     if len(rows)!=expected:raise ValueError('wrong number of frozen families')
     a.output.mkdir(parents=True,exist_ok=False);raw=a.output/'source_pdb';raw.mkdir();m=dict(status='running',split=a.split,expected=expected,records=[],selection_sha256=hashlib.sha256(a.selection.read_bytes()).hexdigest(),scope='AFDB predicted source structures, not experimental native conformations');atomic_json(a.output/'manifest.json',m)
     def fetch(row):

@@ -3,9 +3,6 @@ import argparse
 import json
 from pathlib import Path
 
-from latentfold.fragment_preferences import split_preference
-from prepare_fragment_preference_refold import audit_inputs
-from prepare_overfit import sha
 
 
 def ready_command(root):
@@ -44,6 +41,9 @@ def feasibility_gate(preferences, selected, native_passes, limits):
 
 
 def compare(runs,root):
+    from latentfold.fragment_preferences import split_preference
+    from prepare_fragment_preference_refold import audit_inputs
+    from prepare_overfit import sha
     records=[];preferences=[];parts=set();sources=[];generation_hash=None;gc=None;spec=None
     for run in runs:
         run=run.resolve();mp=run/'manifest.json';rp=root/'reports'/(run.name+'.json')

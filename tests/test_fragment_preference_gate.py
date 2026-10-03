@@ -1,4 +1,8 @@
 import unittest
+import os
+import subprocess
+import sys
+from pathlib import Path
 from compare_fragment_preferences import feasibility_gate
 
 
@@ -28,6 +32,12 @@ class GateTests(unittest.TestCase):
         result=self.gate()
         self.assertFalse(result['checks']['length_buckets'])
         self.assertFalse(result['checks']['long_proteins'])
+
+    def test_watcher_callback_import_without_project_pythonpath(self):
+        root=Path(__file__).resolve().parents[1]
+        env=dict(os.environ,PYTHONPATH=str(root/'scripts'))
+        code="from pathlib import Path; from compare_fragment_preferences import ready_command; import tempfile; t=tempfile.TemporaryDirectory(); assert ready_command(Path(t.name)) is None"
+        subprocess.run([sys.executable,'-c',code],cwd='/tmp',env=env,check=True)
 
     def test_empty_is_failure(self):
         for r in self.preferences:r.update(eligible=False,confirmed=False)

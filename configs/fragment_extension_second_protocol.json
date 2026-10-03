@@ -1,0 +1,29 @@
+{
+  "purpose": "Test remaining learning-curve headroom after the first duration extension produced refold-validated motif successes. No claim of a broad weighted-model advantage: scaffold-screened fresh whole-panel success was1/64in both arms.",
+  "parents": {
+    "plain": "fragment_training_50042807",
+    "weighted": "fragment_training_50043086"
+  },
+  "seed": 2026100281,
+  "total_prior_updates": 6000,
+  "updates": 2000,
+  "evaluation_steps": [
+    500,
+    2000
+  ],
+  "training": "Continue each matched128protein parent for one additional2000update block, reaching8000total. Same new primary draws, fresh optimizer and unchanged block schedule; no added data or feedback targets. Preserve separate plain and3xweighted objectives.",
+  "controls": "Each arm must reproduce its own384historical outputs before training; the two arms intentionally start from different weights. Audit matched primary traces across the original pair and this continuation pair. Profile40updates per arm before full training, require<=75GiB. Retain original32capacity and16development families, identical four sampling noises and supplied fragments.",
+  "evaluation": "Strict raw proper-fit analysis at500/2000, followed by unchanged36-backbone/288-refold final assay for both arms regardless of raw results. Every raw strict match outside that assay receives exactly eight supplemental refolds; reuse overlapping fixed-assay outputs. Require retention and global agreement in the same valid refold. All development failures remain in denominators; locked tests unscored.",
+  "decision": "One additional2000update block only. Evaluate both final arms regardless of raw results, preserving same-refold primary and scaffold-onlyTM>0.5supplement. No automatic continuation to10000. New feedback labels are excluded from this matched exposure comparison.",
+  "resources": "Two separate one-RTX profiles, then at most two concurrent one-RTX training jobs with walltimes estimated from measured profiles. Eight own running-plus-pending GPUs maximum.",
+  "original_protocol": "configs/fragment_extension_protocol.json",
+  "original_protocol_sha256": "1c67e457a8ab165983e2331e9b57865ff5756ccf0fe90476dbc40938e7121523",
+  "failed_profile": "fragment_training_50039563",
+  "failed_profile_manifest_sha256": "2b26aa378f812d1136c426e4b1868c7a2d676d6224e2117f289c9b996ebda1f5",
+  "sampling_control_mode": "same_batch_repeat",
+  "evaluation_batch_size": 4,
+  "correction": "The first weighted extension profile failed batch1-versus4 latent tolerance0.00016117>1e-4 while historical batch4 outputs were exact. Preserve this failure. Pin every evaluation to its historical batch4 and require same-batch repeated latent agreement<=1e-5 for all four controls. Do not claim cross-batch invariance. Neither sampling noises nor scientific thresholds change. Rerun both profiles under this separately bound protocol.",
+  "evidence": "Weighted original32capacity strict raw rose12/128to22/128 from4000to6000updates; development2/64to3/64. Within last block mean weighted flowloss across first/middle/last200updates fell.1051/.0991/.0953. Strict-refold success first appeared at6000; fresh scaffold-screened focus success1/16,wholepanel1/64. Limited development evidence supports one bounded exposure test, not indefinite continuation.",
+  "parent_comparison_report": "reports/fragment_extension_comparison_50043086.json",
+  "parent_comparison_sha256": "655c715451727ca64d7178d043de4ce805b8d5d18d56f0aa1a4a78237d2a911d"
+}

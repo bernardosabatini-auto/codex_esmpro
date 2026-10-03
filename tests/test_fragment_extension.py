@@ -16,6 +16,10 @@ class ExtensionLineageTests(unittest.TestCase):
             self.assertEqual(audit_extension(c),spec)
             for key,value in [('sampling_control_mode','same_batch_repeat'),('total_prior_updates',4001),('seed',13),('latent_motif_weight',3),('fragments_sha256','other'),('checkpoint','other'),('updates',80),('evaluation_steps',[80]),('rollout_motif',{'weight':1})]:
                 with self.subTest(key=key),self.assertRaises(ValueError):audit_extension(dict(copy.deepcopy(c),**{key:value}))
+            spec['total_prior_updates']=6000;protocol.write_text(json.dumps(spec));report.write_text(json.dumps(dict(status='complete',manifest_sha256=sha(manifest),total_training_updates=6000)))
+            c.update(total_prior_updates=6000,extension_protocol_sha256=sha(protocol),warm_protocol_sha256=sha(protocol))
+            self.assertEqual(audit_extension(c),spec)
+            with self.assertRaises(ValueError):audit_extension(dict(c,total_prior_updates=4000))
             manifest.write_text(json.dumps(dict(status='failed',updates=2000,config=pc)))
             with self.assertRaises(ValueError):audit_extension(c)
 

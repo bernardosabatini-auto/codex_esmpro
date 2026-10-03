@@ -52,11 +52,11 @@ def main():
         audit_config(c)
     if c.get('extension_protocol'):
         from fragment_extension import audit_extension
-        audit_extension(c)
+        extension_spec=audit_extension(c)
     if warm:
         for key in ('warm_protocol','warm_parent_manifest','warm_parent_report','warm_predictions'):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed warm-start source')
-        if c['arm']!='full' or c.get('variant')!='geometry' or c.get('auxiliary_motif') or c.get('total_prior_updates')!=(4000 if c.get('extension_protocol') else 2000):raise ValueError('Wrong warm-start arm')
+        if c['arm']!='full' or c.get('variant')!='geometry' or c.get('auxiliary_motif') or c.get('total_prior_updates')!=(extension_spec['total_prior_updates'] if c.get('extension_protocol') else 2000):raise ValueError('Wrong warm-start arm')
     if c.get('expanded_fragment_data'):
         if not warm or sha(c['expanded_protocol'])!=c['expanded_protocol_sha256']:raise ValueError('Invalid expanded continuation')
         parent_config=json.loads(Path(c['warm_parent_manifest']).read_text())['config']

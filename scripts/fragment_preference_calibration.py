@@ -29,13 +29,13 @@ def native_inventory(c):
     return rows
 
 
-def select_sources(spec, inventory, excluded):
+def select_sources(spec, inventory, excluded, *, per_bucket=8):
     selected = []
     for bucket in (128, 256, 384, 512):
         pool = [r for r in inventory.values() if r['bucket'] == bucket and r['id'] not in excluded]
         pool.sort(key=lambda r: hashlib.sha256(f"{spec['selection_seed']}:{r['id']}".encode()).hexdigest())
-        if len(pool) < 8: raise ValueError('Insufficient prespecified training stratum')
-        selected.extend(dict(r, partition=k % 4) for k, r in enumerate(pool[:8]))
+        if len(pool) < per_bucket: raise ValueError('Insufficient prespecified training stratum')
+        selected.extend(dict(r, partition=k % 4) for k, r in enumerate(pool[:per_bucket]))
     return selected
 
 
@@ -67,7 +67,16 @@ def audit_generation(c):
         raise ValueError('Wrong preserved512 corpus')
     inventory = native_inventory(c)
     excluded = json.loads(Path(c['excluded_feedback_manifest']).read_text())['config']['selected_training_ids']
-    selected = select_sources(spec, inventory, excluded)
+    if spec.get('native_anchor_calibration'):
+        previous=json.loads(Path(c['previous_generation_manifest']).read_text())
+        previous_report=json.loads(Path(c['previous_generation_report']).read_text())
+        if (Path(c['previous_generation_manifest']).parent.name!=spec['previous_generation']
+                or previous['status']!='complete' or previous_report['status']!='complete'
+                or previous_report['manifest_sha256']!=sha(c['previous_generation_manifest'])
+                or len(previous['config']['target_ids'])!=32 or spec['native_samples']!=2):
+            raise ValueError('Wrong excluded prior collection or native decoder budget')
+        excluded=set(excluded)|set(previous['config']['target_ids'])
+    selected = select_sources(spec, inventory, excluded, per_bucket=4 if spec.get('native_anchor_calibration') else 8)
     if selected != c['selected'] or c['target_ids'] != sorted(r['id'] for r in selected):
         raise ValueError('Changed prospective selection')
     with h5py.File(c['fragments']) as f:

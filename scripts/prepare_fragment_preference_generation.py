@@ -9,8 +9,8 @@ from prepare_overfit import sha
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-    root=Path(__file__).resolve().parents[1];protocol=root/'configs/fragment_preference_calibration_protocol.json'
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--protocol',type=Path);a=p.parse_args()
+    root=Path(__file__).resolve().parents[1];protocol=a.protocol.resolve() if a.protocol else root/'configs/fragment_preference_calibration_protocol.json'
     spec=json.loads(protocol.read_text());parent=root/'runs'/spec['parent'];m=json.loads((parent/'manifest.json').read_text())
     corpus=root/spec['corpus'];c=dict(arm='parent6000',spec=spec,sources=[],native_sources=[])
     def bind(path):
@@ -31,15 +31,19 @@ def main():
         c['native_sources'].append({key:bind(path) for key,path in
             [('manifest',run/'manifest.json'),('report',root/'reports'/(name+'.json')),
              ('refolded',run/'refolded.h5'),('predictions',sm['config']['predictions'])]})
+    if spec.get('native_anchor_calibration'):
+        c['previous_generation_manifest']=bind(root/'runs'/spec['previous_generation']/'manifest.json')
+        c['previous_generation_report']=bind(root/'reports'/(spec['previous_generation']+'.json'))
     inventory=native_inventory(c)
     excluded=json.loads(Path(c['excluded_feedback_manifest']).read_text())['config']['selected_training_ids']
-    c['selected']=select_sources(spec,inventory,excluded);c['target_ids']=sorted(r['id'] for r in c['selected'])
+    if spec.get('native_anchor_calibration'):excluded=set(excluded)|set(json.loads(Path(c['previous_generation_manifest']).read_text())['config']['target_ids'])
+    c['selected']=select_sources(spec,inventory,excluded,per_bucket=4 if spec.get('native_anchor_calibration') else 8);c['target_ids']=sorted(r['id'] for r in c['selected'])
     with h5py.File(c['fragments']) as f:
         c['control_ids']=[min(i for i in m['config']['evaluation_train_ids']
                              if (int(f['train/'+i].attrs['length'])+127)//128*128==b) for b in (128,256,384,512)]
     audit_generation(c)
     with a.output.open('x') as f:json.dump(c,f,indent=2)
-    print('Bound32 training proteins,128generations; original32native budgets reused.')
+    print('Bound',len(c['target_ids']),'training proteins;',4*len(c['target_ids']),'generated candidates; native-anchor flag',spec.get('native_anchor_calibration',False))
 
 
 if __name__=='__main__':main()

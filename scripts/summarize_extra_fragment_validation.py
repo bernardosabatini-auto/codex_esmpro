@@ -20,7 +20,7 @@ def analyze(run):
     history_cohort=spec.get('historical_cohort','development')
     new=load_conditions(c['fragments'],c['target_ids'],spec.get('condition','f30_center'),cohort=spec.get('cohort','development'));history=load_conditions(c['historical_fragments'],c['control_ids'],cohort=history_cohort)
     with h5py.File(run/'predictions.h5') as out,h5py.File(c['historical_predictions']) as old:
-        if set(out)!={'new','historical'} or set(out['new'])!=set(new) or set(out['historical'])!=set(history):raise ValueError('Changed stored inventory')
+        if set(out)!=({'new','historical','native'} if spec.get('native_anchor_calibration') else {'new','historical'}) or set(out['new'])!=set(new) or set(out['historical'])!=set(history):raise ValueError('Changed stored inventory')
         for ident,item in history.items():
             g=out['historical/'+ident];reference=old[history_cohort+'/conditioned/'+ident];bb=g['backbone'][:];rb=reference['backbone'][:]
             if np.max(abs(g['latent'][:]-reference['latent'][:]))>1e-5:raise ValueError('Stored historical latent changed')
@@ -40,10 +40,14 @@ def analyze(run):
         rr=[r for r in records if cohort=='all' or (r['length']<=256 if cohort=='short' else r['length']>256)]
         if len(rr)!=(4*count if cohort=='all' else 2*count):raise ValueError('Changed stratified denominator')
         summaries.append(dict(cohort=cohort,samples=len(rr),families=len({r['family'] for r in rr}),valid=sum(r['coarse_valid'] for r in rr),raw_matches=sum(r['raw_gate_passed'] for r in rr),mean_motif_ca_rmsd=float(np.mean([r['motif_ca_rmsd'] for r in rr]))))
-    return dict(status='complete',arm=c['arm'],manifest_sha256=sha(path),predictions_sha256=m['predictions_sha256'],summaries=summaries,records=records,controls=control_count,timing=m['batches'],elapsed_seconds=m['elapsed_seconds'],scope=spec['scope']+' Raw retention does not establish designability.')
+    result=dict(status='complete',arm=c['arm'],manifest_sha256=sha(path),predictions_sha256=m['predictions_sha256'],summaries=summaries,records=records,controls=control_count,timing=m['batches'],elapsed_seconds=m['elapsed_seconds'],scope=spec['scope']+' Raw retention does not establish designability.')
+    if spec.get('native_anchor_calibration'):
+        from native_anchor_calibration import score_native_decodes
+        result.update(score_native_decodes(run,m,new))
+    return result
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs=1,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();d=analyze(a.runs[0]);a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n');a.output.with_suffix('.md').write_text('# Additional-family conditional generation\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','timing')},indent=2)+'\n```\n')
+    p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs=1,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();d=analyze(a.runs[0]);a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n');a.output.with_suffix('.md').write_text('# Additional-family conditional generation\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','timing','native_records')},indent=2)+'\n```\n')
 
 if __name__=='__main__':main()

@@ -45,7 +45,21 @@ def main():
                 for kind,posed in [('same_batch_repeat',False),('pose',True)]:
                     check,_=sample(ident,item,spec['seed'],posed=posed,decode=False,drop=spec.get('drop_fragment',{}).get(c['arm'],False));g.create_dataset(kind,data=check);error=float(np.max(abs(check-z)));m['controls'].append(dict(kind=kind,target_id=ident,latent_max_abs=error))
                     if error>(1e-4 if posed else 1e-5):raise ValueError('Additional sampling repeat/pose failed')
-                m['batches'].append(dict(target_id=ident,samples=4,length=item['length'],seconds=seconds,peak_reserved_GiB=peak));out.flush();atomic_json(a.output/'manifest.json',m)
+                m['batches'].append(dict(target_id=ident,samples=4,length=item['length'],seconds=seconds,peak_reserved_GiB=peak))
+                if spec.get('native_anchor_calibration'):
+                    # Full native codes enter only this explicit positive-control path.
+                    # The fragment-only model samples above are already stored.
+                    from latentfold.native_anchors import decode_native_anchors
+                    with h5py.File(c['fragments']) as native_file:
+                        native_z=torch.from_numpy(native_file['train/'+ident+'/reference_z'][:]).cuda()
+                    torch.cuda.reset_peak_memory_stats();native_start=time.monotonic()
+                    nz,nb=decode_native_anchors(decoder,native_z,target_id=ident,seed=spec['native_seed'])
+                    _,repeat=decode_native_anchors(decoder,native_z,target_id=ident,seed=spec['native_seed'])
+                    torch.cuda.synchronize();error=float((nb-repeat).abs().max());peak=torch.cuda.max_memory_reserved()/2**30
+                    if error>1e-4 or peak>75:raise ValueError('Native decoder repeat or resource control failed')
+                    ng=out.create_group('native/'+ident);ng.create_dataset('latent',data=nz.cpu().numpy());ng.create_dataset('backbone',data=nb.cpu().numpy());ng.create_dataset('same_batch_repeat',data=repeat.cpu().numpy())
+                    m.setdefault('native_controls',[]).append(dict(target_id=ident,coordinate_max_abs=error,peak_reserved_GiB=peak,seconds=time.monotonic()-native_start))
+                out.flush();atomic_json(a.output/'manifest.json',m)
         m.update(status='complete',predictions_sha256=sha(a.output/'predictions.h5'))
     except BaseException as error:m.update(status='failed',error=f'{type(error).__name__}: {error}');raise
     finally:

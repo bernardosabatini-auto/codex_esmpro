@@ -1,0 +1,43 @@
+{
+  "purpose": "Learn isolated-fragment latent inpainting while preserving the surrounding generated scaffold, then test same-valid-refold motif/global/scaffold agreement.",
+  "baseline_generation": "extra_fragment_validation_50188437",
+  "diagnostic": "decoder_fragment_variance_50267175",
+  "architecture": {
+    "width": 256,
+    "layers": 4,
+    "heads": 8,
+    "max_length": 512
+  },
+  "seed": 2026100451,
+  "sampling_seed": 2026100405,
+  "sampling_stream": "motif_repair:0",
+  "conditions": [
+    "c20_left",
+    "c20_center",
+    "c20_right"
+  ],
+  "flank": 8,
+  "steps": 20,
+  "decoder_steps": 3,
+  "updates": 2000,
+  "profile_updates": 40,
+  "learning_rate": 0.0003,
+  "warmup_updates": 40,
+  "ema_decay": 0.99,
+  "batches": {
+    "128": 128,
+    "256": 64,
+    "384": 32,
+    "512": 16
+  },
+  "data": "All512 original training proteins and their three separately encoded20residue fragments. Full native latent is the supervised endpoint and clean scaffold context during training. Inference context comes ONLY from the archived generated latent; native context is an explicitly labelled oracle capacity control. No native editable latent is visible to the sampler. No scaffold sequence or reference coordinates enter model conditioning. Repeated32protein training diagnostic; locked tests untouched.",
+  "corruption": "Editable region is the supplied20residue motif plus up to8residues on each side. Only this region follows the Gaussian-to-native linear flow path. The rest of the native latent stays clean during training. Sample logit-normal times and independent Gaussian noise; average squared velocity error over editable residues perprotein. Tenpercent whole-fragment dropout removes token and intramotif-distance inputs. No self-conditioning or decoder gradient. Uniform protein draws within cycled length buckets, uniform three-condition draws.",
+  "network": "Train a new small transformer from scratch. Inputs:current8D latent,editable-mask embedding,absolute/relative positions,time,isolated29channel fragment codes/sequence/mask,FP64-computed intramotif-distance biases. Four existing PairDiTBlocks; no pair track or triangular updates. Zero output initialization. Parent generator and ProteinAE remain unchanged. This learns local reconstruction; it is not the previously failed optimization-based clash repair, untrained latent clamping, or teacher-reencoding refinement.",
+  "optimizer": "AdamW betas(.9,.95),weight_decay.01,gradientclip1. Linear40stepwarmup then cosine to.1floor over2000updates. FP32. Use final EMA(.99), no checkpoint selection or width/flank/duration/LR sweeps.",
+  "sampling": "TwentyEulersteps from fresh noise ONLY in editable region; copy remaining context exactly at eachstep and after terminal perresidue latent normalization. Repair all128 original generated latents with one fixed repairnoise each. Same four repairnoises for supplied-fragment and no-fragment arms; same original fourAE3 decoder noises. Report all outputs, with no repair acceptance filter or extra attempts. Native-context controls use the same noises; these are not generated successes.",
+  "profile": "One40updateRTXprofile,20minuteallocation. Require finite nonzero gradient/weight updates,unchangedcodecweights,original16backbone reproduction on firstselectedtarget perlengthbucket,exact scaffold preservation,allfiniteoutputs and supplied-coordinate rigid-pose parity<=1e-4latent. Peak<=75GiB. Quality is not a profile gate. Full2000update runtime derived from profile; identical initialization and first40protein/condition/noise/time/drop/LRdraws required. Independent savedEMA CPU replay on first length128 target,all four noises,native and generated conditioned arms must agree to1e-4latent; fullraw/EMA weights after40updates must matchprofile to1e-4.",
+  "full_evaluation": "All32 original training diagnostic proteins,4samples each,center20motif. Native-context and generated-context,each with fragment on/off. Frozen AE3 FP32 exact-length batch4. Original128parent backbones reproduced. Native directdecodes are reconstruction controls; independently audit all512 repaired outputs,context-copy invariants,savedcheckpoint,and geometry. Fullnativecontext capacity target>=103/128raw and>=126/128coarsevalid. Generated conditioned arm must exceed25/128parent raw and no-fragment raw,have>=126/128valid,and improve raw success on at least2families versusparent before spending on refolds. Failedgate closes this recipe without altered thresholds or extensions.",
+  "refolding": "Only after fullcapacity/geometry gates pass, refold ALL128conditioned and ALL128no-fragment repaired outputs with8fixed-motifCA-onlyProteinMPNNdesigns and qualified deterministicFP32teacher3loops50steps. Compare with unchanged original128parent/1024refolds and32native controls, without poolingattempts. Same valid refold must have propermotifCA RMSD<=1A,dRMS<=1A,globalTM>.5,scaffoldTM>.5. Advancement requires >8strong,>=7successfulfamilies,>=45designable versusparent, with family-bootstrap uncertainty. Report null-arm and parent comparisons, all-pair and jointlysuccessful diversity, and incremental repaircost separately from end-to-end generation.",
+  "limitations": "Fixed latent scaffold does not imply fixed decoded scaffold; explicitly measure scaffold coordinate drift. Native-context capacity can exploit training context and cannot establish generalization or fragment reliance. On/off comparison is required. New repairnoise is local model stochasticity, not evidence of biological conformational diversity.",
+  "resources": "OneRTXprofile then oneRTXtraining; at most8ownrunning-plus-pending GPUs overall. Watcher automatic audits and explicit registered IDs only. No installations or distributed training. No refolds until gates pass. Preserve every failure."
+}

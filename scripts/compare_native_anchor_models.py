@@ -65,7 +65,7 @@ def diversity(gc,records,usalign,precomputed=None):
     else:
         with h5py.File(path) as f,h5py.File(config['fragments']) as fragments:
             for r in config['selected']:
-                ident=r['id'];bb=f['new/'+ident+'/backbone'][:];q=fragments['train/'+ident+'/conditions/c20_center']
+                ident=r['id'];bb=f[config.get('prediction_group','new')+'/'+ident+'/backbone'][:];q=fragments['train/'+ident+'/conditions/c20_center']
                 mask=np.ones(r['length'],bool);start=int(q.attrs['start']);mask[start:start+20]=False
                 for i,j in itertools.combinations(range(4),2):
                     rows.append(dict(target_id=ident,bucket=r['bucket'],slots=[i,j],both_strong=(ident,i) in successful and (ident,j) in successful,
@@ -88,7 +88,9 @@ def compare(plan,root):
     from prepare_fragment_preference_refold import audit_inputs,TEACHER_KEYS
     from prepare_overfit import sha
     coverage=bool(plan.get('positive_coverage_comparison'))
-    candidates=('positive','positive_coverage') if coverage else ('positive','contrastive')
+    masked=bool(plan.get('pretrained_masked_comparison'))
+    if masked and coverage:raise ValueError('Ambiguous comparison family')
+    candidates=('generated_null','generated_cond') if masked else (('positive','positive_coverage') if coverage else ('positive','contrastive'))
     if set(plan['jobs'])!=set(candidates):raise ValueError('Changed comparison arms')
     if coverage:
         old_path=root/'reports/native_anchor_model_comparison_20261003.json'
@@ -144,7 +146,7 @@ def compare(plan,root):
                                 strong=sum(r['scaffold_joint_success'] for r in rows),designable=sum(r['valid_designable'] for r in rows),
                                 strong_families=len({r['family'] for r in rows if r['scaffold_joint_success']})))
         families=sorted({r['family'] for r in subsets['parent6000']})
-        for candidate,reference in [('positive','parent6000'),(candidates[1],'parent6000'),(candidates[1],'positive')]:
+        for candidate,reference in [(candidates[0],'parent6000'),(candidates[1],'parent6000'),(candidates[1],candidates[0])]:
             metrics={}
             for metric in ('raw_gate_passed','scaffold_joint_success','valid_designable'):
                 delta=[np.mean([r[metric] for r in subsets[candidate] if r['family']==f])-np.mean([r[metric] for r in subsets[reference] if r['family']==f]) for f in families]
@@ -155,6 +157,9 @@ def compare(plan,root):
     if coverage:
         if (reference['strong'],reference['strong_families'],totals['positive']['strong'],totals['positive']['designable'])!=(8,7,9,51):raise ValueError('Changed preregistered comparator counts')
         qualified={'positive_coverage':positive_coverage_gate(totals['positive_coverage'],reference,totals['positive'])}
+    if masked:
+        if (reference['strong'],reference['strong_families'],reference['designable'])!=(8,7,45):raise ValueError('Changed declared masked-flow comparator')
+        qualified={'generated_cond':qualified['generated_cond']}
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=3) as pool:
         tasks={arm:pool.submit(diversity,generations[arm],rows,configs[arm,0]['usalign'],plan.get('diversity',{}).get(arm)) for arm,rows in arms.items()}
@@ -162,7 +167,7 @@ def compare(plan,root):
     return dict(status='complete',training_only=True,source_reports=sources,summary=summary,contrasts=contrasts,
                 development_screen_qualified=qualified,new_refolds=1024 if coverage else 2048,reused_refolds=2048 if coverage else 1024,native=prior['native'],
                 diversity=diversity_results,reused_diversity=plan.get('diversity',{}),
-                scope=('Repeated32training-protein diagnostic; disjoint from16original and64new qualification sources. ' if coverage else 'Repeated32training-protein diagnostic; disjoint from16anchor-source proteins. ')+
+                scope=('Repeated32training-protein diagnostic; masked repair trained on original512 proteins. ' if masked else ('Repeated32training-protein diagnostic; disjoint from16original and64new qualification sources. ' if coverage else 'Repeated32training-protein diagnostic; disjoint from16anchor-source proteins. '))+
                       'Not independent generalization. All128samples/arm and8designs/sample retained. Same valid refold must satisfy motif/global/scaffold gates. Native budgets reused unchanged; teacher RNG not claimed paired. Bootstrap describes family variation, not training-seed replication. Qualification permits a separate development assay only.')
 
 
@@ -182,6 +187,7 @@ def write_comparison(a):
     d=compare(json.loads(a.plan.read_text()),Path(__file__).resolve().parents[1]);d['plan_sha256']=plan_sha
     temporary=target.with_suffix('.json.tmp');temporary.write_text(json.dumps(d,indent=2)+'\n');temporary.replace(target)
     lines=['# Native-anchor model diagnostic','',d['scope'],'','|Arm|Raw /128|Strong /128|Designable /128|Successful families|','|---|---:|---:|---:|---:|']
+    if json.loads(a.plan.read_text()).get('pretrained_masked_comparison'):lines[0]='# Pretrained masked-flow model diagnostic'
     for r in d['summary']:
         if r['bucket'] is None:lines.append(f"|{r['arm']}|{r['raw']}|{r['strong']}|{r['designable']}|{r['strong_families']}|")
     lines.extend(['','Development-screen qualification: '+json.dumps(d['development_screen_qualified'])])

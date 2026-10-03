@@ -286,7 +286,8 @@ def tick(root, config, query=scheduler_states, analyze=followup):
     if analyses_started == 0:
         from compare_native_anchor_models import ready_command as ready_native_models
         from compare_native_positive_models import ready_command as ready_positive_models
-        command = ready_native_models(root) or ready_positive_models(root)
+        from compare_pretrained_masked_models import ready_command as ready_masked_models
+        command = ready_native_models(root) or ready_positive_models(root) or ready_masked_models(root)
         if command:
             env = dict(os.environ, CUDA_VISIBLE_DEVICES='', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1', PYTHONPATH=str(root/'src'))
             with (root/'runs/watch/native_anchor_model_comparison.log').open('a') as log:

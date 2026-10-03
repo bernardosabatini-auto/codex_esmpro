@@ -29,7 +29,8 @@ def ready_command(root):
     from compare_native_anchor_models import ready_command as ready_models
     from compare_native_positive_coverage import ready_command as ready_positives
     from compare_native_positive_models import ready_command as ready_coverage_models
-    return ready_models(root) or ready_positives(root) or ready_coverage_models(root)
+    from compare_pretrained_masked_models import ready_command as ready_masked_models
+    return ready_models(root) or ready_positives(root) or ready_coverage_models(root) or ready_masked_models(root)
 
 
 def feasibility_gate(preferences, selected, native_passes, limits):

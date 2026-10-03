@@ -27,8 +27,9 @@ def analyze(run):
                 row['scaffold_tm']=usalign_coordinates(c['usalign'],folded[r['name']+'/'+str(k)][:][mask,1],bb[mask,1])
             passing=[k for k in r['successful_refold_indices'] if r['refolds'][k]['scaffold_tm']>.5] if r['raw_gate_passed'] else []
             r.update(scaffold_successful_refold_indices=passing,scaffold_joint_success=bool(passing))
-    params={k:spec['preference'][k] for k in ('minimum_quality','discovery_margin','confirmation_margin')} if not gc.get('native_positive_coverage') else {}
-    if spec.get('native_anchor_model_validation') or gc.get('native_positive_coverage'):
+    skip_preferences=spec.get('native_anchor_model_validation') or gc.get('native_positive_coverage') or gc.get('pretrained_masked_refold')
+    params={} if skip_preferences else {k:spec['preference'][k] for k in ('minimum_quality','discovery_margin','confirmation_margin')}
+    if skip_preferences:
         prefs=[]
     elif spec.get('native_anchor_calibration'):
         from native_anchor_calibration import native_pair
@@ -53,6 +54,8 @@ def analyze(run):
         result.update(native_anchor_calibration=True,summary=[dict(arm=arm,samples=sum(r['arm']==arm for r in records),strong=sum(r['arm']==arm and r['scaffold_joint_success'] for r in records),designable=sum(r['arm']==arm and r['valid_designable'] for r in records)) for arm in ('parent6000','native_latent')])
     if gc.get('native_positive_coverage'):
         result['native_positive_coverage']=True;result.pop('eligible');result.pop('confirmed')
+    if gc.get('pretrained_masked_refold'):
+        result.update(pretrained_masked_refold=True,arm=gc['arm'])
     return result
 
 
@@ -69,6 +72,7 @@ def main():
                     and old['refolded_sha256']==sha(run/'refolded.h5')):return
         d=analyze(a.runs[0]);temporary=target.with_suffix('.json.tmp');temporary.write_text(json.dumps(d,indent=2)+'\n');temporary.replace(target)
         title='Native-positive qualification partition' if d.get('native_positive_coverage') else 'Training-only preference calibration partition'
+        if d.get('pretrained_masked_refold'):title='Pretrained masked-flow refolding'
         a.output.with_suffix('.md').write_text('# '+title+'\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','preferences')},indent=2)+'\n```\n')
 
 

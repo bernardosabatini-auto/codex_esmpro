@@ -54,6 +54,7 @@ def main():
              records=[], comparisons=[], strict_probe={}, design_attempts=0,
              scope='Numerical diagnostic only; all calls retained, no best repeat or qualification retry.',
              environment={k: os.environ.get(k) for k in ('CUBLAS_WORKSPACE_CONFIG', 'PYTORCH_ALLOC_CONF')})
+    m['deterministic_algorithms'] = bool(c.get('deterministic_algorithms', False))
     atomic_json(a.output / 'manifest.json', m)
     start = time.monotonic()
     try:
@@ -62,6 +63,7 @@ def main():
         torch.cuda.set_per_process_memory_fraction(.85)
         m['device'] = torch.cuda.get_device_name()
         model, m['teacher_adapter'] = load_fast_model(Path(c['source']) / 'data/esmfold2_fast')
+        torch.use_deterministic_algorithms(m['deterministic_algorithms'])
         with h5py.File(c['failed_refolded']) as f:
             original = f[first['name']][str(first['sequence_index'])][:]
         outputs = []

@@ -19,6 +19,7 @@ def analyze(m):
     if any(not math.isfinite(r[k]) for r in metrics for k in ('ca_rmsd','ca_lddt')):
         raise ValueError('Nonfinite comparison')
     return dict(status='complete', original_gate=dict(ca_rmsd_max=.01,ca_lddt_min=.999),
+                deterministic_algorithms=m.get('deterministic_algorithms',False),
                 feature_mutations=[r['index'] for r in m['records'] if r['features_before']!=r['features_after']],
                 feature_rng_changes=[r['index'] for r in m['records'] if r['rng_before_features']!=r['rng_after_features']],
                 fresh_feature_hashes_match=all(r['features_before']==m['records'][0]['features_before'] for r in m['records']),

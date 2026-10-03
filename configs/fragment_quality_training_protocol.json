@@ -1,0 +1,42 @@
+{
+  "purpose": "Test whether better-supported isolated fragments improve same-refold scaffold success and designability, controlling proteins, length and placement counts.",
+  "broad_short_corpus": true,
+  "parent": "fragment_training_50106855",
+  "arms": {
+    "control": {
+      "corpus": "broad",
+      "motif_mass": null,
+      "freeze_trunk": true,
+      "selection_arm": "control"
+    },
+    "quality": {
+      "corpus": "broad",
+      "motif_mass": null,
+      "freeze_trunk": true,
+      "selection_arm": "quality"
+    }
+  },
+  "seed": 2026100391,
+  "total_prior_updates": 6000,
+  "updates": 2000,
+  "evaluation_steps": [
+    500,
+    2000
+  ],
+  "weight": 3.0,
+  "sampling_control_mode": "same_batch_repeat",
+  "assembly_protocol": "configs/fragment_broad_full_protocol.json",
+  "data": "Same7941proteins and full latent targets; exactly one existing20-residue fragment per protein in each arm. Bound CPU assignment matches placement counts within every length bucket and raises mean fragment AFDB confidence11.35points. All12conditions remain stored for unchanged diagnostics; only training selection is restricted.",
+  "objective": "Preserve the established protein-weighted flow objective with per-residue motif weight3 and uniform null-example weighting. Same adapter learning-rate schedule, condition dropout and self-conditioning. Only generator trainability changes; no region-mass, decoded-geometry or teacher-derived objective is introduced.",
+  "training": "Both arms start from the same6000-update parent with frozen generator/EMA and update only existing fragment adapters. Same2000updates, protein/RNG/time/drop/LR draws, batches and weight3 objective. Condition identity follows the bound selection; this intended difference is audited explicitly. No new loss, geometry correction, target or teacher labels.",
+  "evaluation": "Primary8000endpoint, no checkpoint selection. Original32training/16development diagnostics retained. Subsequent same64additional-development short-motif assay: four fixed noises,50Euler/AE3/CFG1; all raw matches plus unchanged32-family designability panel,8fixed-motifMPNN designs/backbone, same-refold motif/global/scaffold gates. Compare quality to newly matched control and6000parent; do not pool attempts or infer parent designability. A positive recipe requires independent confirmation; locked tests remain unscored.",
+  "decision": "Both40-update profiles must retain frozen generator/EMA, historical null/pose controls, identical initial predictions and matched draws except declared condition identity. Then one2000-update comparison only. No duration/LR/quality-threshold sweep. Real success requires stronger same-refold scaffold performance with retained designability; source confidence is not a performance proxy.",
+  "resources": "Two40-update oneRTX profiles, then two2000-update oneRTX continuations only after both profiles and matched controls qualify. Runtime from measured profile;75GiB limit; total8own running-plus-pending GPUs. No distributed training.",
+  "freeze_trunk_study": true,
+  "source_calibration_report": "reports/fragment_source_comparison_20261003.json",
+  "source_calibration_sha256": "5b90edd5da2b498234567e6f3aeeac9badcca13836200978afae05700c870954",
+  "prerequisite": "Completed frozen-generator study did not beat6000parent. Training-source confidence associates with refold motif retention. Matched selection passed prospectively fixed confidence-separation gates, without changing protein inventory or length/placement counts. Global modulation audit gave no clear explanation of the observed designability difference.",
+  "condition_quality_study": true,
+  "selection_report": "reports/fragment_quality_selection_20261003.json",
+  "selection_report_sha256": "f413b6df4f3bb1ed00d89fa8f49c9ebe05418fe57e1ebeb38280e06de02fdaf9"
+}

@@ -35,6 +35,9 @@ def main():
              training_protein_count=dm['training_protein_count'])
     if 'freeze_trunk' in arm:
         c['freeze_trunk'] = arm['freeze_trunk']
+    if spec.get('condition_quality_study'):
+        selected=(root/spec['selection_report']).resolve()
+        c.update(condition_selection=str(selected),condition_selection_sha256=sha(selected))
     for key, path in [('extension_protocol', protocol), ('broad_corpus_protocol', protocol),
                       ('warm_protocol', protocol), ('latent_weight_protocol', protocol),
                       ('warm_parent_manifest', parent / 'manifest.json'), ('warm_parent_report', report),

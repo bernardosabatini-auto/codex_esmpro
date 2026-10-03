@@ -13,6 +13,7 @@ OVERRIDES = {'extension_arm', 'profile_only', 'seed', 'updates', 'evaluation_ste
              'total_prior_updates', 'work_cap_seconds', 'allocation_minutes',
              'training_protein_count', 'motif_mass', 'corpus', 'latent_weight_profile_audit', 'freeze_trunk'}
 OVERRIDES |= set(PATH_OVERRIDES) | {k + '_sha256' for k in PATH_OVERRIDES}
+OVERRIDES |= {'condition_selection','condition_selection_sha256'}
 
 
 def audit_broad(c):
@@ -26,6 +27,11 @@ def audit_broad(c):
     if not spec['broad_short_corpus'] or c['extension_arm'] not in spec['arms']:
         raise ValueError('Undeclared broader training arm')
     arm = spec['arms'][c['extension_arm']]
+    if bool(c.get('condition_selection'))!=bool(spec.get('condition_quality_study')):
+        raise ValueError('Changed condition-selection policy')
+    if c.get('condition_selection'):
+        from fragment_quality_training import selection_for_config
+        selection_for_config(c)
     if type(c.get('freeze_trunk', False)) is not bool or c.get('freeze_trunk', False) != arm.get('freeze_trunk', False):
         raise ValueError('Changed generator freeze policy')
     if c.get('freeze_trunk'):

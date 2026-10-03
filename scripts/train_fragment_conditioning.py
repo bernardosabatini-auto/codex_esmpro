@@ -43,6 +43,8 @@ def main():
     p=argparse.ArgumentParser()
     for key in ('source','config','output'):p.add_argument('--'+key,type=Path,required=True)
     a=p.parse_args();c=json.loads(a.config.read_text())
+    from fragment_quality_training import selection_for_config
+    selected_conditions=selection_for_config(c)
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     warm=c.get('warm_start',False)
@@ -196,7 +198,7 @@ def main():
                 torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic()
                 for step in range(begin,end):
                     if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('Fragment training cap')
-                    n=(128,256,384,512)[step%4];b=c['batches'][str(n)];ids=order.choice(bucket_ids[n],size=b).tolist();names=[order.choice(sorted(data[('train',ident)]['conditions'])) for ident in ids];z=torch.zeros(b,n,8);features=torch.zeros(b,n,41 if c.get('backbone_tokens') else 29);keep=torch.zeros(b,n,dtype=torch.bool);mask=torch.zeros_like(keep);coordinates=torch.zeros(b,n,3) if geometry else None
+                    n=(128,256,384,512)[step%4];b=c['batches'][str(n)];ids=order.choice(bucket_ids[n],size=b).tolist();names=[order.choice([selected_conditions[ident]] if selected_conditions is not None else sorted(data[('train',ident)]['conditions'])) for ident in ids];z=torch.zeros(b,n,8);features=torch.zeros(b,n,41 if c.get('backbone_tokens') else 29);keep=torch.zeros(b,n,dtype=torch.bool);mask=torch.zeros_like(keep);coordinates=torch.zeros(b,n,3) if geometry else None
                     null_target=torch.zeros_like(z) if c.get('target_frame_training') else None
                     for i,(ident,name) in enumerate(zip(ids,names)):
                         v=data[('train',ident)];q=v['conditions'][name];l=v['length'];z[i,:l]=q['target'] if c.get('target_frame_training') else v['target'];features[i,:l]=q['features'];keep[i,:l]=q['keep'];mask[i,:l]=True

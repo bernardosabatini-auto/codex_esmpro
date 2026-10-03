@@ -1,0 +1,52 @@
+{
+  "encoded_cohort": "extra_fragment_data_50117443",
+  "selection": "fragment_extra_development_20261003",
+  "seed": 2026100351,
+  "historical_seed": 2026100211,
+  "samples": 4,
+  "steps": 50,
+  "decoder_steps": 3,
+  "batch_size": 4,
+  "guidance": 1,
+  "work_cap_seconds": 1080,
+  "controls": "Eachmodel reproduces its own four historical control families: latent1e-5,CA RMSD<=.2A,lDDT>=.99,and identical raw-validity/strict decisions. Every newfamily gets same-batch repeat<=1e-5and supplied-fragment rigid-pose latent control<=1e-4. No correction, noise retry, reflow, ranking, or strength sweep.",
+  "scope": "Repeated64-family development panel, not a locked test. No evaluation labels enter training. Candidate-versus-full and candidate-versus6000-parent comparisons are prespecified separately; native attempts are reused without pooling.",
+  "purpose": "Test learned-generator freezing at8000totalupdates with the unchanged short-motif generation and refold assay.",
+  "parents": {
+    "control_frozen": "fragment_training_50139079",
+    "broad_frozen": "fragment_training_50139147"
+  },
+  "total_updates": {
+    "control_frozen": 8000,
+    "broad_frozen": 8000
+  },
+  "training_counts": {
+    "control_frozen": 512,
+    "broad_frozen": 7941
+  },
+  "condition": "c20_center",
+  "refold_protocol": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/configs/fragment_frozen_refold_protocol.json",
+  "refold_protocol_sha256": "3d8f7da4c1c2bf689d4970d581f8f41c26f0a77b7d32ae0a9d1f057bda7d2c06",
+  "designability_panel": {
+    "families_per_length": 16,
+    "slot": 0,
+    "seed": 2026100377
+  },
+  "native_runs": [
+    "extra_fragment_refold_50120060",
+    "extra_fragment_refold_50120141",
+    "extra_fragment_refold_50120178",
+    "extra_fragment_refold_50120232"
+  ],
+  "matched_training_report": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/reports/fragment_frozen_training_20261003.json",
+  "comparisons": [
+    {
+      "label": 7941,
+      "baseline": "control_frozen",
+      "candidate": "broad_frozen"
+    }
+  ],
+  "inventory": "Exactly256outputs per new arm,512total, retaining all132numerical controls/arm and every failure. Full-network and6000-update frontier generations/refolds are reused unchanged.",
+  "refolding": "Union of all strict raw matches and the prospectively selected32-family slot0panel. Eight fixed-motif designs per unique backbone. Reuse the frozen64native budgets for this task. Same valid refold must satisfy global,scaffold and motif constraints.",
+  "resources": "Two independent oneRTX generation jobs,20minutes each; at most8own running-plus-pending GPUs."
+}

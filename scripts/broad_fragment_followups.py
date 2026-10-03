@@ -15,6 +15,24 @@ ARMS = ('control_weight3', 'control_balanced', 'broad_weight3', 'broad_balanced'
 CONDITIONS = ('c20_center', 'f30_center')
 
 
+def graph_layout(study):
+    if study == 'broad':
+        return ARMS, CONDITIONS
+    if study == 'frozen':
+        return ('control_frozen', 'broad_frozen'), ('c20_center',)
+    raise ValueError('Unknown fixed fragment study')
+
+
+def generation_paths(study, condition, arm):
+    if study == 'frozen':
+        name = 'fragment_frozen_eval_' + arm.removesuffix('_frozen')
+        return ('slurm/' + name + '_rtx.sbatch', 'runs/' + name + '_20261003.json',
+                'configs/fragment_frozen_c20_validation_protocol.json')
+    name = 'broad_eval_' + condition + '_' + arm
+    return ('slurm/' + name + '_rtx.sbatch', 'runs/' + name + '.json',
+            'configs/fragment_broad_' + condition + '_validation_protocol.json')
+
+
 def existing_job(jobs, script):
     found = [j for j in jobs if j.get('script') == script]
     if len(found) > 1:
@@ -41,16 +59,19 @@ def completed_report(root, job, watch, prefix):
 
 def advance(root, plan, jobs, watch, *, dry_run=False):
     byid = {j['id']: j for j in jobs}
-    if set(plan['parents']) != set(ARMS) or len(set(plan['parents'].values())) != 4:
-        raise ValueError('Changed four-arm graph')
+    study = plan.get('study', 'broad'); arms, conditions = graph_layout(study)
+    if set(plan['parents']) != set(arms) or len(set(plan['parents'].values())) != len(arms):
+        raise ValueError('Changed fixed training graph')
     parents = []; waiting_training = False
-    for arm in ARMS:
+    for arm in arms:
         jid = plan['parents'][arm]
         if jid not in byid or byid[jid]['completion_action'] != 'summarize_fragment_training':
             raise ValueError('Unregistered training parent')
         frozen = json.loads((Path(byid[jid]['code_snapshot']) / 'entry_configs/0.json').read_text())
         if frozen['extension_arm'] != arm or frozen['profile_only'] or frozen['updates'] != 2000 or frozen['broad_corpus_protocol_sha256'] != plan['training_protocol_sha256']:
             raise ValueError('Wrong registered training parent')
+        if bool(frozen.get('freeze_trunk')) != (study == 'frozen'):
+            raise ValueError('Wrong generator update policy')
         if completed_report(root, byid[jid], watch, 'fragment_training') is None:
             waiting_training = True
         parents.append(root / 'runs' / ('fragment_training_' + jid))
@@ -77,43 +98,43 @@ def advance(root, plan, jobs, watch, *, dry_run=False):
             return dict(status='active', phase='submission_guard_wait', script=script, error=str(error))
         return dict(status='active', phase='submitted', script=script,
                     submitted=json.loads(result.strip().splitlines()[-1])['submitted'])
-    comparison = root / 'reports/broad_fragment_training_20261003.json'
+    comparison = root / ('reports/fragment_frozen_training_20261003.json' if study == 'frozen' else 'reports/broad_fragment_training_20261003.json')
     if not comparison.exists():
         if dry_run:
             return dict(status='active', phase='ready_training_comparison')
-        run(['scripts/compare_broad_fragment_training.py', '--runs', *parents,
+        run(['scripts/compare_frozen_fragment_training.py' if study == 'frozen' else 'scripts/compare_broad_fragment_training.py', '--runs', *parents,
              '--output', comparison.with_suffix('')])
         return dict(status='active', phase='training_compared')
     compared = json.loads(comparison.read_text())
     if compared['status'] != 'complete' or compared['profile_only'] or compared['matched_training_updates'] != 2000 or compared['protocol_sha256'] != plan['training_protocol_sha256']:
         raise ValueError('Unqualified matched training comparison')
     generations = {}
-    for condition in CONDITIONS:
+    for condition in conditions:
         generations[condition] = []
-        for arm in ARMS:
-            name = 'broad_eval_' + condition + '_' + arm
-            script, config = 'slurm/' + name + '_rtx.sbatch', 'runs/' + name + '.json'
+        for arm in arms:
+            script, config, protocol = generation_paths(study, condition, arm)
             job = existing_job(jobs, script)
             if job is None:
                 if dry_run:
                     return dict(status='active', phase='ready_generation', script=script)
                 run(['scripts/prepare_extra_fragment_validation.py', '--protocol',
-                     'configs/fragment_broad_' + condition + '_validation_protocol.json',
+                     protocol,
                      '--arm', arm, '--output', config])
                 return submit(script, config, 'summarize_extra_fragment_validation',
-                              'Fixed broad-fragment endpoint generation ' + condition + ' ' + arm)
+                              'Fixed ' + study + '-fragment endpoint generation ' + condition + ' ' + arm)
             frozen = json.loads((Path(job['code_snapshot']) / 'entry_configs/0.json').read_text())
             if frozen['arm'] != arm or frozen['spec']['condition'] != condition or Path(frozen['model_manifest']).parent.name != 'fragment_training_' + plan['parents'][arm]:
                 raise ValueError('Wrong existing generation lineage')
             completed_report(root, job, watch, 'extra_fragment_validation')
             generations[condition].append(job)
     all_done = True
-    for condition in CONDITIONS:
+    for condition in conditions:
         gen_jobs = generations[condition]
         if any(completed_report(root, j, watch, 'extra_fragment_validation') is None for j in gen_jobs):
             all_done = False
             continue
-        prefix = 'runs/broad_refold_' + condition
+        refold_prefix = 'fragment_frozen_refold_' if study == 'frozen' else 'broad_refold_'
+        prefix = 'runs/' + refold_prefix + condition
         configs = [Path(prefix + '_' + str(k) + '.json') for k in range(4)]
         if not all((root / c).exists() for c in configs):
             if any((root / c).exists() for c in configs):
@@ -126,10 +147,10 @@ def advance(root, plan, jobs, watch, *, dry_run=False):
             return dict(status='active', phase='refolds_prepared', condition=condition)
         refolds = []
         for k, config in enumerate(configs):
-            name = 'broad_refold_' + condition + '_' + str(k)
+            name = refold_prefix + condition + '_' + str(k)
             script = 'slurm/' + name + '_rtx.sbatch'
             c = json.loads((root / config).read_text())
-            if c['partition'] != k or Path(c['protocol']).name != 'fragment_broad_' + condition + '_validation_protocol.json':
+            if c['partition'] != k or Path(c['protocol']).name != Path(generation_paths(study, condition, arms[0])[2]).name:
                 raise ValueError('Wrong prepared refold configuration')
             job = existing_job(jobs, script)
             if job is None:
@@ -143,7 +164,7 @@ def advance(root, plan, jobs, watch, *, dry_run=False):
                     raise ValueError('Changed generated refold script')
                 path.write_text(body)
                 return submit(script, str(config), 'summarize_extra_fragment_refold',
-                              'Fixed broad-fragment same-refold assay ' + condition + ' partition' + str(k))
+                              'Fixed ' + study + '-fragment same-refold assay ' + condition + ' partition' + str(k))
             frozen = json.loads((Path(job['code_snapshot']) / 'entry_configs/0.json').read_text())
             if frozen['partition'] != k or frozen['generation_manifest_sha256'] != c['generation_manifest_sha256'] or frozen['predictions_sha256'] != c['predictions_sha256']:
                 raise ValueError('Wrong existing refold lineage')
@@ -152,11 +173,11 @@ def advance(root, plan, jobs, watch, *, dry_run=False):
         if any(completed_report(root, j, watch, 'extra_fragment_refold') is None for j in refolds):
             all_done = False
             continue
-        out = root / 'reports' / ('broad_fragment_' + condition + '_comparison.json')
+        out = root / 'reports' / ('fragment_frozen_c20_comparison_20261003.json' if study == 'frozen' else 'broad_fragment_' + condition + '_comparison.json')
         if not out.exists():
             if dry_run:
                 return dict(status='active', phase='ready_refold_comparison', condition=condition)
-            run(['scripts/compare_extra_fragment_refolds.py', '--runs',
+            run(['scripts/compare_frozen_fragment_refolds.py' if study == 'frozen' else 'scripts/compare_extra_fragment_refolds.py', '--runs',
                  *[root / 'runs' / ('extra_fragment_refold_' + j['id']) for j in refolds],
                  '--output', out.with_suffix('')])
             return dict(status='active', phase='refolds_compared', condition=condition)
@@ -165,13 +186,16 @@ def advance(root, plan, jobs, watch, *, dry_run=False):
     return dict(status='resolved' if all_done else 'active', phase='resolved' if all_done else 'waiting_assays')
 
 
-def tick(root, dry_run=False):
+def tick(root, dry_run=False, study='broad'):
     root = Path(root).resolve()
-    plan = json.loads((root / 'runs/broad_fragment_followups.json').read_text())
+    graph_layout(study)
+    stem = study + '_fragment_followups'
+    plan = json.loads((root / ('runs/' + stem + '.json')).read_text())
+    if plan.get('study', 'broad') != study:raise ValueError('Wrong fixed study plan')
     policy = json.loads((root / 'runs/execution_policy.json').read_text())
     if plan['status'] != 'active' or policy['status'] != 'active':
         return dict(status='inactive')
-    with (root / 'runs/broad_fragment_followups.lock').open('w') as lock:
+    with (root / ('runs/' + stem + '.lock')).open('w') as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
@@ -187,14 +211,15 @@ def tick(root, dry_run=False):
             result = dict(status='failed', error=f'{type(error).__name__}: {error}')
         result['checked_at'] = stamp()
         if not dry_run:
-            write_json(root / 'runs/broad_fragment_followups_state.json', result)
+            write_json(root / ('runs/' + stem + '_state.json'), result)
             if result['status'] in ('failed', 'resolved'):
-                subprocess.run(['systemctl', '--user', 'stop', UNIT], check=True, timeout=10)
+                subprocess.run(['systemctl', '--user', 'stop', 'esm-proae-' + stem.replace('_','-') + '.timer'], check=True, timeout=10)
         return result
 
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--dry-run', action='store_true')
+    p.add_argument('--study', choices=('broad','frozen'), default='broad')
     a = p.parse_args()
-    print(json.dumps(tick(Path(__file__).resolve().parents[1], a.dry_run)))
+    print(json.dumps(tick(Path(__file__).resolve().parents[1], a.dry_run, a.study)))

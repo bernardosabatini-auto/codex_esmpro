@@ -1,0 +1,46 @@
+{
+  "purpose": "Compare frozen learned generators to matched full-network continuations and the better6000-update parent, without regenerating or refolding old controls.",
+  "generation_protocol": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/configs/fragment_frozen_c20_validation_protocol.json",
+  "generation_protocol_sha256": "0313ab66336256cc1d92cf04ed1cace9e5155d37ebe33dd5577450c073c885ee",
+  "full_comparison": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/reports/broad_fragment_c20_center_comparison.json",
+  "parent_comparison": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/reports/fragment_short64_conditioning_comparison.json",
+  "full_arms": [
+    "control_weight3",
+    "broad_weight3"
+  ],
+  "new_arms": [
+    "control_frozen",
+    "broad_frozen"
+  ],
+  "parent_arm": "control512",
+  "matched_pairs": [
+    {
+      "label": 512,
+      "baseline": "control_weight3",
+      "candidate": "control_frozen"
+    },
+    {
+      "label": 7941,
+      "baseline": "broad_weight3",
+      "candidate": "broad_frozen"
+    }
+  ],
+  "frontier_pairs": [
+    {
+      "label": 512,
+      "baseline": "parent6000",
+      "candidate": "control_frozen"
+    },
+    {
+      "label": 7941,
+      "baseline": "parent6000",
+      "candidate": "broad_frozen"
+    }
+  ],
+  "primary": "Same valid refold passes both motif<=1A limits, globalTM>.5 and scaffold-onlyTM>.5, with raw validity and raw motif gates.256outputs/model, no failure removal.",
+  "designability": "Same fixed32-family slot0 panel for new and full-network arms. Parent6000has no outcome-independent panel: no parent designability estimate is invented.",
+  "decision": "Useful progress requires stronger same-refold success improvement over both matched full-network control and6000-parent, spanning families while retaining measured designability. Report paired-family uncertainty; overlapping-zero intervals are exploratory, not established gains. No best-checkpoint or attempt pooling.",
+  "budget": "Eight fixed-motif CA-onlyMPNN designs per unique new backbone; unchangedFP32teacher3loops50steps1sample. Reused controls retain their original eight attempts. Sampling noises are paired; refolding RNG is not claimed paired across arms.",
+  "full_comparison_sha256": "cc92ffc6b3d94b23cd3349583cde9ec21036e157aba0942bff176ade98b04a65",
+  "parent_comparison_sha256": "87cd0248f509ecc78d1a017f10891d93839c752be2e61606799488fabacfab53"
+}

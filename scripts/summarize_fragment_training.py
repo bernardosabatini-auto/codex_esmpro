@@ -17,6 +17,7 @@ def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error','Incomplete'),updates=m.get('updates',0),profile_qualified=False)
     c=m['config'];warm=c.get('warm_start',False)
+    if c.get('fragment_cross_attention') and not c.get('broad_corpus_protocol'):raise ValueError('Unbound fragment cross-attention')
     if c.get('freeze_trunk') and (not warm or not c.get('broad_corpus_protocol')):raise ValueError('Unbound learned-generator freeze')
     if c.get('motif_mass') is not None and not c.get('broad_corpus_protocol'):raise ValueError('Unbound region-balanced objective')
     if c.get('broad_corpus_protocol') and not c.get('extension_protocol'):raise ValueError('Unbound broader continuation')
@@ -84,6 +85,9 @@ def analyze(run):
         if sum(r['motif_examples'] for r in rows)<c['updates'] or not any(r['aux_parameter_grad_norm']>0 for r in rows) or any(r['motif_examples'] and r['velocity_evaluations']!=50 for r in rows):raise ValueError('Incomplete rollout objective')
     if m['updates']!=c['updates'] or len(m['training'])!=c['updates'] or m['frozen_initial']!=m['frozen_final']:raise ValueError('Incomplete/frozen-weight failure')
     if c.get('freeze_trunk') and not m.get('frozen_generator_ema_exact'):raise ValueError('Frozen generator EMA was not preserved')
+    if c.get('fragment_cross_attention'):
+        from fragment_cross_training import audit_cross_manifest
+        audit_cross_manifest(m)
     if [r['step'] for r in m['training']]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['flow_loss']) or r['adapter_gradient_norm']<=0 for r in m['training']):raise ValueError('Invalid training trace')
     if any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in m['initial_controls']):raise ValueError('Failed initial controls')
     if len(m['initial_controls'])!=(32 if c['profile_only'] else 128) or len(m['sampling_controls'])!=4 or any(r['original_max_abs']>1e-5 or r['batched_max_abs']>(1e-5 if c.get('sampling_control_mode')=='same_batch_repeat' else 1e-4) or (c.get('sampling_control_mode')=='same_batch_repeat' and r.get('kind')!='same_batch_repeat') for r in m['sampling_controls']):raise ValueError('Incomplete sampler controls')

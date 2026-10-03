@@ -1,0 +1,59 @@
+{
+  "purpose": "Test whether direct dynamic scaffold access to supplied isolated-fragment memory improves same-refold scaffolding without changing the learned generator.",
+  "broad_short_corpus": true,
+  "parent": "fragment_training_50106855",
+  "arms": {
+    "motif": {
+      "corpus": "control512",
+      "motif_mass": null,
+      "freeze_trunk": true,
+      "fragment_cross_attention": {
+        "cross_width": 128,
+        "cross_heads": 4,
+        "cross_route": "motif"
+      }
+    },
+    "all": {
+      "corpus": "control512",
+      "motif_mass": null,
+      "freeze_trunk": true,
+      "fragment_cross_attention": {
+        "cross_width": 128,
+        "cross_heads": 4,
+        "cross_route": "all"
+      }
+    }
+  },
+  "seed": 2026100401,
+  "total_prior_updates": 6000,
+  "updates": 2000,
+  "evaluation_steps": [
+    500,
+    2000
+  ],
+  "weight": 3.0,
+  "sampling_control_mode": "same_batch_repeat",
+  "assembly_protocol": "configs/fragment_broad_full_protocol.json",
+  "data": "Same original512 training proteins,12conditions each from qualified assembled control512 corpus. No new labels, filtering or condition selection. Same original32training/16development diagnostics. Additional64development assay follows the final endpoint; locked tests unscored.",
+  "objective": "Unchanged weight3 protein-weighted flow objective,10percent fragment dropout,50percent self-conditioning. Only output-routing mask differs between newly matched arms.",
+  "training": "Freeze entire6000parent generator and old fragment adapter, including EMA. Train only new cross-attention parameters. Match all initial tensors and protein/condition/noise/time/drop/self-condition/LR draws between arms. Established2000update weight3 flow loss and adapterLR3e-4; no new auxiliary objective.",
+  "evaluation": "Primary final2000new-update endpoint. Same64additional development families,4fixed noises,center20motif,50Euler/AE3/CFG1. Refold every raw match plus identical preselected32-family slot0 designability panel,8fixed-motifMPNNdesigns. DeterministicFP32teacher using qualified prior policy. Full256denominator; raw failures retained. Same valid refold must retain proper motifRMSD<=1A anddRMS<=1A, globalTM>.5, scaffoldTM>.5. Compare all versus motif and6000parent; original native budgets reused, parent panel unmeasured.",
+  "decision": "First two40-update profiles must pass historical initial/null, pose, frozen generator/oldadapter/EMA, finite new-branch gradients and exact paired draw controls; <=75GiB. Then one2000-update comparison, no duration/width/LR sweep. Advance only on improved same-refold success across families with retained fixed-panel designability, reporting family uncertainty and repeated-development limitation. Raw retention alone never qualifies. Positive result requires independent confirmation.",
+  "resources": "Two40-update profiles on singleRTX GPUs,20minute limits; subsequent runtimes derived from measured profiles. <=8registered project running+pending GPUs. Same operations/parameters in routing arms; packed fragment memory reused across50flowsteps. No distributed training.",
+  "freeze_trunk_study": true,
+  "source_calibration_report": "reports/fragment_source_comparison_20261003.json",
+  "source_calibration_sha256": "5b90edd5da2b498234567e6f3aeeac9badcca13836200978afae05700c870954",
+  "prerequisite": "Quality selection and learned-generator freezing did not improve stronger same-refold success over6000parent. Global modulation magnitude audit gave no clear explanation. Direct scaffold access is an architectural hypothesis, not an established diagnosis.",
+  "fragment_cross_study": true,
+  "prerequisite_reports": [
+    {
+      "path": "reports/fragment_quality_c20_comparison_20261003.json",
+      "sha256": "5030f944b3bf7b04aae2dea81d7f76abc76fb2d0181ac88ce5ffd39937858ca6"
+    },
+    {
+      "path": "reports/fragment_frozen_c20_comparison_20261003.json",
+      "sha256": "d1d328757ae05b6397b52bd9517950a1df4979d009822c041bbff48f68e251ca"
+    }
+  ],
+  "architecture": "Packed isolated29-channel latent/sequence tokens feed shared width128 key/value memory. Each generator block gets a width128 four-head dynamic attention residual, with zero output initialization and relative sequence-position bias clipped32. Identical parameters and operations in both arms. Output gate is motif-only or all valid residues; fragment dropout zeros both routes. Existing geometry adapter remains frozen. No scaffold features enter memory."
+}

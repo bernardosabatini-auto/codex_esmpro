@@ -62,9 +62,18 @@ def prepare_fragment_condition(net, adapter, features, keep, mask, dropped, *, c
         if coordinates is None or len(prepared)!=3:raise ValueError('Geometry conditioning requires supplied coordinates and pair-attention model')
         extra=adapter.pair_biases(coordinates,keep,mask,dropped)
         if len(extra)!=len(prepared[2]) or any(x.shape!=y.shape for x,y in zip(extra,prepared[2])):raise ValueError('Pair adapter architecture mismatch')
-        return esm, (token,pool,tuple(x+y for x,y in zip(prepared[2],extra)))
+        condition = (token,pool,tuple(x+y for x,y in zip(prepared[2],extra)))
+        if hasattr(adapter, 'cross_condition'):
+            condition = (*condition, adapter.cross_condition(features, keep, mask, dropped))
+        return esm, condition
     if coordinates is not None:raise ValueError('Token-only adapter does not consume coordinates')
     return esm, (token, pool, *prepared[2:])
+
+
+def fragment_velocity(net, adapter, *args, **kwargs):
+    if hasattr(adapter, 'cross_condition'):
+        kwargs['fragment_adapter'] = adapter
+    return net(*args, **kwargs)
 
 
 def region_balanced_loss(error, keep, mask, dropped, motif_mass):
@@ -110,8 +119,8 @@ def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator,
         def detach(v):
             return v.detach() if isinstance(v, torch.Tensor) else tuple(detach(x) for x in v)
         with torch.no_grad():
-            history = x + (1-tt)*net(x, t, esm, mask, x_sc=None, prepared=detach(prepared))
-    velocity = net(x, t, esm, mask, x_sc=history, prepared=prepared)
+            history = x + (1-tt)*fragment_velocity(net, adapter, x, t, esm, mask, x_sc=None, prepared=detach(prepared))
+    velocity = fragment_velocity(net, adapter, x, t, esm, mask, x_sc=history, prepared=prepared)
     error = (velocity - (target-noise)).square().mean(-1)
     if motif_mass is not None:
         loss = region_balanced_loss(error, keep, mask, dropped, motif_mass)
@@ -151,9 +160,9 @@ def sample_fragment(net, adapter, features, keep, mask, *, noise, steps=50, drop
     ts = torch.linspace(start_time, 1, steps+1, device=noise.device)
     for i in range(steps):
         t, dt = ts[i], ts[i+1]-ts[i]
-        v = net(x, t.expand(len(x)), esm, mask, x_sc=history, prepared=prepared).float()
+        v = fragment_velocity(net, adapter, x, t.expand(len(x)), esm, mask, x_sc=history, prepared=prepared).float()
         if null_prepared is not None:
-            unconditional=net(x,t.expand(len(x)),esm,mask,x_sc=history,prepared=null_prepared).float();v=unconditional+guidance*(v-unconditional)
+            unconditional=fragment_velocity(net,adapter,x,t.expand(len(x)),esm,mask,x_sc=history,prepared=null_prepared).float();v=unconditional+guidance*(v-unconditional)
         if net.self_cond:
             history = x + (1-t)*v
         x = x + dt*v

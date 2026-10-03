@@ -48,6 +48,7 @@ def main():
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     warm=c.get('warm_start',False)
+    if c.get('fragment_cross_attention') and not c.get('broad_corpus_protocol'):raise ValueError('Unbound fragment cross-attention')
     if c.get('freeze_trunk') and (not warm or not c.get('broad_corpus_protocol')):raise ValueError('Unbound learned-generator freeze')
     if c.get('motif_mass') is not None and not c.get('broad_corpus_protocol'):raise ValueError('Unbound region-balanced objective')
     if c.get('broad_corpus_protocol') and not c.get('extension_protocol'):raise ValueError('Unbound broader continuation')
@@ -132,12 +133,22 @@ def main():
         else:frozen=freeze_unused_conditioning(model)
         torch.manual_seed(c['seed']);adapter=(FragmentGeometryAdapter(model.d_model,n_layers=len(model.blocks),n_heads=model.n_heads,hidden=recipe['adapter']['hidden'],distance_precision=c.get('distance_precision','fp32'),backbone_tokens=c.get('backbone_tokens',False)) if geometry else FragmentAdapter(model.d_model,recipe['adapter']['hidden'])).cuda().train()
         if warm:
-            parent_checkpoint=torch.load(c['checkpoint'],map_location='cpu',weights_only=False,mmap=True);adapter.load_state_dict(parent_checkpoint['fragment_adapter']);del parent_checkpoint
+            parent_checkpoint=torch.load(c['checkpoint'],map_location='cpu',weights_only=False,mmap=True)
+            if c.get('fragment_cross_attention'):
+                from latentfold.fragment_cross_attention import FragmentCrossAttentionAdapter
+                torch.manual_seed(c['seed'])
+                adapter=FragmentCrossAttentionAdapter(model.d_model,n_layers=len(model.blocks),n_heads=model.n_heads,hidden=recipe['adapter']['hidden'],distance_precision=c['distance_precision'],**c['fragment_cross_attention']).cuda().train()
+                adapter.load_parent(parent_checkpoint['fragment_adapter']);adapter.freeze_parent()
+                m['frozen_adapter_names']=[n for n,_ in adapter.named_parameters() if not n.startswith('cross_')]
+                m['frozen_adapter_initial']=frozen_hash(adapter,m['frozen_adapter_names'])
+                m['cross_initial']=frozen_hash(adapter,[n for n,_ in adapter.named_parameters() if n.startswith('cross_')])
+            else:adapter.load_state_dict(parent_checkpoint['fragment_adapter'])
+            del parent_checkpoint
         m['frozen_names']=frozen;m['frozen_initial']=frozen_hash(model,frozen);m['adapter_initial']=frozen_hash(adapter,[n for n,_ in adapter.named_parameters()]);m['token_adapter_initial']=frozen_hash(adapter,['hidden.weight','hidden.bias','output.weight','output.bias'])
         decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval().requires_grad_(False)
         if c.get('backbone_tokens'):m['shared_adapter_initial']=frozen_hash(adapter,[n for n,_ in adapter.named_parameters() if not n.startswith('backbone_')])
         ema={k:v.detach().clone() for k,v in model.state_dict().items()};adapter_ema={k:v.detach().clone() for k,v in adapter.state_dict().items()}
-        trunk=[p for p in model.parameters() if p.requires_grad];aps=list(adapter.parameters());parameters=trunk+aps;groups=[dict(params=aps,lr=3e-4,base_lr=3e-4)]
+        trunk=[p for p in model.parameters() if p.requires_grad];aps=[p for p in adapter.parameters() if p.requires_grad];parameters=trunk+aps;groups=[dict(params=aps,lr=3e-4,base_lr=3e-4)]
         if trunk:groups.append(dict(params=trunk,lr=1e-5,base_lr=1e-5))
         gradient_model=torch.nn.ModuleDict({'generator':model,'fragment':adapter})
         optimizer=torch.optim.AdamW(groups,betas=(.9,.95),weight_decay=.01,foreach=False);order=np.random.default_rng(c['seed']);rng=torch.Generator(device='cuda').manual_seed(c['seed']);torch.cuda.manual_seed(c['seed']);m['trainable_parameters']=sum(p.numel() for p in parameters);telemetry=Telemetry(a.output,True)
@@ -229,7 +240,7 @@ def main():
                     with torch.no_grad():
                         for net,bank in ((model,ema),(adapter,adapter_ema)):
                             if c.get('freeze_trunk') and net is model:continue
-                            current=net.state_dict();keys=[k for k in bank if bank[k].is_floating_point()];torch._foreach_lerp_([bank[k] for k in keys],[current[k] for k in keys],.01)
+                            current=net.state_dict();keys=[k for k in bank if bank[k].is_floating_point() and (not c.get('fragment_cross_attention') or net is not adapter or k.startswith('cross_'))];torch._foreach_lerp_([bank[k] for k in keys],[current[k] for k in keys],.01)
                     m['updates']=step+1;m['training'].append(dict(step=step+1,length=n,batch=b,ids=ids,conditions=names,flow_loss=float(loss.detach()),gradient_norm=float(norm),adapter_gradient_norm=float(anorm),learning_rate_factor=factor,self_conditioned=info['self_conditioned'],noise_sha256=digest(info['noise']),time_sha256=digest(info['t']),drop_sha256=digest(info['dropped']),rng_sha256=digest(rng.get_state()),global_rng_sha256=digest(torch.cuda.get_rng_state())))
                     if c.get('conditional_time_shift'):
                         dropped=info['dropped'];m['training'][-1].update(base_time_sha256=digest(info['base_t']),conditioned_examples=int((~dropped).sum()),null_time_max_abs=float((info['t'][dropped]-info['base_t'][dropped]).abs().max()) if dropped.any() else 0.,mean_conditional_time=float(info['t'][~dropped].mean()) if (~dropped).any() else None,mean_base_conditional_time=float(info['base_t'][~dropped].mean()) if (~dropped).any() else None)
@@ -240,7 +251,13 @@ def main():
                 if c.get('freeze_trunk'):
                     m['frozen_generator_ema_exact']=all(torch.equal(ema[k],v) for k,v in model.state_dict().items())
                     if trunk or not m['frozen_generator_ema_exact']:raise ValueError('Learned generator or its EMA changed')
-                if not c['profile_only']:torch.save(dict(ema={k:v.cpu() for k,v in ema.items()},fragment_adapter={k:v.cpu() for k,v in adapter_ema.items()},adapter_config=dict(output_width=model.d_model,hidden=recipe['adapter']['hidden'],variant='geometry' if geometry else 'token',n_layers=len(model.blocks),n_heads=model.n_heads,distance_precision=c.get('distance_precision','fp32'),backbone_tokens=c.get('backbone_tokens',False)),arch=arch['architecture'],extra_arch=arch['extra_architecture'],model=arch['model'],experiment=c),a.output/f'ema_{end}.ckpt')
+                if c.get('fragment_cross_attention'):
+                    m['frozen_adapter_final']=frozen_hash(adapter,m['frozen_adapter_names'])
+                    m['frozen_adapter_ema_exact']=all(torch.equal(adapter_ema[k],v) for k,v in adapter.state_dict().items() if not k.startswith('cross_'))
+                    if m['frozen_adapter_final']!=m['frozen_adapter_initial'] or not m['frozen_adapter_ema_exact']:raise ValueError('Parent fragment adapter changed')
+                adapter_config=dict(output_width=model.d_model,hidden=recipe['adapter']['hidden'],variant='geometry' if geometry else 'token',n_layers=len(model.blocks),n_heads=model.n_heads,distance_precision=c.get('distance_precision','fp32'),backbone_tokens=c.get('backbone_tokens',False))
+                if c.get('fragment_cross_attention'):adapter_config.update(variant='cross_attention',**c['fragment_cross_attention'])
+                if not c['profile_only']:torch.save(dict(ema={k:v.cpu() for k,v in ema.items()},fragment_adapter={k:v.cpu() for k,v in adapter_ema.items()},adapter_config=adapter_config,arch=arch['architecture'],extra_arch=arch['extra_architecture'],model=arch['model'],experiment=c),a.output/f'ema_{end}.ckpt')
                 evaluate(end)
         m['status']='complete'
     except BaseException as error:m.update(status='failed',error=f'{type(error).__name__}: {error}');raise

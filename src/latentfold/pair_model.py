@@ -198,20 +198,30 @@ class PairFlowNet(nn.Module):
         pbs = pb_all.contiguous().split(self.n_heads, dim=1)
         return c_tok, c_pool, pbs
 
-    def forward(self, x_t, t, esm, mask, cond_drop=None, x_sc=None, pair=None, contact=None, dist_feats=None, *, prepared=None):
+    def forward(self, x_t, t, esm, mask, cond_drop=None, x_sc=None, pair=None, contact=None, dist_feats=None, *, prepared=None, fragment_adapter=None):
         B, L, _ = x_t.shape
         if self.self_cond:
             x_sc = torch.zeros_like(x_t) if x_sc is None else x_sc
             x_in = torch.cat([x_t, x_sc], dim=-1)
         else:
             x_in = x_t
+        memory = None
+        if fragment_adapter is not None:
+            if prepared is None or len(prepared) != 4 or fragment_adapter.n_layers != len(self.blocks):
+                raise ValueError('Explicit matching fragment memory required')
+            prepared, memory = prepared[:3], prepared[3]
         c_tok, c_pool, pbs = self.prepare_condition(esm, mask, cond_drop, pair=pair, contact=contact, dist_feats=dist_feats) if prepared is None else prepared
         h = self.in_proj(x_in) + c_tok + self.pos.weight[:L][None]
         c = self.t_mlp(timestep_embedding(t, self.d_model)) + c_pool
-        for blk, pb in zip(self.blocks, pbs):
+        for layer, (blk, pb) in enumerate(zip(self.blocks, pbs)):
             if self.checkpoint_blocks and torch.is_grad_enabled():
                 h = checkpoint(blk, h, c, mask, pb, use_reentrant=False)
             else:
                 h = blk(h, c, mask, pb)
+            if fragment_adapter is not None:
+                if self.checkpoint_blocks and torch.is_grad_enabled():
+                    h = checkpoint(fragment_adapter.cross_update, h, layer, memory, use_reentrant=False)
+                else:
+                    h = fragment_adapter.cross_update(h, layer, memory)
         s, b = self.out_ada(c).unsqueeze(1).chunk(2, dim=-1)
         return self.out_proj(self.out_norm(h) * (1 + s) + b)

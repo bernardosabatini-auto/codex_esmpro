@@ -14,6 +14,7 @@ OVERRIDES = {'extension_arm', 'profile_only', 'seed', 'updates', 'evaluation_ste
              'training_protein_count', 'motif_mass', 'corpus', 'latent_weight_profile_audit', 'freeze_trunk'}
 OVERRIDES |= set(PATH_OVERRIDES) | {k + '_sha256' for k in PATH_OVERRIDES}
 OVERRIDES |= {'condition_selection','condition_selection_sha256'}
+OVERRIDES |= {'fragment_cross_attention'}
 
 
 def audit_broad(c):
@@ -27,6 +28,11 @@ def audit_broad(c):
     if not spec['broad_short_corpus'] or c['extension_arm'] not in spec['arms']:
         raise ValueError('Undeclared broader training arm')
     arm = spec['arms'][c['extension_arm']]
+    if c.get('fragment_cross_attention') != arm.get('fragment_cross_attention'):
+        raise ValueError('Changed fragment cross-attention architecture')
+    if c.get('fragment_cross_attention'):
+        from fragment_cross_training import audit_cross_config
+        audit_cross_config(c, spec)
     if bool(c.get('condition_selection'))!=bool(spec.get('condition_quality_study')):
         raise ValueError('Changed condition-selection policy')
     if c.get('condition_selection'):
@@ -121,4 +127,6 @@ def audit_broad(c):
                 raise ValueError('Wrong matched profile')
         if profile['config'].get('freeze_trunk', False) != c.get('freeze_trunk', False):
             raise ValueError('Wrong generator-freezing profile')
+        if profile['config'].get('fragment_cross_attention') != c.get('fragment_cross_attention'):
+            raise ValueError('Wrong fragment-routing profile')
     return dict(spec, training_protein_count=n)

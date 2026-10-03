@@ -28,3 +28,11 @@ class ExtraRefoldTests(unittest.TestCase):
         with self.assertRaises(ValueError):summarize(rows,[],native)
         with self.assertRaises(ValueError):summarize(rows,[record,record],native)
         with self.assertRaises(ValueError):summarize(rows[:-1],[record],native)
+
+    def test_two_arm_conditioning_contrast_keeps256_samples_per_arm(self):
+        native={str(i):dict(scaffold_joint_success=True) for i in range(64)}
+        rows=[dict(arm=arm,target_id=str(i),family=str(i),generation_slot=k,length=100 if i<32 else 300,raw_gate_passed=False) for arm in ('null512','control512') for i in range(64) for k in range(4)]
+        summaries,contrasts=summarize(rows,[],native,arms=('null512','control512'),pairs=[dict(label=512,baseline='null512',candidate='control512')])
+        self.assertEqual(len(summaries),6);self.assertEqual(len(contrasts),3)
+        self.assertEqual(contrasts[0]['baseline_arm'],'null512')
+        self.assertEqual([r['samples'] for r in summaries if r['cohort']=='all'],[256,256])

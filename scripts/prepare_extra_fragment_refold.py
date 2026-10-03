@@ -22,7 +22,7 @@ def screen(c):
     rows=[];selected={};items={}
     with h5py.File(c['fragments']) as fr:
         for ident in sorted(fr['development']):
-            g=fr['development/'+ident];q=g['conditions/f30_center']
+            g=fr['development/'+ident];q=g['conditions/'+spec.get('condition','f30_center')]
             items[ident]=dict(fragment=q['fragment'][:],sequence=str(q.attrs['sequence']),start=int(q.attrs['start']),family=str(g.attrs['family']),length=int(g.attrs['length']))
         parts=partitions({i:q['length'] for i,q in items.items()})
         if c['partition'] not in range(4) or c['target_ids']!=parts[c['partition']]:raise ValueError('Changed family partition')
@@ -56,7 +56,7 @@ def audit_inputs(c,check_teacher=False):
     rows,selected,items,spec=screen(c)
     wanted=set(selected)|{('native',i,0) for i in c['target_ids']}
     if c['num_sequences']!=8 or c['temperature']!=.1 or c['mpnn_seed']!=1 or c['precision']!='fp32':raise ValueError('Changed fixed teacher budget')
-    if c['screen_rows']!=rows or len(rows)!=256 or c['expected_backbones']!=len(wanted) or len(c['entries'])!=len(wanted) or {(r['arm'],r['target_id'],r['generation_slot']) for r in c['entries']}!=wanted:raise ValueError('Changed unique backbone inventory')
+    if c['screen_rows']!=rows or len(rows)!=16*4*len(spec['parents']) or c['expected_backbones']!=len(wanted) or len(c['entries'])!=len(wanted) or {(r['arm'],r['target_id'],r['generation_slot']) for r in c['entries']}!=wanted:raise ValueError('Changed unique backbone inventory')
     with h5py.File(c['predictions']) as out,h5py.File(c['fragments']) as fr:
         if set(out)!={'motifs'}|{r['dataset'] for r in c['entries']} or set(out['motifs'])!=set(c['target_ids']):raise ValueError('Changed refold input groups')
         for r in c['entries']:
@@ -66,7 +66,7 @@ def audit_inputs(c,check_teacher=False):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--generations',type=Path,nargs=4,required=True);p.add_argument('--output-prefix',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];index=dict(status='complete',generations={});fragments=None
+    p=argparse.ArgumentParser();p.add_argument('--generations',type=Path,nargs='+',required=True);p.add_argument('--output-prefix',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];index=dict(status='complete',generations={});fragments=None
     for run in a.generations:
         run=run.resolve();m=json.loads((run/'manifest.json').read_text());gc=m['config'];arm=gc['arm']
         if arm in index['generations']:raise ValueError('Duplicated model')
@@ -80,7 +80,7 @@ def main():
     with h5py.File(fragments) as f:parts=partitions({i:int(g.attrs['length']) for i,g in f['development'].items()})
     for k,ids in enumerate(parts):
         output=Path(str(a.output_prefix)+f'_{k}.json').resolve();c={key:prior[key] for key in ('num_sequences','temperature','mpnn_seed','seed','mpnn','dependencies','teacher_artifacts','precision','usalign','usalign_sha256')};c.update(assay='extra_fragment_refold',partition=k,target_ids=ids,entries=[])
-        for key,path in [('generation_manifest',indexpath),('protocol',root/'configs/fragment_extra_validation_protocol.json'),('fragments',Path(fragments))]:c[key]=str(path);c[key+'_sha256']=sha(path)
+        for key,path in [('generation_manifest',indexpath),('protocol',Path(gc['protocol'])),('fragments',Path(fragments))]:c[key]=str(path);c[key+'_sha256']=sha(path)
         c['screen_rows'],selected,items,_=screen(c);inputs=output.with_suffix('.h5')
         with h5py.File(inputs,'x') as out,h5py.File(fragments) as fr:
             for ident in ids:out.create_dataset('motifs/'+ident,data=items[ident]['fragment'])

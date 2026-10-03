@@ -1,0 +1,11 @@
+{
+  "purpose": "Verify every additional training candidate against its actual complete AFDB source before any geometric supervision.",
+  "candidates": "broad_fragment_candidates_balanced_20261003",
+  "pilot": "broad_fragment_data_50118830",
+  "partitions": 4,
+  "source_candidates": 7680,
+  "selection": "Four disjoint round-robin partitions of the frozen candidate list. All candidates remain in the audit denominator. No new candidates replace failures, and no evaluation outcomes select training cases.",
+  "verification": "Exact cached sequence and complete unique contiguous N/CA/C/O residue mapping; properCA RMSD<=.02A against cached coordinates. Preserve source paths, hashes, maps, and every rejection. Public source download retries may recover transport errors only. No invented atoms or geometric reconstruction may substitute for missing source atoms.",
+  "gate": "Each partition must verify at least98percent of its original1920candidates. Passing source verification does not certify cached-latent parity or decoder quality. A subsequent complete data audit must retain at least90percent of the original7680new candidates after all source/codec requirements. The512base proteins and their existing conditions stay unchanged;8192is a ceiling, not a promised post-filter count.",
+  "resources": "CPU-only, at most two concurrent source downloads per partition and one numerical-library thread per process. Eight concurrent downloads maximum. Each partition has a3600second work cap. No GPU use or teacher labeling."
+}

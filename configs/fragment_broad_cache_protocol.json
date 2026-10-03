@@ -1,0 +1,20 @@
+{
+  "purpose": "Assess substantially broader isolated-fragment supervision using existing training latents and verified source AFDB backbones, without new teacher labeling.",
+  "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/runs/recovery_data_16384/pilot.h5",
+  "base_fragments": "runs/fragment_data_49981806/fragments.h5",
+  "base_manifest": "runs/fragment_data_49981806/manifest.json",
+  "candidate_pool_per_bucket": 4096,
+  "total_training_proteins": 8192,
+  "bucket_counts": {
+    "128": 2048,
+    "256": 2048,
+    "384": 2048,
+    "512": 2048
+  },
+  "salt": "isolated-fragment-broad-cache-20261003-v1:",
+  "selection": "Read only the existing balanced16384training cache, which preserves inherited train-split provenance. In a fixed hash order retain up to4096metadata-eligible candidates per length bucket,50..512residues and standard amino acids, with matching z/CA shapes. Sensitive MMseqs self-search clusters candidates; exclude>=30percent identity with>=50percent coverage of either sequence against all prior exclusion sequences and all64additional development proteins. Propagate exclusions through sequence components. Select one deterministic representative per family, keeping all512base inputs unchanged and filling to2048proteins per bucket. No model outputs or experimental scores select training cases. Fail on insufficient distinct families; do not relax exclusions.",
+  "pilot": "Before full data construction,16new cases per length bucket selected by the same hash order. First recover the actual AFDB N/CA/C/O backbone and prove exact full sequence, unique contiguous residue mapping, and properCA RMSD<=.02A against cached CAs. Missing source atoms or mapping failures stop qualification. Re-encode complete verified backbones and require latent parityRMSE<=.05with cached targets. Decode with frozenFP32ProteinAE,3steps; require coarse-valid geometry andCA RMSD<=1A. Crop nine isolated fragments using established fractions and positions,canonicalize inFP64,and encode only the crop. Audit decoder repeats and rigid-pose controls. Retain every failure. Stop this source route if fewer than90percent of pilot cases pass reconstruction; no model training is authorized by data qualification alone.",
+  "training_gate": "A separate full-data certificate must verify every new sequence/residue map/source backbone and latent encoding before a prospectively specified matched training/profile comparison. No geometry supervision from unverified cached rows. Keep original512conditions unchanged. Preserve all prior development and locked-test exclusions; no evaluation labels enter training.",
+  "resources": "This first step is CPU-only metadata and sequence auditing. At most2CPUthreads, bounded searches, noGPUallocation. Any later data or training job must use the registered eight-GPU guard and measured walltime.",
+  "source_manifest": "runs/recovery_data_16384/manifest.json"
+}

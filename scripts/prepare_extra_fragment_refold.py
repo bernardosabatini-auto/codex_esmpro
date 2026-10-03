@@ -59,6 +59,7 @@ def audit_inputs(c,check_teacher=False):
         for r in c['dependencies']+c['teacher_artifacts']:
             if sha(r['path'])!=r['sha256']:raise ValueError('Changed teacher dependency')
     rows,selected,items,spec=screen(c)
+    if type(c.get('teacher_deterministic_algorithms',False)) is not bool or c.get('teacher_deterministic_algorithms',False)!=spec.get('teacher_deterministic_algorithms',False):raise ValueError('Unbound teacher execution policy')
     native=audit_native_reuse(c,items,spec)
     wanted=set(selected)|({('native',i,0) for i in c['target_ids']} if native is None else set())
     if c['num_sequences']!=8 or c['temperature']!=.1 or c['mpnn_seed']!=1 or c['precision']!='fp32':raise ValueError('Changed fixed teacher budget')
@@ -89,6 +90,7 @@ def main():
         output=Path(str(a.output_prefix)+f'_{k}.json').resolve();c={key:prior[key] for key in ('num_sequences','temperature','mpnn_seed','seed','mpnn','dependencies','teacher_artifacts','precision','usalign','usalign_sha256')};c.update(assay='extra_fragment_refold',partition=k,target_ids=ids,entries=[])
         for key,path in [('generation_manifest',indexpath),('protocol',Path(gc['protocol'])),('fragments',Path(fragments))]:c[key]=str(path);c[key+'_sha256']=sha(path)
         c['screen_rows'],selected,items,spec=screen(c);inputs=output.with_suffix('.h5')
+        if spec.get('teacher_deterministic_algorithms'):c['teacher_deterministic_algorithms']=True
         if spec.get('native_runs'):
             native_run=root/'runs'/spec['native_runs'][k];nm=json.loads((native_run/'manifest.json').read_text());reuse={}
             for key,path in [('manifest',native_run/'manifest.json'),('report',root/'reports'/(native_run.name+'.json')),('refolded',native_run/'refolded.h5'),('predictions',Path(nm['config']['predictions']))]:reuse[key]=str(path);reuse[key+'_sha256']=sha(path)

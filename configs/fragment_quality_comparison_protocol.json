@@ -1,0 +1,38 @@
+{
+  "purpose": "Matched fragment-quality intervention against random-condition control and6000parent.",
+  "generation_protocol": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/configs/fragment_quality_c20_validation_protocol.json",
+  "generation_protocol_sha256": "a8f218062c51eeb658117593343003d355b9a6af89e03189e1a3c9ea0ba65b3f",
+  "full_comparison": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/reports/broad_fragment_c20_center_comparison.json",
+  "parent_comparison": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/reports/fragment_short64_conditioning_comparison.json",
+  "full_arms": [],
+  "new_arms": [
+    "control",
+    "quality"
+  ],
+  "parent_arm": "control512",
+  "matched_pairs": [
+    {
+      "label": 7941,
+      "baseline": "control",
+      "candidate": "quality"
+    }
+  ],
+  "frontier_pairs": [
+    {
+      "label": 7941,
+      "baseline": "parent6000",
+      "candidate": "control"
+    },
+    {
+      "label": 7941,
+      "baseline": "parent6000",
+      "candidate": "quality"
+    }
+  ],
+  "primary": "Same valid refold passes both motif<=1A limits, globalTM>.5 and scaffold-onlyTM>.5, with raw validity and raw motif gates.256outputs/model, no failure removal.",
+  "designability": "Fixed32-family slot0panel for both new arms. Parent has no unbiased designability panel. Older full-model report only binds panel/native provenance; its model scores are not added to this comparison.",
+  "decision": "Require improved same-valid-refold motif/global/scaffold success over matched control and6000parent, across families without loss of designability. Report paired-family uncertainty and all failed outputs. A positive development result needs independent confirmation; no checkpoint selection or pooled attempts.",
+  "budget": "Eight fixed-motifCA-onlyMPNN designs per unique selected new backbone. Bothnewarms deterministicFP32teacher3loops50steps1sample; historical references unchanged. Generation noises paired; refold RNG not claimed paired across arms.",
+  "full_comparison_sha256": "cc92ffc6b3d94b23cd3349583cde9ec21036e157aba0942bff176ade98b04a65",
+  "parent_comparison_sha256": "87cd0248f509ecc78d1a017f10891d93839c752be2e61606799488fabacfab53"
+}

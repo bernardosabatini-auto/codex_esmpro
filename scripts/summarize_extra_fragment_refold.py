@@ -18,6 +18,7 @@ def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error'))
     c=m['config'];audit_inputs(c);records=score_assay(run);diversity=[]
+    if c.get('teacher_deterministic_algorithms') and m.get('teacher_deterministic_algorithms') is not True:raise ValueError('Declared deterministic teacher execution missing')
     if c.get('numerical_recovery'):
         from teacher_numerical_recovery import audit_recovery
         original=audit_recovery(c);control=m['recovery_control']

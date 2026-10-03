@@ -17,6 +17,7 @@ def main():
     a=p.parse_args();c=json.loads(a.config.read_text())
     from teacher_numerical_recovery import audit_recovery
     recovered=audit_recovery(c)
+    if c.get('teacher_deterministic_algorithms') and c.get('assay')!='extra_fragment_refold':raise ValueError('Undeclared deterministic teacher assay')
     for key in ('generation_manifest','predictions','protocol','usalign'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     for dep in c['dependencies']+c['teacher_artifacts']:
@@ -70,7 +71,8 @@ def main():
     start=time.monotonic();telemetry=None;m=dict(status='running',config=c,records=[],controls=[],sequences={},training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
     try:
         torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
-        if recovered is not None:torch.use_deterministic_algorithms(True)
+        if recovered is not None or c.get('teacher_deterministic_algorithms'):torch.use_deterministic_algorithms(True)
+        m['teacher_deterministic_algorithms']=torch.are_deterministic_algorithms_enabled()
         telemetry=Telemetry(a.output,True);backbones={}
         with h5py.File(c['predictions']) as f:
             for r in c['entries']:

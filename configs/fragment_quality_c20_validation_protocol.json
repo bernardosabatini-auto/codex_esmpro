@@ -1,0 +1,53 @@
+{
+  "encoded_cohort": "extra_fragment_data_50117443",
+  "selection": "fragment_extra_development_20261003",
+  "seed": 2026100351,
+  "historical_seed": 2026100211,
+  "samples": 4,
+  "steps": 50,
+  "decoder_steps": 3,
+  "batch_size": 4,
+  "guidance": 1,
+  "work_cap_seconds": 1080,
+  "controls": "Eachmodel reproduces its own four historical control families: latent1e-5,CA RMSD<=.2A,lDDT>=.99,and identical raw-validity/strict decisions. Every newfamily gets same-batch repeat<=1e-5and supplied-fragment rigid-pose latent control<=1e-4. No correction, noise retry, reflow, ranking, or strength sweep.",
+  "scope": "Repeated64-family development comparison. Training-condition quality alone differs between new arms; teacher-kernel policy is shared. No evaluation labels train either model. The6000parent and original native attempts are historical references, not new pooled budgets.",
+  "purpose": "Evaluate matched random-versus-higher-confidence training fragments after2000updates, with frozen generator.",
+  "parents": {
+    "control": "fragment_training_50162221",
+    "quality": "fragment_training_50162404"
+  },
+  "total_updates": {
+    "control": 8000,
+    "quality": 8000
+  },
+  "training_counts": {
+    "control": 7941,
+    "quality": 7941
+  },
+  "condition": "c20_center",
+  "refold_protocol": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/configs/fragment_quality_refold_protocol.json",
+  "refold_protocol_sha256": "1c4d051a85bc6ac9de3f1f8b92b783d29a8e415b86325a5c78c04a09cdde4f16",
+  "designability_panel": {
+    "families_per_length": 16,
+    "slot": 0,
+    "seed": 2026100377
+  },
+  "native_runs": [
+    "extra_fragment_refold_50120060",
+    "extra_fragment_refold_50120141",
+    "extra_fragment_refold_50120178",
+    "extra_fragment_refold_50120232"
+  ],
+  "matched_training_report": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/reports/fragment_quality_training_20261003.json",
+  "comparisons": [
+    {
+      "label": 7941,
+      "baseline": "control",
+      "candidate": "quality"
+    }
+  ],
+  "inventory": "Exactly256outputs/model,512total. Retain every numerical control and failure; no retry, ranker or noise selection.",
+  "refolding": "Union of all strict raw matches and the prospectively selected32-family slot0panel. Eight fixed-motif designs per unique backbone. Reuse the frozen64native budgets for this task. Same valid refold must satisfy global,scaffold and motif constraints.",
+  "resources": "Two independent oneRTX generation jobs,20minutes each; at most8own running-plus-pending GPUs.",
+  "teacher_deterministic_algorithms": true
+}

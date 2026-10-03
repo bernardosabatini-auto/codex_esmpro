@@ -20,10 +20,16 @@ def graph_layout(study):
         return ARMS, CONDITIONS
     if study == 'frozen':
         return ('control_frozen', 'broad_frozen'), ('c20_center',)
+    if study == 'quality':
+        return ('control', 'quality'), ('c20_center',)
     raise ValueError('Unknown fixed fragment study')
 
 
 def generation_paths(study, condition, arm):
+    if study == 'quality':
+        name = 'fragment_quality_eval_' + arm
+        return ('slurm/' + name + '_rtx.sbatch', 'runs/' + name + '_20261003.json',
+                'configs/fragment_quality_c20_validation_protocol.json')
     if study == 'frozen':
         name = 'fragment_frozen_eval_' + arm.removesuffix('_frozen')
         return ('slurm/' + name + '_rtx.sbatch', 'runs/' + name + '_20261003.json',
@@ -70,8 +76,10 @@ def advance(root, plan, jobs, watch, *, dry_run=False):
         frozen = json.loads((Path(byid[jid]['code_snapshot']) / 'entry_configs/0.json').read_text())
         if frozen['extension_arm'] != arm or frozen['profile_only'] or frozen['updates'] != 2000 or frozen['broad_corpus_protocol_sha256'] != plan['training_protocol_sha256']:
             raise ValueError('Wrong registered training parent')
-        if bool(frozen.get('freeze_trunk')) != (study == 'frozen'):
+        if bool(frozen.get('freeze_trunk')) != (study in ('frozen','quality')):
             raise ValueError('Wrong generator update policy')
+        if bool(frozen.get('condition_selection')) != (study == 'quality'):
+            raise ValueError('Wrong condition-selection policy')
         if completed_report(root, byid[jid], watch, 'fragment_training') is None:
             waiting_training = True
         parents.append(root / 'runs' / ('fragment_training_' + jid))
@@ -98,11 +106,11 @@ def advance(root, plan, jobs, watch, *, dry_run=False):
             return dict(status='active', phase='submission_guard_wait', script=script, error=str(error))
         return dict(status='active', phase='submitted', script=script,
                     submitted=json.loads(result.strip().splitlines()[-1])['submitted'])
-    comparison = root / ('reports/fragment_frozen_training_20261003.json' if study == 'frozen' else 'reports/broad_fragment_training_20261003.json')
+    comparison = root / dict(frozen='reports/fragment_frozen_training_20261003.json',quality='reports/fragment_quality_training_20261003.json',broad='reports/broad_fragment_training_20261003.json')[study]
     if not comparison.exists():
         if dry_run:
             return dict(status='active', phase='ready_training_comparison')
-        run(['scripts/compare_frozen_fragment_training.py' if study == 'frozen' else 'scripts/compare_broad_fragment_training.py', '--runs', *parents,
+        run([dict(frozen='scripts/compare_frozen_fragment_training.py',quality='scripts/compare_fragment_quality_training.py',broad='scripts/compare_broad_fragment_training.py')[study], '--runs', *parents,
              '--output', comparison.with_suffix('')])
         return dict(status='active', phase='training_compared')
     compared = json.loads(comparison.read_text())
@@ -133,7 +141,7 @@ def advance(root, plan, jobs, watch, *, dry_run=False):
         if any(completed_report(root, j, watch, 'extra_fragment_validation') is None for j in gen_jobs):
             all_done = False
             continue
-        refold_prefix = 'fragment_frozen_refold_' if study == 'frozen' else 'broad_refold_'
+        refold_prefix = dict(frozen='fragment_frozen_refold_',quality='fragment_quality_refold_',broad='broad_refold_')[study]
         prefix = 'runs/' + refold_prefix + condition
         configs = [Path(prefix + '_' + str(k) + '.json') for k in range(4)]
         if not all((root / c).exists() for c in configs):
@@ -173,11 +181,12 @@ def advance(root, plan, jobs, watch, *, dry_run=False):
         if any(completed_report(root, j, watch, 'extra_fragment_refold') is None for j in refolds):
             all_done = False
             continue
-        out = root / 'reports' / ('fragment_frozen_c20_comparison_20261003.json' if study == 'frozen' else 'broad_fragment_' + condition + '_comparison.json')
+        out = root / 'reports' / dict(frozen='fragment_frozen_c20_comparison_20261003.json',quality='fragment_quality_c20_comparison_20261003.json',broad='broad_fragment_' + condition + '_comparison.json')[study]
         if not out.exists():
             if dry_run:
                 return dict(status='active', phase='ready_refold_comparison', condition=condition)
-            run(['scripts/compare_frozen_fragment_refolds.py' if study == 'frozen' else 'scripts/compare_extra_fragment_refolds.py', '--runs',
+            extra=['--protocol','configs/fragment_quality_comparison_protocol.json'] if study=='quality' else []
+            run(['scripts/compare_frozen_fragment_refolds.py' if study in ('frozen','quality') else 'scripts/compare_extra_fragment_refolds.py', *extra, '--runs',
                  *[root / 'runs' / ('extra_fragment_refold_' + j['id']) for j in refolds],
                  '--output', out.with_suffix('')])
             return dict(status='active', phase='refolds_compared', condition=condition)
@@ -220,6 +229,6 @@ def tick(root, dry_run=False, study='broad'):
 if __name__ == '__main__':
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--dry-run', action='store_true')
-    p.add_argument('--study', choices=('broad','frozen'), default='broad')
+    p.add_argument('--study', choices=('broad','frozen','quality'), default='broad')
     a = p.parse_args()
     print(json.dumps(tick(Path(__file__).resolve().parents[1], a.dry_run, a.study)))

@@ -34,8 +34,8 @@ def project(reports, arms, *, rename=None, raw_only=False):
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--runs',type=Path,nargs=4,required=True)
-    parser.add_argument('--output',type=Path,required=True);args=parser.parse_args();root=Path(__file__).resolve().parents[1]
-    protocol=root/'configs/fragment_frozen_comparison_protocol.json';plan=json.loads(protocol.read_text())
+    parser.add_argument('--output',type=Path,required=True);parser.add_argument('--protocol',type=Path);args=parser.parse_args();root=Path(__file__).resolve().parents[1]
+    protocol=args.protocol or root/'configs/fragment_frozen_comparison_protocol.json';plan=json.loads(protocol.read_text())
     for key in ('generation_protocol','full_comparison','parent_comparison'):
         if sha(plan[key])!=plan[key+'_sha256']:raise ValueError('Changed declared comparison source')
     new,configs,spec,sources=load_partitions(root,[root/'reports'/(p.name+'.json') for p in args.runs])
@@ -75,6 +75,7 @@ def main():
                 frontier_summaries=frontier_summaries,frontier_paired_family_contrasts=frontier_contrasts,
                 new_refolds=sum(d['completed_refolds'] for d in new),reused_full_model_refolds=len(fr)*8,
                 numerical_recoveries=[d['numerical_recovery'] for d in new if d.get('numerical_recovery')],
+                teacher_deterministic_algorithms=[bool(c.get('teacher_deterministic_algorithms')) for c in configs],
                 reused_parent_model_refolds=len(pr)*8,native_controls=native,
                 successful_scaffold_diversity=[r for d in new for r in d['successful_scaffold_diversity']],
                 scope='Repeated64-family development panel, not independent confirmation. Full256sample denominators. Same-refold motif/global/scaffold gates. Fixed32-panel designability only for new and matched-full arms; parent lacks this panel. Original eight-attempt budgets reused without pooling; teacher RNG is not claimed paired. No evaluation labels train models.')
@@ -84,6 +85,8 @@ def main():
            '|---|---:|---:|---:|---:|']
     if result['numerical_recoveries']:
         lines[2]+=' One failed numerical partition was replaced using deterministic algorithms, unchanged sequences/seeds and original-output parity below0.01A. Failed and diagnostic attempts are excluded from scoring.'
+    if any(result['teacher_deterministic_algorithms']):
+        lines[2]+=' New paired arms use prospectively declared deterministicFP32 teacher execution; historical control outputs are reused unchanged. This changes numerical execution, not teacher weights, steps or design budgets.'
     panel_counts={r['arm']:r['valid_designable'] for r in designability['summaries'] if r['cohort']=='all'}
     allrows=[r for r in frontier_summaries if r['cohort']=='all' and r['arm']=='parent6000']+[r for r in summaries if r['cohort']=='all']
     for r in allrows:

@@ -16,6 +16,14 @@ def audit_refold_plan(spec):
     if sha(spec['refold_protocol']) != spec['refold_protocol_sha256']:
         raise ValueError('Changed prospective refold plan')
     plan = json.loads(Path(spec['refold_protocol']).read_text())
+    if type(spec.get('teacher_deterministic_algorithms',False)) is not bool or spec.get('teacher_deterministic_algorithms',False)!=plan.get('teacher_deterministic_algorithms',False):
+        raise ValueError('Changed teacher execution policy')
+    if spec.get('teacher_deterministic_algorithms'):
+        evidence=Path(spec['refold_protocol']).parent.parent/plan['teacher_execution_evidence']
+        if sha(evidence)!=plan['teacher_execution_evidence_sha256']:raise ValueError('Changed teacher execution evidence')
+        d=json.loads(evidence.read_text())
+        if d['status']!='complete' or not d['deterministic_algorithms'] or d['failed_pairs'] or d['max_pair_ca_rmsd']>.01 or any(r['ca_rmsd']>.01 or r['ca_lddt']<.999 for r in d['original_comparisons']):
+            raise ValueError('Unqualified deterministic teacher execution')
     if spec['designability_panel'] != plan['designability_panel'] or spec['native_runs'] != plan['native_runs'][spec['condition']]:
         raise ValueError('Changed declared panel or native sources')
 

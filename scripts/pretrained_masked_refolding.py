@@ -16,17 +16,47 @@ def require_quality(d):
         or not all(checks.values()) or not d['refold_gate']['qualified'] or not d['qualified']):raise ValueError('Predeclared repair capacity/geometry gate failed')
 
 
+
+def require_clock_quality(d,spec):
+    from scaffold_clock_training_core import quality_gate
+    if (d.get('status')!='complete' or d.get('profile_only') or not d.get('scaffold_clock')
+            or d.get('pretrained_masked') or not d.get('numerically_qualified') or d.get('updates')!=spec['updates']):
+        raise ValueError('Completed audited full scaffold-clock experiment required')
+    ids=sorted({r['target_id'] for r in d['records']})
+    gate=quality_gate(d['summary'],d['records'],ids,spec)
+    if not gate['qualified'] or gate!=d.get('refold_gate') or not d.get('qualified'):
+        raise ValueError('Predeclared whole-chain capacity/geometry gate failed')
+
+
+def study_of(c):
+    studies=[s for s in ('pretrained_masked','scaffold_clock') if c.get(s+'_refold') is True]
+    if len(studies)!=1:raise ValueError('Exactly one bound repair study required')
+    return studies[0]
+
+
+def qualify_training(gc,d,study,*,audit_sources=True):
+    if study=='scaffold_clock':
+        from scaffold_clock_training_core import audit as audit_clock
+        if audit_sources:audit_clock(gc)
+        require_clock_quality(d,gc['spec'])
+    elif study=='pretrained_masked':
+        if audit_sources:audit_training(gc)
+        require_quality(d)
+    else:raise ValueError('Unknown repair study')
+
+
 def audit_refold(c,*,audited_generation=None):
     from prepare_fragment_preference_refold import audit_inputs
+    study=study_of(c)
     for key in ('generation_manifest','generation_report','generated_predictions','predictions','protocol','baseline_refold_manifest','baseline_refold_report'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed masked-refold input: '+key)
-    gm=json.loads(Path(c['generation_manifest']).read_text());gc=gm['config'];d=json.loads(Path(c['generation_report']).read_text());spec=gc['spec'];require_quality(d)
+    gm=json.loads(Path(c['generation_manifest']).read_text());gc=gm['config'];d=json.loads(Path(c['generation_report']).read_text());spec=gc['spec'];qualify_training(gc,d,study,audit_sources=audited_generation is None)
     bm=json.loads(Path(c['baseline_refold_manifest']).read_text());bd=json.loads(Path(c['baseline_refold_report']).read_text());bc=bm['config']
     if audited_generation is None:
-        audit_training(gc);original,unused=audit_inputs(bc)
+        original,unused=audit_inputs(bc)
     else:
         original=json.loads(Path(bc['generation_manifest']).read_text())['config']
-    result=dict(gc,arm=c['arm'],prediction_group=c['arm'],pretrained_masked_refold=True,native_sources=original['native_sources'])
+    result=dict(gc,arm=c['arm'],prediction_group=c['arm'],native_sources=original['native_sources']);result[study+'_refold']=True
     if audited_generation is not None and audited_generation!=(result,spec):raise ValueError('Changed previously audited masked generation')
     if (gm['status']!='complete' or gm['config']['profile_only'] or d['manifest_sha256']!=c['generation_manifest_sha256'] or d['predictions_sha256']!=c['generated_predictions_sha256'] or gm['predictions_sha256']!=c['generated_predictions_sha256']
         or d['protocol_sha256']!=c['protocol_sha256'] or c['protocol']!=gc['protocol'] or d['controls']!=128
@@ -51,13 +81,14 @@ def audit_refold(c,*,audited_generation=None):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--generation',type=Path,required=True);p.add_argument('--baseline-run',type=Path,required=True);p.add_argument('--output-prefix',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];run=a.generation.resolve();base=a.baseline_run.resolve()
-    gm=json.loads((run/'manifest.json').read_text());gc=gm['config'];audit_training(gc);report=root/'reports'/(run.name+'.json');require_quality(json.loads(report.read_text()));prior=json.loads((base/'manifest.json').read_text())['config']
+    p=argparse.ArgumentParser();p.add_argument('--study',choices=('pretrained_masked','scaffold_clock'),default='pretrained_masked');p.add_argument('--generation',type=Path,required=True);p.add_argument('--baseline-run',type=Path,required=True);p.add_argument('--output-prefix',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];run=a.generation.resolve();base=a.baseline_run.resolve()
+    gm=json.loads((run/'manifest.json').read_text());gc=gm['config'];report=root/'reports'/(run.name+'.json');qualify_training(gc,json.loads(report.read_text()),a.study);prior=json.loads((base/'manifest.json').read_text())['config']
     for arm in ('generated_cond','generated_null'):
         cached=None
         for partition in range(4):
             path=Path(str(a.output_prefix)+f'_{arm}_{partition}.json').resolve();inputs=path.with_suffix('.h5');c={k:prior[k] for k in TEACHER_KEYS}
-            c.update(pretrained_masked_refold=True,assay='fragment_preference_refold',arm=arm,partition=partition,expected_backbones=32,entries=[],allocation_minutes=35,work_cap_seconds=2010,teacher_deterministic_algorithms=True)
+            c[a.study+'_refold']=True
+            c.update(assay='fragment_preference_refold',arm=arm,partition=partition,expected_backbones=32,entries=[],allocation_minutes=35,work_cap_seconds=2010,teacher_deterministic_algorithms=True)
             for key,value in [('generation_manifest',run/'manifest.json'),('generation_report',report),('generated_predictions',run/'predictions.h5'),('protocol',gc['protocol']),('baseline_refold_manifest',base/'manifest.json'),('baseline_refold_report',root/'reports'/(base.name+'.json'))]:c[key]=str(value);c[key+'_sha256']=sha(value)
             with h5py.File(gc['fragments']) as fr,h5py.File(run/'predictions.h5') as gen,h5py.File(inputs,'x') as out:
                 for row in (r for r in gc['selected'] if r['partition']==partition):

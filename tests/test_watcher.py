@@ -123,7 +123,7 @@ class WatcherTests(unittest.TestCase):
 
     def test_generation_diagnostics_route_to_cpu_audit(self):
         (self.root/'reports').mkdir()
-        for prefix in ['roundtrip_designability','fragment_frame','fragment_target_frame']:
+        for prefix in ['roundtrip_designability','fragment_frame','fragment_target_frame','extra_fragment_data','extra_fragment_validation','extra_fragment_refold','broad_fragment_data','broad_codec_batch']:
             job=dict(id='123',completion_action='summarize_'+prefix)
             with patch.object(watch,'run_monitored_analysis') as run,patch('start_state_scoring.start') as start:
                 result=watch.followup(self.root,job,dict(python='python'))

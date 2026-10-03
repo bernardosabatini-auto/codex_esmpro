@@ -1,0 +1,10 @@
+{
+  "purpose": "Complete the strict64sample screen for weighted512 at4000totalupdates, preserving the independently run fixed-panel assay.",
+  "sources": [["weighted512", "fragment_training_50059766", "development/conditioned"]],
+  "expected_backbones": 6,
+  "selection": "All64outputs are screened using the unchanged proper-rotation raw criterion. Three raw matches:1BFYslot2,1BM5slot1,1CB9slot3. None overlaps the fixed-panel generated samples. Refold every match and its corresponding fixed-motif native control:48newrefolds. Every raw failure remains a failure in the64sample denominator.",
+  "control": "Plain51249985054has an audited0/64strict result in49996435and an unchanged fixed-panel assay49993768. Reuse that result and its8design budget; do not regenerate its failed backbone or pool attempts. Matched2000training draws and384initial outputs were verified in fragment_weight_breadth_comparison_50059766.",
+  "assay": "EightCA-onlyProteinMPNN designs perbackbone,T.1,seed1,fixed supplied motif amino acids; same guardedFP32teacher3loops50steps1sample. A SAME coarse-valid refold must retain proper motif RMSD<=1A and motifdRMS<=1A while reaching globalTM>0.5. Allthree fixed-motif native controls must be evaluated and reported.",
+  "supplementary": "Apply configs/fragment_scaffold_agreement_protocol.json to all48refolds: require scaffold-onlyTM>0.5 in that SAME qualifying refold. Preserve primary outcomes separately. No post-refolding threshold or selection change.",
+  "scope": "Development feasibility with reused families, not independent generalization. No development refolds become training labels. No seed, guidance or temperature sweep. OneRTX10minutes; atmost8ownrunning-plus-pending GPUs."
+}

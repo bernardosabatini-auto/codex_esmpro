@@ -1,0 +1,9 @@
+{
+  "purpose": "Separate agreement on the generated scaffold from agreement contributed by the supplied fragment.",
+  "motivation": "Fresh-noise validation50057480 meets its preregistered whole-chain criterion, but first qualifying P62593refolds have scaffold-only TM0.468and0.538. Long supplied motifs can materially raise whole-chain TM. This diagnostic was introduced after those outcomes and must be labeled post-hoc on them.",
+  "primary": "Preserve all existing raw-validity, proper motif RMSD<=1A, motif dRMS<=1A, and same valid refold whole-chainTM>0.5 outcomes unchanged.",
+  "supplementary": "Remove the supplied fragment positions from BOTH generated and refolded CA arrays. Use fixed residue correspondence and US-align TM-optimal superposition, normalized by remaining scaffold length. Require scaffold-onlyTM>0.5 in the SAME refold that meets every primary condition. Consider exactly the existing8designs per backbone. No new sequences, refolds or changed thresholds.",
+  "denominators": "Keep every screened generation in its original denominator, including raw failures. One generated backbone counts at most once. Whole-panel64and selected-case16views overlap and remain separate. Native fixed-motif controls receive the same calculation.",
+  "diversity": "Report diversity of first qualifying refolds separately for the original and supplementary definitions. If fewer than two generated backbones qualify, diversity under that definition is undefined. Never choose alternative refolds to maximize diversity.",
+  "application": "Post-hoc on50057480and all earlier assays. Prospective supplementary endpoint for the weighted512refolding assay after training50059766; this declaration precedes its refolding outcomes. The original training and primary-assay protocols remain unchanged."
+}

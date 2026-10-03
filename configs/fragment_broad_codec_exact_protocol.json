@@ -1,0 +1,19 @@
+{
+  "purpose": "Retest batch16with exactly equal sequence lengths after the padded codec profile failed numerical parity. All prior tolerances and qualification decisions remain unchanged; no padding is permitted.",
+  "parent": "broad_fragment_data_50118830",
+  "batch_size": 16,
+  "length_multiple": 1,
+  "seed": 2026100363,
+  "decoder_steps": 3,
+  "precision": "fp32",
+  "historical_latent_max_abs": 1e-05,
+  "encoded_max_abs": 0.0001,
+  "decoded_ca_rmsd_max": 0.01,
+  "decoded_ca_lddt_min": 0.999,
+  "work_cap_seconds": 780,
+  "max_reserved_GiB": 75,
+  "controls": "All64full-chain and576previous fragment outputs must match the single-item pilot under the numerical tolerances and preserve every full-endpoint and fragment-roundtrip qualification decision, including all failures. Four historical normalized fragment codes must match. Do not change precision,seeds,noise streams,or source arrays.",
+  "new_conditions": "For these64training-only sources, add exactly20residue crops at left,center,and right. Crop before FP64canonicalization/encoding. At least90percent of192new isolated roundtrips must satisfy properCA RMSD/dRMS<=.5A. These are candidate additive training conditions; existing512proteins and their nine archived conditions will remain unchanged.",
+  "scope": "Data-preparation efficiency and input feasibility only. No model training or designability claim. A separate full-data protocol must fix filtering,coverage,conditions,and paired training controls before expansion.",
+  "failed_padding_profile": "broad_codec_batch_50121087"
+}

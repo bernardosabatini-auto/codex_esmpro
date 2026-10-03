@@ -7,9 +7,11 @@ from .backbone import encode_backbone
 from .flow import target_noise
 
 
-def pack_backbones(items,device):
+def pack_backbones(items,device,length_multiple=32):
     if not items:raise ValueError('Empty codec batch')
-    lengths=[len(r['backbone']) for r in items];width=32*math.ceil(max(lengths)/32)
+    if length_multiple not in (1,32):raise ValueError('Undeclared codec length grouping')
+    lengths=[len(r['backbone']) for r in items];width=length_multiple*math.ceil(max(lengths)/length_multiple)
+    if length_multiple==1 and len(set(lengths))!=1:raise ValueError('Exact-length batch cannot contain padding')
     x=torch.zeros(len(items),width,4,3,dtype=torch.float32,device=device);mask=torch.arange(width,device=device)[None]<torch.tensor(lengths,device=device)[:,None]
     for i,r in enumerate(items):
         value=np.asarray(r['backbone'])
@@ -19,15 +21,15 @@ def pack_backbones(items,device):
 
 
 @torch.no_grad()
-def run_codec_batches(decoder,items,*,batch_size,seed):
+def run_codec_batches(decoder,items,*,batch_size,seed,length_multiple=32):
     keys=[r['key'] for r in items]
     if len(set(keys))!=len(keys) or batch_size<1:raise ValueError('Duplicated codec item or invalid batch')
     buckets={}
-    for item in items:buckets.setdefault(32*math.ceil(len(item['backbone'])/32),[]).append(item)
+    for item in items:buckets.setdefault(length_multiple*math.ceil(len(item['backbone'])/length_multiple),[]).append(item)
     results={};batches=[]
     for width,group in sorted(buckets.items()):
         for start in range(0,len(group),batch_size):
-            chunk=group[start:start+batch_size];torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic();x,mask,lengths=pack_backbones(chunk,'cuda');encoded=encode_backbone(decoder,x,mask);z=F.layer_norm(encoded,(8,));noise=torch.zeros(len(chunk),4*width,3,device='cuda')
+            chunk=group[start:start+batch_size];torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic();x,mask,lengths=pack_backbones(chunk,'cuda',length_multiple=length_multiple);encoded=encode_backbone(decoder,x,mask);z=F.layer_norm(encoded,(8,));noise=torch.zeros(len(chunk),4*width,3,device='cuda')
             for i,r in enumerate(chunk):
                 n=lengths[i]
                 if r.get('reference_latent') is not None:

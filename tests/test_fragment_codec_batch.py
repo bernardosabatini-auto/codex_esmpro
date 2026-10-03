@@ -15,3 +15,9 @@ class CodecPackingTests(unittest.TestCase):
         for x in (np.ones((5,3,3)),np.full((5,4,3),np.nan)):
             with self.assertRaises(ValueError):pack_backbones([dict(backbone=x)],'cpu')
         with self.assertRaises(ValueError):pack_backbones([],'cpu')
+
+    def test_exact_length_mode_forbids_padding(self):
+        a=dict(backbone=np.ones((5,4,3),np.float32));b=dict(backbone=np.ones((6,4,3),np.float32))
+        x,mask,lengths=pack_backbones([a,a],'cpu',length_multiple=1)
+        self.assertEqual(tuple(x.shape),(2,5,4,3));self.assertTrue(mask.all())
+        with self.assertRaises(ValueError):pack_backbones([a,b],'cpu',length_multiple=1)

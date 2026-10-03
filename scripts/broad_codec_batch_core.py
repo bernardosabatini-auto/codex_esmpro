@@ -10,6 +10,9 @@ def audit(c):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed codec batch source')
     spec=json.loads(Path(c['protocol']).read_text());pm=json.loads(Path(c['parent_manifest']).read_text());pd=json.loads(Path(c['parent_report']).read_text())
     if spec!=c['spec'] or Path(c['parent_manifest']).parent.name!=spec['parent'] or pm['status']!='complete' or pd['status']!='complete' or not pd['data_gate_passed'] or pd['manifest_sha256']!=c['parent_manifest_sha256'] or pd['fragments_sha256']!=c['parent_fragments_sha256'] or pm['config']['decoder_checkpoint']!=c['decoder_checkpoint'] or pm['config']['historical_fragments']!=c['historical_fragments']:raise ValueError('Unqualified batch parent')
+    if spec.get('failed_padding_profile'):
+        path=Path(c['failed_padding_report']);failed=json.loads(path.read_text())
+        if sha(path)!=c['failed_padding_report_sha256'] or path.stem!=spec['failed_padding_profile'] or failed['status']!='complete' or failed['profile_qualified'] or spec['length_multiple']!=1:raise ValueError('Changed failed-padding evidence')
     return pm
 
 

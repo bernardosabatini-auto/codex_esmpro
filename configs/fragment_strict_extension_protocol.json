@@ -1,0 +1,14 @@
+{
+  "purpose": "Refold every strict raw match from the final matched duration test, retaining64generated samples perarm and eight designs perbackbone.",
+  "sources": [
+    ["plain_extended", "fragment_training_50042807", "development/conditioned"],
+    ["weighted_extended", "fragment_training_50043086", "development/conditioned"]
+  ],
+  "covered_assays": [
+    ["plain_extended", "runs/trained_fragment_designability_extension_plain.json", "trained_fragment_designability_50050141", "fragment_fixed_positive_49906292"]
+  ],
+  "expected_backbones": 6,
+  "screening": "Recompute all64outputs perarm. The plain1CB9slot1match is already covered by its unchanged fixed assay: reuse those eight refolds and its audited fixed-motif native control. Refold all three weighted matches (P12758slot0,P62593slot3,1BFYslot0) and their three corresponding fixed-motif native controls.48newrefolds;16reusedrefolds. No repeated generated sample or pooled sequence budgets.",
+  "audit": "Bind source checkpoints/reports, exact raw and motif arrays, planned overlapping assay and teacher recipe. Recompute all scores; require retention and global agreement in the SAME valid refold. Keep native-control failures visible. Every raw failure remains a strict failure in the64sample denominator.",
+  "interpretation": "Exploratory complete-screen follow-up on reused development families, not a replacement for the fixed-panel assays or a population generalization estimate. No development refold becomes a training label. Global designability of unrefolded raw failures is not measured."
+}

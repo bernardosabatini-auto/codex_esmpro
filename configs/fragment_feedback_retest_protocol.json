@@ -1,0 +1,10 @@
+{
+  "purpose": "Test whether the improved explicitly conditioned parent produces enough measured, training-only feedback targets. This is a new parent contrast, not a rescue of the failed original collection.",
+  "parent": "fragment_training_50043086",
+  "original_collection": "fragment_feedback_49941786",
+  "panel": "Exactly the original eight training families and first two archived noise slots, with unchanged center30 fragments and native controls. Sixteen generated plus eight reference backbones,192fresh refolds,8designs each. No development labels, no selection by current outcome, no pooled historical sequence attempts.",
+  "target": "Generated backbone must be coarse-valid. Choose first sequence-index refold that is coarse-valid, has globalTM>0.5 AND scaffold-onlyTM>0.5 to the generated backbone, and proper motifCA RMSD<=1A AND dRMS<=1A to the supplied fragment. All conditions must hold in the SAME refold. The scaffold score excludes supplied motif residues with fixed correspondence. A repaired raw motif is a training label, never relabeled strict retention.",
+  "gates": "At least8of16generated backbones spanning4of8families qualify, at least6of8native controls have valid global and scaffold agreement in the same refold, and all8numerical repeats pass. These retain original yield/coverage thresholds and add scaffold agreement. Failed collection closes without increased sequence budget or selected-family filtering.",
+  "resources": "Use original completed192refold collection as measured resource profile: identical24backbone lengths, teacher recipe, hardware partition and sequence budget. Conservative allocation from prior actual elapsed time with50percent headroom and180seconds startup, minimum10minutes. OneRTX;max75GiB;atmost8ownrunning-plus-pending GPUs.",
+  "downstream": "Only after collection qualifies, verify canonical AE roundtrip of repaired targets and preserve exact isolated-fragment provenance before matched reference/repaired-target training. Report computational teacher consistency; no independent benchmark or experimental function claim. Keep original failed collection intact."
+}

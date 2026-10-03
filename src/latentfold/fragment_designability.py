@@ -26,11 +26,15 @@ def same_refold_success(raw, refolds):
     return dict(raw_gate_passed=raw_ok,strict_joint_success=raw_ok and bool(same),successful_refold_indices=same,legacy_drms_joint_success=bool(raw['coarse_valid'] and raw['motif_drms']<=1 and legacy),valid_designable=bool(raw['coarse_valid'] and any(r['sc_tm']>.5 and r['coarse_valid'] for r in refolds)))
 
 
-def first_repaired_target(raw,refolds):
+def first_repaired_target(raw,refolds,require_scaffold=False):
     """A same-refold training label, distinct from raw motif retention success."""
     outcome=same_refold_success(raw,refolds)
-    if not raw['coarse_valid'] or not outcome['successful_refold_indices']:return None
-    return outcome['successful_refold_indices'][0]
+    passing=outcome['successful_refold_indices']
+    if require_scaffold:
+        if any(not np.isfinite(r['scaffold_tm']) or not 0<=r['scaffold_tm']<=1 for r in refolds):raise ValueError('Invalid scaffold agreement')
+        passing=[k for k in passing if refolds[k]['scaffold_tm']>.5]
+    if not raw['coarse_valid'] or not passing:return None
+    return passing[0]
 
 
 def motif_error(bb,ref,keep):

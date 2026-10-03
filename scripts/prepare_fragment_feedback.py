@@ -19,6 +19,9 @@ def audit_inputs(c):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     for r in c['dependencies']+c['teacher_artifacts']:
         if sha(r['path'])!=r['sha256']:raise ValueError('Changed teacher dependency')
+    if c.get('feedback_revision')=='weighted6000_scaffold':
+        from prepare_fragment_feedback_retest import audit_retest
+        return audit_retest(c)
     if Path(c['generation_manifest']).parent.name!='fragment_training_49929751':raise ValueError('Unregistered feedback source')
     m=json.loads(Path(c['generation_manifest']).read_text());d=json.loads(Path(c['training_report']).read_text())
     if m['status']!='complete' or m['updates']!=2000 or m['config']['arm']!='full' or m['config'].get('variant')!='geometry' or m['config'].get('auxiliary_motif') or d['manifest_sha256']!=c['generation_manifest_sha256'] or d['status']!='complete' or c['fragments_sha256']!=m['config']['fragments_sha256']:raise ValueError('Invalid feedback parent')

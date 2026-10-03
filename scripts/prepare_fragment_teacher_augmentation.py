@@ -11,11 +11,11 @@ def audit_config(c):
     spec=json.loads(Path(c['protocol']).read_text());m=json.loads(Path(c['parent_manifest']).read_text())
     if spec!=c['spec'] or m['status']!='complete' or Path(c['parent_manifest']).parent.name!=spec['parent'] or m['config']['fragments_sha256']!=c['fragments_sha256'] or m['config']['decoder_checkpoint_sha256']!=c['decoder_checkpoint_sha256']:raise ValueError('Changed parent or augmentation recipe')
     with h5py.File(c['fragments']) as fr,h5py.File(c['candidates']) as candidates:
-        if len(fr['train'])!=128 or set(candidates)!=set(fr['train']) or set(candidates)&set(fr['development']):raise ValueError('Changed training-only coverage')
+        if len(fr['train'])!=spec.get('training_protein_count',128) or set(candidates)!=set(fr['train']) or set(candidates)&set(fr['development']):raise ValueError('Changed training-only coverage')
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];protocol=root/'configs/fragment_teacher_augmentation_protocol.json';spec=json.loads(protocol.read_text());inventory=root/spec['inventory'];d=json.loads(inventory.read_text());fragments=root/spec['fragments'];parent=root/'runs'/spec['parent']/'manifest.json';m=json.loads(parent.read_text());inputs=a.output.with_suffix('.h5').resolve();c=dict(spec=spec)
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--protocol',type=Path);a=p.parse_args();root=Path(__file__).resolve().parents[1];protocol=a.protocol or root/'configs/fragment_teacher_augmentation_protocol.json';spec=json.loads(protocol.read_text());inventory=root/spec['inventory'];d=json.loads(inventory.read_text());fragments=root/spec['fragments'];parent=root/'runs'/spec['parent']/'manifest.json';m=json.loads(parent.read_text());inputs=a.output.with_suffix('.h5').resolve();c=dict(spec=spec)
     if d['status']!='complete':raise ValueError('Incomplete teacher inventory')
     for s in d['source_shards']:
         if sha(s['manifest'])!=s['manifest_sha256'] or sha(s['labels'])!=s['labels_sha256']:raise ValueError('Changed cached teacher shard')
@@ -41,7 +41,7 @@ def main():
     finally:
         for f in handles.values():f.close()
     for key,path in [('protocol',protocol),('inventory',inventory),('fragments',fragments),('parent_manifest',parent),('decoder_checkpoint',Path(m['config']['decoder_checkpoint'])),('candidates',inputs)]:c[key]=str(path);c[key+'_sha256']=sha(path)
-    audit_config(c);a.output.write_text(json.dumps(c,indent=2)+'\n');print('Bound original128proteins and cached candidate states')
+    audit_config(c);a.output.write_text(json.dumps(c,indent=2)+'\n');print('Bound',spec.get('training_protein_count',128),'original proteins and cached candidate states')
 
 
 if __name__=='__main__':main()

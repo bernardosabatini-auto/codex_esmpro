@@ -1,0 +1,17 @@
+{
+  "purpose": "Test replication of compatible-endpoint augmentation on the existing512-protein corpus at matched6000total training updates. New joint-success and scaffold-diversity evidence from128proteins motivates this fixed breadth test.",
+  "fragments": "runs/fragment_data_49981806/fragments.h5",
+  "inventory": "reports/fragment_teacher_target_inventory_20261003.json",
+  "parent": "fragment_training_50059766",
+  "seed": 2026100303,
+  "mixture_probability": 0.5,
+  "data": "Use only original inventory states with mean pLDDT>=.8,coarse-valid source geometry,and both proper motifRMSD/dRMS<=.5A to unchanged isolated fragments. Preserve supplied amino acids and residue mapping. Decode every candidate teacher latent through frozen FP32AE3. A condition/state pair is retained only if decoded output is coarse-valid,wholeCA RMSD<=1A to source teacher,and motifproperRMSD/dRMS<=1A. Retain all failures and source states; no new teacher labeling.",
+  "data_gate": "All decoder repeat controls must satisfyCA RMSD<=.01A,lDDT>=.999;max75GiB. At least256of512proteins must retain two states for some condition, and at least128proteins must have a retained pair with scaffold-only properRMSD>1A. These are target-coverage/variation gates,not designability evidence. No filtering of original proteins or conditions; absent eligible alternatives fall back to original target.",
+  "training": "Continue weighted512parent from4000to6000totalupdates. After data qualification, profile a reference continuation and a50percent-compatible-endpoint candidate with identical initialization,seed2026100301,schedule,primary draws,and batches. Original targets remain available everywhere and on all dropped-condition examples. Independent endpoint RNGseed2026100303. Both arms receive2000new updates, with fresh optimizer and unchanged schedule; no further automatic duration.",
+  "evaluation": "Original strict raw and same-valid-refold designability criteria,plus scaffold-onlyTM>0.5 in that same refold. Full fixed288refold assay and supplementary raw-pass refolds for the candidate, using the concurrent matched control. Compare successful-backbone diversity only among qualifying samples. Locked tests untouched; repeated development feasibility only. Retain original32training capacity and16development families. Any positive outcome requires prospective fresh-noise replication. Whole-panel denominators remain64, no post-hoc family filtering.",
+  "resources": "OneRTX15minute data pilot,780second worker limit,batch4AE decoding. Then oneRTX40update training profile before measured full allocation. No more than8ownrunning-plus-pending GPUs.",
+  "training_protein_count": 512,
+  "min_multistate_proteins": 256,
+  "min_diverse_proteins": 128,
+  "training_seed": 2026100301
+}

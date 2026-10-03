@@ -10,10 +10,10 @@ from prepare_overfit import sha
 def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error'),training_gate_passed=False)
-    c=m['config'];audit_config(c)
+    c=m['config'];audit_config(c);count=c['spec'].get('training_protein_count',128)
     if m['training_updates_executed'] or m['targets_sha256']!=sha(run/'targets.h5') or m['peak_reserved_GiB']>75:raise ValueError('Changed data job outputs')
     index={(r['target_id'],r['condition']):r for r in m['records']};rows=[];wanted_controls=set()
-    if len(index)!=1152 or len(m['records'])!=1152:raise ValueError('Changed full condition coverage')
+    if len(index)!=9*count or len(m['records'])!=9*count:raise ValueError('Changed full condition coverage')
     with h5py.File(c['candidates']) as src,h5py.File(c['fragments']) as fr,h5py.File(run/'targets.h5') as out:
         if set(out)!=set(src):raise ValueError('Changed full protein coverage')
         for ident,g in src.items():
@@ -30,8 +30,8 @@ def analyze(run):
                 rows.append(dict(target_id=ident,condition=condition,source_states=len(base),retained_states=len(accepted),max_scaffold_rmsd=difference))
     controls=m['controls']
     if len(controls)!=len(wanted_controls) or {r['target_id'] for r in controls}!=wanted_controls or any(r['ca_rmsd']>.01 or r['ca_lddt']<.999 for r in controls):raise ValueError('Missing or failed repeat controls')
-    multiple={r['target_id'] for r in rows if r['retained_states']>=2};diverse={r['target_id'] for r in rows if r['max_scaffold_rmsd'] is not None and r['max_scaffold_rmsd']>1};gate=len(multiple)>=64 and len(diverse)>=32
-    return dict(status='complete',manifest_sha256=sha(path),targets_sha256=m['targets_sha256'],training_gate_passed=gate,proteins=128,conditions=1152,source_condition_state_pairs=sum(r['source_states'] for r in rows),retained_condition_state_pairs=sum(r['retained_states'] for r in rows),eligible_conditions=sum(r['retained_states']>0 for r in rows),proteins_with_multiple_states=len(multiple),proteins_with_scaffold_pair_over_1A=len(diverse),repeat_controls=len(controls),peak_reserved_GiB=m['peak_reserved_GiB'],elapsed_seconds=m['elapsed_seconds'],records=rows,scope='Training-only endpoints. Original examples remain available for every condition. Roundtrip quality and diversity do not establish generated-sample designability; matched downstream refolding is required.')
+    multiple={r['target_id'] for r in rows if r['retained_states']>=2};diverse={r['target_id'] for r in rows if r['max_scaffold_rmsd'] is not None and r['max_scaffold_rmsd']>1};gate=len(multiple)>=c['spec'].get('min_multistate_proteins',64) and len(diverse)>=c['spec'].get('min_diverse_proteins',32)
+    return dict(status='complete',manifest_sha256=sha(path),targets_sha256=m['targets_sha256'],training_gate_passed=gate,proteins=count,conditions=9*count,source_condition_state_pairs=sum(r['source_states'] for r in rows),retained_condition_state_pairs=sum(r['retained_states'] for r in rows),eligible_conditions=sum(r['retained_states']>0 for r in rows),proteins_with_multiple_states=len(multiple),proteins_with_scaffold_pair_over_1A=len(diverse),repeat_controls=len(controls),peak_reserved_GiB=m['peak_reserved_GiB'],elapsed_seconds=m['elapsed_seconds'],records=rows,scope='Training-only endpoints. Original examples remain available for every condition. Roundtrip quality and diversity do not establish generated-sample designability; matched downstream refolding is required.')
 
 
 def main():

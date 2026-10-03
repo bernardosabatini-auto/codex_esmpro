@@ -10,7 +10,7 @@ The generated backbone must be valid and retain the fragment. One of eight desig
 
 - The weighted 6,000-update model produced one strict success among 64 fixed-noise development samples; that success also passes scaffold agreement.
 - Fresh-noise testing gives one scaffold-qualified success among 64 whole-panel samples for both weighted and plain models. In the selected P62593 case, weighted achieves 1/16 versus plain 0/16. These views overlap and cannot be pooled.
-- The new augmented model produced two scaffold-qualified P62593 backbones in a fresh 16-sample ensemble. Their first qualifying refolds have global TM 0.342 and scaffold-only TM 0.200. This establishes a two-backbone feasibility result for one selected development family, not broad conformational coverage.
+- The new augmented model produced two scaffold-qualified P62593 backbones in a fresh 16-sample ensemble. Their first qualifying refolds have global TM 0.342 and scaffold-only TM 0.200. The qualifying designed sequences share 39.9% identity overall and retain the same supplied motif; this measures scaffold-design diversity across sequences. This establishes a two-backbone feasibility result for one selected development family, not broad conformational coverage.
 - Decoder endpoint correction improved motif fits but invalidated 7/16 backbones. Closed.
 - Training-only refold feedback from the improved parent yielded zero scaffold-qualified targets among 16 backbones; all eight native controls passed. Closed.
 

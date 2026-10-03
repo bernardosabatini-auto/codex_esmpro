@@ -1,0 +1,10 @@
+{
+  "purpose": "Certify isolated conditioning inputs for the frozen64-family additional experimental development panel, before any conditional generation.",
+  "seed": 2026100341,
+  "decoder_steps": 3,
+  "condition": "f30_center",
+  "encoding": "Crop center30percent before FP64 canonicalization; encode only cropped N/CA/C/O through frozen FP32 ProteinAE; layer-normalize8latent channels perresidue. Store only fragment sequence in conditioning. Preserve full native backbones separately for positive controls.",
+  "controls": "All64fragments: rigid90degree rotation plus translation before canonicalization must reproduce coordinates and encoded latents within1e-4. Four original control fragments must reproduce archived isolated latents within1e-5. FixedAE3noise, no seed selection. Max75GiB and780seconds.",
+  "quality_gate": "At least90percent of all64isolated-fragment roundtrips satisfy both properCA RMSD<=.5AanddRMS<=.5A. Every numerical control must pass. No individual fragment is dropped, even if its roundtrip is poor. Stop on a failed cohort gate.",
+  "scope": "Preprocessing only: no conditioning-model predictions, no test-set scoring, no model-outcome selection. Full experimental construct coordinates never enter fragment encoding. This cohort is additional development data; locked tests remain excluded."
+}

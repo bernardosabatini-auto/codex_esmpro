@@ -1,0 +1,40 @@
+{
+  "purpose": "Measure whether explicit conditioning improves generation for20residue motifs versus the same model with its condition dropped. Calibrate the1Aendpoint using all64native controls.",
+  "parents": {
+    "control512": "fragment_training_50106855",
+    "null512": "fragment_training_50106855"
+  },
+  "total_updates": {
+    "control512": 6000,
+    "null512": 6000
+  },
+  "encoded_cohort": "extra_fragment_data_50117443",
+  "selection": "fragment_extra_development_20261003",
+  "seed": 2026100351,
+  "historical_seed": 2026100211,
+  "samples": 4,
+  "steps": 50,
+  "decoder_steps": 3,
+  "batch_size": 4,
+  "guidance": 1,
+  "work_cap_seconds": 1080,
+  "controls": "Eachmodel reproduces its own four historical control families: latent1e-5,CA RMSD<=.2A,lDDT>=.99,and identical raw-validity/strict decisions. Every newfamily gets same-batch repeat<=1e-5and supplied-fragment rigid-pose latent control<=1e-4. No correction, noise retry, reflow, ranking, or strength sweep.",
+  "inventory": "Exactly64families times4paired noises perarm:256perarm,512total. Same seed as the prior30percent assay; only20residue inputs and the declared drop-fragment contrast differ. Historical controls always reproduce the conditioned parent. All64codec roundtrips passed.",
+  "refolding": "Every raw strict match receives exactly8fixed-motif CA-only ProteinMPNNv48_020designs,T.1,seed1,guarded FP32teacher3loops50steps1sample. Every64native construct receives one8design fixed-motif positive-control assay, shared acrossarms. No attempt pooling. Raw failures remain in the full256denominator; their unconstrained global designability is unmeasured.",
+  "endpoint": "Generated backbone coarse-valid and propermotifCA RMSD/dRMS<=1A; one SAME refold must be coarse-valid, retain both1Amotiflimits, agree globallyTM>.5and have scaffold-onlyTM>.5. Report original primary criterion separately. Native control failures remain visible. Diversity only among distinct qualifying backbones, using first qualifying refold perbackbone.",
+  "analysis": "Compare condition present versus absent in the same frozen model, matching families,noises,sampler,and fixed-motif sequence-design budget. Report paired family-clustered uncertainty and short/long strata. Interpret30percent and20residue constraints as different tasks; changed success rate is not a model improvement.",
+  "scope": "Additional development replication on previously unused conditioning families from an already-used prediction-development corpus. Sequence exclusions are heuristic; frozen-model pretraining exposure is unknown. All locked tests remain unscored and no new evaluation outputs enter training.",
+  "resources": "Two independent oneRTXgeneration jobs,20minutes each, then four disjoint family partitions for exactly8designs per raw match and per native. No augmentation,correction,retry,or training. Eightown running-plus-pending GPUs maximum.",
+  "condition": "c20_center",
+  "drop_fragment": {
+    "control512": false,
+    "null512": true
+  },
+  "comparisons": [
+    {
+      "label": 512,
+      "baseline": "null512",
+      "candidate": "control512"
+    }
+  ]
+}

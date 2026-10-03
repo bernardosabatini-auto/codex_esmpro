@@ -6,7 +6,7 @@ from extra_fragment_validation_core import audit_config
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--arm',required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];protocol=root/'configs/fragment_extra_validation_protocol.json';spec=json.loads(protocol.read_text());run=root/'runs'/spec['parents'][a.arm];data=root/'runs'/spec['encoded_cohort'];m=json.loads((run/'manifest.json').read_text());c=dict(arm=a.arm,spec=spec,control_ids=m['config']['control_ids'],sources=[])
+    p=argparse.ArgumentParser();p.add_argument('--protocol',type=Path);p.add_argument('--arm',required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];protocol=(a.protocol or root/'configs/fragment_extra_validation_protocol.json').resolve();spec=json.loads(protocol.read_text());run=root/'runs'/spec['parents'][a.arm];data=root/'runs'/spec['encoded_cohort'];m=json.loads((run/'manifest.json').read_text());c=dict(arm=a.arm,spec=spec,control_ids=m['config']['control_ids'],sources=[])
     def bind(path):
         path=Path(path).resolve();row=dict(path=str(path),sha256=sha(path))
         if row not in c['sources']:c['sources'].append(row)

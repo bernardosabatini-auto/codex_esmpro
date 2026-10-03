@@ -1,0 +1,21 @@
+{
+  "purpose": "Qualify source-verified isolated-fragment supervision from existing cached training latents without teacher generation.",
+  "selection": "broad_fragment_candidates_balanced_20261003",
+  "source_verification": "broad_fragment_pilot_sources_20261003",
+  "seed": 2026100363,
+  "pilot_proteins": 64,
+  "fractions": [0.2, 0.3, 0.4],
+  "positions": ["left", "center", "right"],
+  "decoder_steps": 3,
+  "full_encoding_rmse_max": 0.05,
+  "source_ca_error_max": 0.02,
+  "decoded_ca_rmsd_max": 1.0,
+  "minimum_qualified_fraction": 0.9,
+  "minimum_fragment_roundtrip_fraction": 0.9,
+  "work_cap_seconds": 780,
+  "max_reserved_GiB": 2,
+  "inputs": "All64cases were selected by sequence-only hash before any structural outcomes. Exact AFDB sequence, complete N/CA/C/O atoms, unique contiguous residue map, and cachedCA agreement are mandatory. Verify cached latent andCA array hashes. Align the actual source backbone to cachedCAs with a proper FP64rotation before full encoding parity checks. Keep the cached target latent unchanged.",
+  "conditioning": "Crop each source backbone before FP64canonicalization and encoding. Only the crop's coordinates,8normalized latent channels,and cropped amino-acid sequence may form a condition. No full sequence or scaffold coordinates enter conditioning. The original512training inputs remain untouched.",
+  "controls": "Four historical isolated codes must reproduce within1e-5; every new center30percent crop has a rigid-pose latent/coordinate control<=1e-4. One full-chain decode per length bucket repeats withinCA RMSD.01AandlDDT.999. All controls must pass. Require all64source-frame and full-encoding parity checks; at least90percent of source+decoded endpoints coarse-valid with decodedCA RMSD<=1A, and90percent of576fragment roundtrips satisfy both properRMSD/dRMS<=.5A. Retain all failed cases and no posthoc replacement.",
+  "scope": "Training-data feasibility only; no conditional-model predictions or designability claim. Passing this pilot permits full source/data qualification, which must precede a separate matched training experiment. No evaluation labels are used."
+}

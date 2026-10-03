@@ -16,16 +16,17 @@ def audit_config(c):
     run=Path(c['model_manifest']).parent
     if c['checkpoint']!=str(run/'ema_2000.ckpt') or c['historical_predictions']!=str(run/'evaluation_2000.h5'):raise ValueError('Changed final checkpoint')
     if dm['status']!='complete' or dd['status']!='complete' or not dd['generation_gate_passed'] or dd['manifest_sha256']!=sha(c['data_manifest']) or dd['fragments_sha256']!=sha(c['fragments']) or Path(c['data_manifest']).parent.name!=spec['encoded_cohort'] or Path(dm['config']['selection']).parent.name!=spec['selection'] or dm['config']['decoder_checkpoint']!=c['decoder_checkpoint']:raise ValueError('Unqualified additional fragments')
+    if dm['config']['spec']['condition']!=spec.get('condition','f30_center'):raise ValueError('Wrong isolated condition')
     if (spec['samples'],spec['batch_size'],spec['steps'],spec['decoder_steps'],spec['guidance'])!=(4,4,50,3,1):raise ValueError('Changed fixed sampler')
     with h5py.File(c['fragments']) as f:
         if len(c['target_ids'])!=64 or c['target_ids']!=sorted(f['development']) or len(c['control_ids'])!=4 or set(c['target_ids'])&set(c['control_ids']):raise ValueError('Changed new/historical cohorts')
     return spec
 
 
-def load_conditions(path,ids):
+def load_conditions(path,ids,condition='f30_center'):
     result={}
     with h5py.File(path) as f:
         for ident in ids:
-            g=f['development/'+ident];q=g['conditions/f30_center'];n=int(g.attrs['length']);start=int(q.attrs['start']);fragment=q['fragment'][:];features,keep=fragment_features(torch.from_numpy(q['latent'][:]),q.attrs['sequence'],length=n,start=start)
+            g=f['development/'+ident];q=g['conditions/'+condition];n=int(g.attrs['length']);start=int(q.attrs['start']);fragment=q['fragment'][:];features,keep=fragment_features(torch.from_numpy(q['latent'][:]),q.attrs['sequence'],length=n,start=start)
             result[ident]=dict(length=n,family=str(g.attrs['family']),start=start,fragment=fragment,features=features,keep=keep,coordinates=fragment_coordinates(torch.from_numpy(fragment),length=n,start=start))
     return result

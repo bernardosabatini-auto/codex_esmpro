@@ -17,7 +17,7 @@ def analyze(run):
         if r['kind']=='historical' and (r['max_ca_rmsd']>.2 or r['min_ca_lddt']<.99 or not r['same_decisions']):raise ValueError('Historical control failed')
     for r in m['batches']:
         if r['samples']!=4 or r['peak_reserved_GiB']>75:raise ValueError('Changed sampling resources')
-    new=load_conditions(c['fragments'],c['target_ids']);history=load_conditions(c['historical_fragments'],c['control_ids'])
+    new=load_conditions(c['fragments'],c['target_ids'],spec.get('condition','f30_center'));history=load_conditions(c['historical_fragments'],c['control_ids'])
     with h5py.File(run/'predictions.h5') as out,h5py.File(c['historical_predictions']) as old:
         if set(out)!={'new','historical'} or set(out['new'])!=set(new) or set(out['historical'])!=set(history):raise ValueError('Changed stored inventory')
         for ident,item in history.items():

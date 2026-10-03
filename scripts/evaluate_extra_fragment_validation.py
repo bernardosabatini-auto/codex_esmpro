@@ -23,11 +23,11 @@ def main():
         torch.set_num_threads(2);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85);telemetry=Telemetry(a.output,True)
         decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval().requires_grad_(False);net,_=load_legacy(c['checkpoint'],trusted_pickle=True);net.cuda().eval().requires_grad_(False)
         ck=torch.load(c['checkpoint'],map_location='cpu',weights_only=False,mmap=True);adapter=FragmentGeometryAdapter(net.d_model,n_layers=len(net.blocks),n_heads=net.n_heads,distance_precision='fp64').cuda().eval().requires_grad_(False);adapter.load_state_dict(ck['fragment_adapter']);del ck
-        historical=load_conditions(c['historical_fragments'],c['control_ids']);new=load_conditions(c['fragments'],c['target_ids'])
-        def sample(ident,item,seed,posed=False,decode=True):
+        historical=load_conditions(c['historical_fragments'],c['control_ids']);new=load_conditions(c['fragments'],c['target_ids'],spec.get('condition','f30_center'))
+        def sample(ident,item,seed,posed=False,decode=True,drop=False):
             n=item['length'];features=item['features'][None].expand(4,-1,-1).cuda();keep=item['keep'][None].expand(4,-1).cuda();coords=item['coordinates'][None].expand(4,-1,-1).cuda();mask=torch.ones(4,n,dtype=torch.bool,device='cuda')
             if posed:coords=(coords.double()@coords.new_tensor([[0,-1,0],[1,0,0],[0,0,1]],dtype=torch.float64)+coords.new_tensor([11,7,-3],dtype=torch.float64))*keep[...,None]
-            noise=torch.cat([target_noise([ident],[n],8,seed=seed,sample_index=k,stream='flow:0',device='cuda') for k in range(4)]);z=sample_fragment(net,adapter,features,keep,mask,noise=noise,steps=50,coordinates=coords)
+            noise=torch.cat([target_noise([ident],[n],8,seed=seed,sample_index=k,stream='flow:0',device='cuda') for k in range(4)]);z=sample_fragment(net,adapter,features,keep,mask,noise=noise,steps=50,coordinates=coords,drop_fragment=drop)
             if not decode:return z.cpu().numpy(),None
             dn=torch.cat([target_noise([ident],[4*n],3,seed=seed,sample_index=k,stream='decoder:0',device='cuda') for k in range(4)])*decoder.fm.scale_ref;_,bb=decoder(z,mask,noise=dn,return_backbone=True);return z.cpu().numpy(),bb.cpu().numpy()
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'predictions.h5','x') as out,h5py.File(c['historical_predictions']) as old:
@@ -38,11 +38,11 @@ def main():
                 g=out.create_group('historical/'+ident);g.create_dataset('latent',data=z);g.create_dataset('backbone',data=bb)
             for ident,item in new.items():
                 if time.monotonic()-tick>spec['work_cap_seconds']:raise TimeoutError('Additional generation cap')
-                torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();start=time.monotonic();z,bb=sample(ident,item,spec['seed']);torch.cuda.synchronize();seconds=time.monotonic()-start;peak=torch.cuda.max_memory_reserved()/2**30
+                torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();start=time.monotonic();z,bb=sample(ident,item,spec['seed'],drop=spec.get('drop_fragment',{}).get(c['arm'],False));torch.cuda.synchronize();seconds=time.monotonic()-start;peak=torch.cuda.max_memory_reserved()/2**30
                 if peak>75:raise ValueError('Additional sampling memory cap')
                 g=out.create_group('new/'+ident);g.create_dataset('latent',data=z);g.create_dataset('backbone',data=bb)
                 for kind,posed in [('same_batch_repeat',False),('pose',True)]:
-                    check,_=sample(ident,item,spec['seed'],posed=posed,decode=False);g.create_dataset(kind,data=check);error=float(np.max(abs(check-z)));m['controls'].append(dict(kind=kind,target_id=ident,latent_max_abs=error))
+                    check,_=sample(ident,item,spec['seed'],posed=posed,decode=False,drop=spec.get('drop_fragment',{}).get(c['arm'],False));g.create_dataset(kind,data=check);error=float(np.max(abs(check-z)));m['controls'].append(dict(kind=kind,target_id=ident,latent_max_abs=error))
                     if error>(1e-4 if posed else 1e-5):raise ValueError('Additional sampling repeat/pose failed')
                 m['batches'].append(dict(target_id=ident,samples=4,length=item['length'],seconds=seconds,peak_reserved_GiB=peak));out.flush();atomic_json(a.output/'manifest.json',m)
         m.update(status='complete',predictions_sha256=sha(a.output/'predictions.h5'))

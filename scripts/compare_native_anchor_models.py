@@ -20,7 +20,10 @@ def ready_command(root):
 
 
 def verify_outcome(r):
+    import math
     from latentfold.fragment_designability import same_refold_success
+    if any(not math.isfinite(x['scaffold_tm']) or not 0<=x['scaffold_tm']<=1 for x in r['refolds']):
+        raise ValueError('Invalid scaffold score')
     expected=same_refold_success(r['raw'],r['refolds'])
     for key,value in expected.items():
         if r[key]!=value:raise ValueError('Changed same-refold outcome: '+key)
@@ -63,13 +66,15 @@ def compare(plan,root):
     baseline=root/'reports/fragment_preference_comparison_20261003.json'
     if sha(baseline)!=plan['baseline_comparison_sha256']:raise ValueError('Changed original refold comparison')
     prior=json.loads(baseline.read_text())
+    if any(sha(r['report'])!=r['report_sha256'] for r in prior['sources']):raise ValueError('Changed reused refold report')
     paths={'parent6000':[Path(r['report']) for r in prior['sources']]}
     paths.update({arm:[root/f'reports/fragment_preference_refold_{i}.json' for i in ids] for arm,ids in plan['jobs'].items()})
     arms={};sources=[];generations={};configs={}
     for arm,reports in paths.items():
-        rows=[];parts=set();generation_hash=None
+        rows=[];parts=set();generation_hash=None;audited_generation=None
         for rp in reports:
-            run=root/'runs'/rp.stem;mp=run/'manifest.json';m=json.loads(mp.read_text());d=json.loads(rp.read_text());c=m['config'];gc,spec=audit_inputs(c)
+            run=root/'runs'/rp.stem;mp=run/'manifest.json';m=json.loads(mp.read_text());d=json.loads(rp.read_text());c=m['config'];gc,spec=audit_inputs(c,audited_generation=audited_generation)
+            audited_generation=(gc,spec)
             if (m['status']!='complete' or d['status']!='complete' or d['manifest_sha256']!=sha(mp)
                     or d['refolded_sha256']!=sha(run/'refolded.h5') or d['completed_refolds']!=256
                     or len(d['records'])!=32 or c['partition'] in parts or d['partition']!=c['partition']

@@ -21,11 +21,15 @@ def make_entry(row, q, slot, index, arm='parent6000'):
                 fixed_sequence=str(q.attrs['sequence']),repeatability_control=index==0)
 
 
-def audit_inputs(c):
+def audit_inputs(c, *, audited_generation=None):
     for key in ('generation_manifest','generation_report','generated_predictions','predictions',
                 'protocol','teacher_profile_manifest','teacher_profile_report','teacher_probe'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed preference input: '+key)
-    gm=json.loads(Path(c['generation_manifest']).read_text());gc=gm['config'];spec=audit_generation(gc)
+    gm=json.loads(Path(c['generation_manifest']).read_text());gc=gm['config']
+    if audited_generation is None:spec=audit_generation(gc)
+    else:
+        old_gc,spec=audited_generation
+        if gc!=old_gc or gc['spec']!=spec:raise ValueError('Changed previously audited generation')
     d=json.loads(Path(c['generation_report']).read_text());native=bool(spec.get('native_anchor_calibration'));count=16 if native else 32
     if (gm['status']!='complete' or d['status']!='complete' or d['controls']!=4+2*count
             or d['manifest_sha256']!=c['generation_manifest_sha256']
@@ -104,7 +108,7 @@ def main():
                     for slot in range(2):
                         entry=make_entry(row,q,slot,len(c['entries']),arm='native_latent');c['entries'].append(entry)
                         out.create_dataset(entry['dataset'],data=gen['native/'+row['id']+'/backbone'][slot][None])
-        c.update(predictions=str(inputs),predictions_sha256=sha(inputs));audit_inputs(c)
+        c.update(predictions=str(inputs),predictions_sha256=sha(inputs));audit_inputs(c,audited_generation=(gc,spec))
         with path.open('x') as f:json.dump(c,f,indent=2)
         print(partition,len(c['entries']),flush=True)
 

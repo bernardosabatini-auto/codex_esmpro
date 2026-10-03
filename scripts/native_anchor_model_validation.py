@@ -20,13 +20,17 @@ def check_recipe(spec, baseline):
 
 def audit_generation(c):
     from fragment_preference_calibration import audit_generation as audit_baseline
-    for row in c['sources']:
-        if sha(row['path'])!=row['sha256']:raise ValueError('Changed model-validation source')
     spec=json.loads(Path(c['protocol']).read_text())
     base=json.loads(Path(c['baseline_manifest']).read_text())
     bd=json.loads(Path(c['baseline_report']).read_text());bc=base['config']
     if bc['spec'].get('native_anchor_model_validation'):raise ValueError('Recursive validation baseline')
     audit_baseline(bc)
+    # The baseline audit just hashed these shared immutable sources. Verify new
+    # sources once too; do not repeatedly stream multi-GB checkpoints from NFS.
+    verified={row['path']:row['sha256'] for row in bc['sources']}
+    for row in c['sources']:
+        if row['path'] not in verified:verified[row['path']]=sha(row['path'])
+        if verified[row['path']]!=row['sha256']:raise ValueError('Changed model-validation source')
     check_recipe(spec,bc['spec'])
     if (spec!=c['spec'] or Path(c['baseline_manifest']).parent.name!=spec['baseline_generation']
             or base['status']!='complete' or bd['status']!='complete'
@@ -41,7 +45,7 @@ def audit_generation(c):
     if (m['status']!='complete' or d['status']!='complete' or not d['numerically_qualified']
             or mc['profile_only'] or mc['updates']!=400 or d['updates']!=400
             or d['manifest_sha256']!=sha(c['model_manifest'])
-            or c['checkpoint']!=str(run/'ema_400.ckpt') or d['checkpoint_sha256']!=sha(c['checkpoint'])
+            or c['checkpoint']!=str(run/'ema_400.ckpt') or d['checkpoint_sha256']!=verified[c['checkpoint']]
             or c['historical_predictions']!=str(run/'evaluation_400.h5')
             or c['arm']!=mc['arm'] or c['arm'] not in ('positive','contrastive')
             or mc['checkpoint']!=bc['checkpoint'] or c['decoder_checkpoint']!=mc['decoder_checkpoint']

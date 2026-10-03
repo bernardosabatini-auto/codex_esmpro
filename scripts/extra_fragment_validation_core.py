@@ -8,6 +8,9 @@ from prepare_overfit import sha
 
 
 def audit_config(c):
+    if c.get('spec',{}).get('training_preference_calibration'):
+        from fragment_preference_calibration import audit_generation
+        return audit_generation(c)
     for row in c['sources']:
         if sha(row['path'])!=row['sha256']:raise ValueError('Changed additional-validation source')
     spec=json.loads(Path(c['protocol']).read_text());m=json.loads(Path(c['model_manifest']).read_text());d=json.loads(Path(c['model_report']).read_text());dm=json.loads(Path(c['data_manifest']).read_text());dd=json.loads(Path(c['data_report']).read_text());pc=m['config'];arm=c['arm']
@@ -29,10 +32,11 @@ def audit_config(c):
     return spec
 
 
-def load_conditions(path,ids,condition='f30_center'):
+def load_conditions(path,ids,condition='f30_center',*,cohort='development'):
+    if cohort not in ('train','development'):raise ValueError('Unknown conditioning cohort')
     result={}
     with h5py.File(path) as f:
         for ident in ids:
-            g=f['development/'+ident];q=g['conditions/'+condition];n=int(g.attrs['length']);start=int(q.attrs['start']);fragment=q['fragment'][:];features,keep=fragment_features(torch.from_numpy(q['latent'][:]),q.attrs['sequence'],length=n,start=start)
+            g=f[cohort+'/'+ident];q=g['conditions/'+condition];n=int(g.attrs['length']);start=int(q.attrs['start']);fragment=q['fragment'][:];features,keep=fragment_features(torch.from_numpy(q['latent'][:]),q.attrs['sequence'],length=n,start=start)
             result[ident]=dict(length=n,family=str(g.attrs['family']),start=start,fragment=fragment,features=features,keep=keep,coordinates=fragment_coordinates(torch.from_numpy(fragment),length=n,start=start))
     return result

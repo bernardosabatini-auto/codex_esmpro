@@ -50,6 +50,9 @@ def main():
     if c.get('time_protocol'):
         from fragment_time_shift import audit_config
         audit_config(c)
+    if c.get('augmentation_protocol'):
+        from fragment_teacher_augmentation_training import audit_config
+        audit_config(c)
     if c.get('extension_protocol'):
         from fragment_extension import audit_extension
         extension_spec=audit_extension(c)
@@ -115,6 +118,10 @@ def main():
         if c.get('fragment_representation'):
             m['representation_latent_max_abs']=max(float(q['features'][:,:8].abs().max()) for v in data.values() for q in v['conditions'].values())
             if m['representation_latent_max_abs']!=0:raise ValueError('Standalone latent input leaked into ablation')
+        endpoint_pool=None
+        if c.get('augmentation_protocol'):
+            from latentfold.teacher_endpoint_pool import TeacherEndpointPool
+            endpoint_pool=TeacherEndpointPool(c['augmentation_targets'],json.loads(Path(c['augmentation_protocol']).read_text())['seed'])
         model,arch=load_legacy(Path(c['checkpoint']),trusted_pickle=True);model.cuda().train();model.checkpoint_blocks=True
         if c['arm']=='adapter_only':model.requires_grad_(False);frozen=[n for n,_ in model.named_parameters()]
         else:frozen=freeze_unused_conditioning(model)
@@ -192,11 +199,16 @@ def main():
                         v=data[('train',ident)];q=v['conditions'][name];l=v['length'];z[i,:l]=q['target'] if c.get('target_frame_training') else v['target'];features[i,:l]=q['features'];keep[i,:l]=q['keep'];mask[i,:l]=True
                         if null_target is not None:null_target[i,:l]=v['target']
                         if geometry:coordinates[i,:l]=q['coordinates']
+                    if endpoint_pool is not None:
+                        null_target=z.clone();z,selected_endpoints=endpoint_pool.draw(ids,names,z)
                     coordinates=coordinates.cuda() if geometry else None;null_target=null_target.cuda() if null_target is not None else None
                     z,features,keep,mask=[x.cuda() for x in (z,features,keep,mask)];factor=min((step+1)/100,1)*(.1+.9*.5*(1+math.cos(math.pi*step/1999)))
                     for group in optimizer.param_groups:group['lr']=group['base_lr']*factor
                     optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates,return_state=bool(c.get('auxiliary_motif')),null_target=null_target,motif_weight=c.get('latent_motif_weight',1.),conditional_time_shift=c.get('conditional_time_shift',0.))
-                    if null_target is not None:m.setdefault('frame_target_updates',[]).append(dict(step=step+1,conditioned_target_sha256=digest(z),null_target_sha256=digest(null_target),selected_target_sha256=digest(info['target']),dropped_slots=info['dropped'].cpu().tolist()))
+                    if null_target is not None:
+                        target_trace=dict(step=step+1,conditioned_target_sha256=digest(z),null_target_sha256=digest(null_target),selected_target_sha256=digest(info['target']),dropped_slots=info['dropped'].cpu().tolist())
+                        if endpoint_pool is not None:target_trace['candidate_indices']=selected_endpoints
+                        m.setdefault('augmentation_target_updates' if endpoint_pool is not None else 'frame_target_updates',[]).append(target_trace)
                     if c.get('auxiliary_motif'):
                         from latentfold.fragment_objective import endpoint_fragment_objective
                         from latentfold.training import controlled_backward

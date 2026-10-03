@@ -21,6 +21,9 @@ def analyze(run):
     if c.get('time_protocol'):
         from fragment_time_shift import audit_config
         audit_config(c)
+    if c.get('augmentation_protocol'):
+        from fragment_teacher_augmentation_training import audit_config
+        audit_config(c)
     if c.get('extension_protocol'):
         from fragment_extension import audit_extension
         audit_extension(c)
@@ -114,6 +117,9 @@ def analyze(run):
     if c.get('time_protocol'):
         from fragment_time_shift import compare
         result['time_contrast_audit']=compare(Path(__file__).resolve().parents[1],run)
+    if c.get('augmentation_protocol'):
+        from fragment_teacher_augmentation_training import compare
+        result['augmentation_contrast_audit']=compare(Path(__file__).resolve().parents[1],run)
     return result
 
 

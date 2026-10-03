@@ -1,8 +1,11 @@
 import unittest
+import json
+import tempfile
 from collections import Counter
+from pathlib import Path
 
 from prepare_fragment_source_refold import select_sources
-from compare_fragment_source_refolds import summarize
+from compare_fragment_source_refolds import summarize, ready_command
 
 
 class SourcePanelTests(unittest.TestCase):
@@ -30,6 +33,22 @@ class SourcePanelTests(unittest.TestCase):
         self.assertEqual(contrasts[1]['ci95'],[0.,0.])
         with self.assertRaises(ValueError): summarize(rows[:-1])
         with self.assertRaises(ValueError): summarize(rows[:-1]+[rows[0]])
+
+    def test_followup_requires_all_own_reports_and_exact_panel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'runs').mkdir();(root/'reports').mkdir()
+            ids=['1','2','3','4'];plan=dict(jobs=ids,inventory_sha256='panel')
+            (root/'runs/fragment_source_comparison.json').write_text(json.dumps(plan))
+            registry={'jobs':[dict(id=i,completion_action='summarize_fragment_source_refold') for i in ids]}
+            (root/'runs/jobs.json').write_text(json.dumps(registry))
+            self.assertIsNone(ready_command(root))
+            for i in ids:
+                (root/f'reports/fragment_source_refold_{i}.json').write_text(json.dumps(dict(status='complete',inventory_sha256='panel')))
+            self.assertIsNotNone(ready_command(root))
+            (root/'reports/fragment_source_refold_4.json').write_text(json.dumps(dict(status='complete',inventory_sha256='other')))
+            with self.assertRaises(ValueError):ready_command(root)
+            registry['jobs'].pop();(root/'runs/jobs.json').write_text(json.dumps(registry))
+            with self.assertRaises(ValueError):ready_command(root)
 
 
 if __name__=='__main__':

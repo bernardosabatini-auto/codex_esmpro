@@ -8,6 +8,26 @@ import numpy as np
 from prepare_overfit import sha
 
 
+def ready_command(root):
+    """The completion watcher may run this one declared CPU comparison."""
+    planpath=root/'runs/fragment_source_comparison.json'
+    if not planpath.exists():return None
+    plan=json.loads(planpath.read_text());ids=plan['jobs']
+    if len(ids)!=4 or len(set(ids))!=4:raise ValueError('Expected four declared source jobs')
+    registry={r['id']:r for r in json.loads((root/'runs/jobs.json').read_text())['jobs']}
+    if any(i not in registry or registry[i].get('completion_action')!='summarize_fragment_source_refold' for i in ids):
+        raise ValueError('Unregistered source comparison job')
+    reports=[root/f'reports/fragment_source_refold_{i}.json' for i in ids]
+    if not all(p.exists() for p in reports):return None
+    data=[json.loads(p.read_text()) for p in reports]
+    if any(d['status']!='complete' for d in data):return None
+    if any(d['inventory_sha256']!=plan['inventory_sha256'] for d in data):raise ValueError('Changed source comparison panel')
+    output=root/'reports/fragment_source_comparison_20261003'
+    if output.with_suffix('.json').exists():return None
+    return [str(root/'scripts/compare_fragment_source_refolds.py'),'--runs',
+            *[str(root/f'runs/fragment_source_refold_{i}') for i in ids],'--output',str(output)]
+
+
 def summarize(records, seed=2026100381):
     if len(records)!=128 or len({r['target_id'] for r in records})!=128 or len({r['family'] for r in records})!=128:
         raise ValueError('Expected128 distinct source families')

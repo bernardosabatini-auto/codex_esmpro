@@ -158,6 +158,11 @@ def followup(root, job, config):
                OPENBLAS_NUM_THREADS='1', PYTHONPATH=str(root/'src'))
     with (root/'runs/watch'/f"analysis_{job['id']}.log").open('a') as log:
         run_monitored_analysis(command, root=root, env=env, log=log, timeout=240)
+        if action == 'summarize_fragment_source_refold':
+            from compare_fragment_source_refolds import ready_command
+            comparison = ready_command(root)
+            if comparison:
+                run_monitored_analysis([config['python'], *comparison], root=root, env=env, log=log, timeout=240)
     if action in ('summarize_ensemble','summarize_teacher_ensemble','summarize_retry_ensemble') and json.loads(report.with_suffix('.json').read_text()).get('status')=='complete':
         from start_state_scoring import start
         start(root,job['id'])

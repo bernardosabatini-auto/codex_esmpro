@@ -1,0 +1,14 @@
+{
+  "purpose": "Test conditional multistate supervision using cached teacher states while retaining all original128proteins and1152conditions. Original broad target-replacement coverage failure remains closed; this is a bounded50percent mixture with original-target fallback, not replacement or threshold relaxation.",
+  "fragments": "runs/fragment_data_49945596/fragments.h5",
+  "inventory": "reports/fragment_teacher_target_inventory_20261003.json",
+  "parent": "fragment_training_50043086",
+  "matched_control": "fragment_training_50081718",
+  "seed": 2026100283,
+  "mixture_probability": 0.5,
+  "data": "Use only original inventory states with mean pLDDT>=.8,coarse-valid source geometry,and both proper motifRMSD/dRMS<=.5A to unchanged isolated fragments. Preserve supplied amino acids and residue mapping. Decode every candidate teacher latent through frozen FP32AE3. A condition/state pair is retained only if decoded output is coarse-valid,wholeCA RMSD<=1A to source teacher,and motifproperRMSD/dRMS<=1A. Retain all failures and source states; no new teacher labeling.",
+  "data_gate": "All decoder repeat controls must satisfyCA RMSD<=.01A,lDDT>=.999;max75GiB. At least64of128proteins must retain two states for some condition, and at least32proteins must have a retained pair with scaffold-only properRMSD>1A. These are target-coverage/variation gates,not designability evidence. No filtering of original proteins or conditions; absent eligible alternatives fall back to original target.",
+  "training": "After data gate and40update profile: clone the exact weighted6000to8000control seed,schedule,batches,optimizer,and evaluations. On50percent of conditional examples with retained alternatives, draw one alternative uniformly using a separate deterministic RNG. Keep original targets on the other half, all unsupported conditions, and all dropped-condition examples. Do not average latents. Audit all primary draws, initialization, selected states, and target tensors. No teacher backbone or full-sequence features enter conditioning.",
+  "evaluation": "Original strict raw and same-valid-refold designability criteria,plus scaffold-onlyTM>0.5 in that same refold. Full fixed288refold assay and supplementary raw-pass refolds for the candidate, using the concurrent matched control. Compare successful-backbone diversity only among qualifying samples. Locked tests untouched; repeated development feasibility only.",
+  "resources": "OneRTX15minute data pilot,780second worker limit,batch4AE decoding. Then oneRTX40update training profile before measured full allocation. No more than8ownrunning-plus-pending GPUs."
+}

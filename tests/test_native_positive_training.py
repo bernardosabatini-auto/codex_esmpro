@@ -26,5 +26,23 @@ class PositiveCoverageTests(unittest.TestCase):
             changed=copy.deepcopy(b);changed[0][k]=2
             with self.assertRaises(ValueError):check_draws(a,changed)
 
+    def test_development_gate_requires_all_three_outcomes(self):
+        from compare_native_anchor_models import positive_coverage_gate
+        parent=dict(strong=8,strong_families=7,designable=45);positive=dict(strong=9,strong_families=6,designable=51)
+        candidate=dict(strong=10,strong_families=7,designable=51)
+        self.assertTrue(positive_coverage_gate(candidate,parent,positive))
+        for key,value in [('strong',9),('strong_families',6),('designable',50)]:
+            self.assertFalse(positive_coverage_gate(dict(candidate,**{key:value}),parent,positive))
+
+    def test_coverage_validation_preserves_original_sampler(self):
+        import json
+        from pathlib import Path
+        from native_anchor_model_validation import check_recipe
+        root=Path(__file__).resolve().parents[1]
+        spec=json.loads((root/'configs/native_positive_model_validation_protocol.json').read_text())
+        base=json.loads((root/'configs/fragment_preference_calibration_protocol.json').read_text())
+        check_recipe(spec,base)
+        with self.assertRaises(ValueError):check_recipe(dict(spec,num_sequences=16),base)
+
 
 if __name__=='__main__':unittest.main()

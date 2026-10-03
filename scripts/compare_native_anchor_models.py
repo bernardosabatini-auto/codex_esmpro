@@ -87,6 +87,16 @@ def compare(plan,root):
     from compare_extra_fragment_refolds import clustered
     from prepare_fragment_preference_refold import audit_inputs,TEACHER_KEYS
     from prepare_overfit import sha
+    coverage=bool(plan.get('positive_coverage_comparison'))
+    candidates=('positive','positive_coverage') if coverage else ('positive','contrastive')
+    if set(plan['jobs'])!=set(candidates):raise ValueError('Changed comparison arms')
+    if coverage:
+        old_path=root/'reports/native_anchor_model_comparison_20261003.json'
+        if sha(old_path)!=plan['positive_control_comparison_sha256']:raise ValueError('Changed reused positive control')
+        old=json.loads(old_path.read_text());bound={r['path']:r['sha256'] for r in old['source_reports']}
+        for jid in plan['jobs']['positive']:
+            rp=root/f'reports/fragment_preference_refold_{jid}.json'
+            if bound.get(str(rp))!=sha(rp):raise ValueError('Unbound positive-control refolds')
     baseline=root/'reports/fragment_preference_comparison_20261003.json'
     if sha(baseline)!=plan['baseline_comparison_sha256']:raise ValueError('Changed original refold comparison')
     prior=json.loads(baseline.read_text())
@@ -117,7 +127,7 @@ def compare(plan,root):
         if parts!=set(range(4)) or len(rows)!=128 or {(r['target_id'],r['generation_slot']) for r in rows}!=wanted:raise ValueError('Changed full denominator')
         arms[arm]=rows
     base=generations['parent6000']['config']
-    for arm in ('positive','contrastive'):
+    for arm in candidates:
         gc=generations[arm]['config']
         if gc['selected']!=base['selected'] or gc['native_sources']!=base['native_sources']:raise ValueError('Changed targets or reused native budgets')
         if sha(generations[arm]['generation_manifest'])!=plan['generation_manifest_sha256'][arm]:raise ValueError('Changed declared generation')
@@ -134,22 +144,32 @@ def compare(plan,root):
                                 strong=sum(r['scaffold_joint_success'] for r in rows),designable=sum(r['valid_designable'] for r in rows),
                                 strong_families=len({r['family'] for r in rows if r['scaffold_joint_success']})))
         families=sorted({r['family'] for r in subsets['parent6000']})
-        for candidate,reference in [('positive','parent6000'),('contrastive','parent6000'),('contrastive','positive')]:
+        for candidate,reference in [('positive','parent6000'),(candidates[1],'parent6000'),(candidates[1],'positive')]:
             metrics={}
             for metric in ('raw_gate_passed','scaffold_joint_success','valid_designable'):
                 delta=[np.mean([r[metric] for r in subsets[candidate] if r['family']==f])-np.mean([r[metric] for r in subsets[reference] if r['family']==f]) for f in families]
                 metrics[metric]=clustered(delta)
             contrasts.append(dict(candidate=candidate,reference=reference,bucket=bucket,metrics=metrics))
     totals={r['arm']:r for r in summary if r['bucket'] is None};reference=totals['parent6000']
-    qualified={arm:(totals[arm]['strong']>reference['strong'] and totals[arm]['designable']>=reference['designable'] and totals[arm]['strong_families']>=reference['strong_families']) for arm in ('positive','contrastive')}
+    qualified={arm:(totals[arm]['strong']>reference['strong'] and totals[arm]['designable']>=reference['designable'] and totals[arm]['strong_families']>=reference['strong_families']) for arm in candidates}
+    if coverage:
+        if (reference['strong'],reference['strong_families'],totals['positive']['strong'],totals['positive']['designable'])!=(8,7,9,51):raise ValueError('Changed preregistered comparator counts')
+        qualified={'positive_coverage':positive_coverage_gate(totals['positive_coverage'],reference,totals['positive'])}
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=3) as pool:
         tasks={arm:pool.submit(diversity,generations[arm],rows,configs[arm,0]['usalign'],plan.get('diversity',{}).get(arm)) for arm,rows in arms.items()}
         diversity_results={arm:task.result() for arm,task in tasks.items()}
     return dict(status='complete',training_only=True,source_reports=sources,summary=summary,contrasts=contrasts,
-                development_screen_qualified=qualified,new_refolds=2048,reused_refolds=1024,native=prior['native'],
+                development_screen_qualified=qualified,new_refolds=1024 if coverage else 2048,reused_refolds=2048 if coverage else 1024,native=prior['native'],
                 diversity=diversity_results,reused_diversity=plan.get('diversity',{}),
-                scope='Repeated32training-protein diagnostic; disjoint from16anchor-source proteins, not independent generalization. All128samples/arm and8designs/sample retained. Same valid refold must satisfy motif/global/scaffold gates. Native budgets reused unchanged; teacher RNG not claimed paired. Bootstrap describes family variation, not training-seed replication. Qualification permits a separate development assay only.')
+                scope=('Repeated32training-protein diagnostic; disjoint from16original and64new qualification sources. ' if coverage else 'Repeated32training-protein diagnostic; disjoint from16anchor-source proteins. ')+
+                      'Not independent generalization. All128samples/arm and8designs/sample retained. Same valid refold must satisfy motif/global/scaffold gates. Native budgets reused unchanged; teacher RNG not claimed paired. Bootstrap describes family variation, not training-seed replication. Qualification permits a separate development assay only.')
+
+
+def positive_coverage_gate(candidate,parent,positive):
+    return (candidate['strong']>max(parent['strong'],positive['strong'])
+            and candidate['strong_families']>=parent['strong_families']
+            and candidate['designable']>=positive['designable'])
 
 
 def write_comparison(a):

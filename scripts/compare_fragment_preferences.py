@@ -28,7 +28,8 @@ def ready_command(root):
                 *[str(root/f'runs/fragment_preference_refold_{i}') for i in ids],'--output',str(output)]
     from compare_native_anchor_models import ready_command as ready_models
     from compare_native_positive_coverage import ready_command as ready_positives
-    return ready_models(root) or ready_positives(root)
+    from compare_native_positive_models import ready_command as ready_coverage_models
+    return ready_models(root) or ready_positives(root) or ready_coverage_models(root)
 
 
 def feasibility_gate(preferences, selected, native_passes, limits):

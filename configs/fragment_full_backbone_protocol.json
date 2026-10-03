@@ -1,0 +1,9 @@
+{
+  "purpose": "Test whether supplying N,CA,C,O to the standard ProteinMPNN model improves strict refold retention relative to the current CA-only design stage.",
+  "baseline_report": "fragment_strict_followup_50030977",
+  "cases": ["nmr__1BFY_1__b91a89d44751", "nmr__1CB9_1__7ca9cd6d9b60"],
+  "assay": "Exactly the same two weighted128raw matches and two fixed-motif native controls; no new generator samples or coordinate repair. Standard full-backbone ProteinMPNN vanilla_model_weights/v_48_020.pt,8sequences perbackbone,T0.1,seed1. Fix only supplied motif residues. Same teacher weights, FP32,3loops50steps,one sample, and original name/index-derived teacher seeds. Compare against the already audited eight CA-only refolds perbackbone, without pooling design budgets.",
+  "metric": "Unchanged raw and same-refold coarse validity, motif proper CA RMSD<=1A, motif dRMS<=1A, and same-refold global scTM>0.5. Report global designability separately. Require both native fixed-motif controls to pass before interpreting a benefit.",
+  "scope": "Selected-case sequence-design feasibility, not generalization or a generator improvement. Keep current training comparisons on the unchanged CA-only assay. If full-backbone design yields strict success with native controls, evaluate it on a fixed panel; otherwise close this design-mode pilot. No model-weight, temperature, backbone-noise or seed sweep.",
+  "resources": "OneRTX,32newrefolds; reuse32baseline CA-only refolds including nativecontrols. No training, packages or external labels. Eight own running-plus-pending GPUs maximum."
+}

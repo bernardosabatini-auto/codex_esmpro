@@ -74,6 +74,7 @@ def main():
                 summaries=summaries,paired_family_contrasts=contrasts,fixed_panel_designability=designability,
                 frontier_summaries=frontier_summaries,frontier_paired_family_contrasts=frontier_contrasts,
                 new_refolds=sum(d['completed_refolds'] for d in new),reused_full_model_refolds=len(fr)*8,
+                numerical_recoveries=[d['numerical_recovery'] for d in new if d.get('numerical_recovery')],
                 reused_parent_model_refolds=len(pr)*8,native_controls=native,
                 successful_scaffold_diversity=[r for d in new for r in d['successful_scaffold_diversity']],
                 scope='Repeated64-family development panel, not independent confirmation. Full256sample denominators. Same-refold motif/global/scaffold gates. Fixed32-panel designability only for new and matched-full arms; parent lacks this panel. Original eight-attempt budgets reused without pooling; teacher RNG is not claimed paired. No evaluation labels train models.')
@@ -81,6 +82,8 @@ def main():
     lines=['# Frozen learned-generator result','',result['scope'],'',
            '|Arm|Raw retained /256|Strong same-refold /256|Successful families|Fixed-panel designability /32|',
            '|---|---:|---:|---:|---:|']
+    if result['numerical_recoveries']:
+        lines[2]+=' One failed numerical partition was replaced using deterministic algorithms, unchanged sequences/seeds and original-output parity below0.01A. Failed and diagnostic attempts are excluded from scoring.'
     panel_counts={r['arm']:r['valid_designable'] for r in designability['summaries'] if r['cohort']=='all'}
     allrows=[r for r in frontier_summaries if r['cohort']=='all' and r['arm']=='parent6000']+[r for r in summaries if r['cohort']=='all']
     for r in allrows:

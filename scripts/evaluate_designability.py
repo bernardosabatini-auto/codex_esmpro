@@ -15,6 +15,8 @@ def main():
     p=argparse.ArgumentParser()
     for key in ('source','config','output'):p.add_argument('--'+key,type=Path,required=True)
     a=p.parse_args();c=json.loads(a.config.read_text())
+    from teacher_numerical_recovery import audit_recovery
+    recovered=audit_recovery(c)
     for key in ('generation_manifest','predictions','protocol','usalign'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     for dep in c['dependencies']+c['teacher_artifacts']:
@@ -68,6 +70,7 @@ def main():
     start=time.monotonic();telemetry=None;m=dict(status='running',config=c,records=[],controls=[],sequences={},training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
     try:
         torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
+        if recovered is not None:torch.use_deterministic_algorithms(True)
         telemetry=Telemetry(a.output,True);backbones={}
         with h5py.File(c['predictions']) as f:
             for r in c['entries']:
@@ -91,6 +94,7 @@ def main():
         m['mpnn_seconds']=time.monotonic()-tick
         for r in c['entries']:m['sequences'][r['name']]=design_sequences(designs/'seqs'/(r['name']+'.fa'),r['length'])
         verify_fixed_sequences(m['sequences'],c['entries'])
+        if recovered is not None and m['sequences']!=recovered['sequences']:raise ValueError('Recovery changed fixed sequence attempts')
         if len(list((designs/'seqs').glob('*.fa')))!=len(c['entries']):raise ValueError('Unexpected design coverage')
         atomic_json(a.output/'manifest.json',m);print('MPNN complete',len(c['entries']),flush=True)
         model,m['teacher_adapter']=load_fast_model(a.source/'data/esmfold2_fast');atomic_json(a.output/'manifest.json',m)
@@ -102,6 +106,10 @@ def main():
                     seed=int.from_bytes(hashlib.sha256(f"{c['seed']}:{name}:{index}".encode()).digest()[:8],'little')%(2**63-1);torch.manual_seed(seed);torch.cuda.synchronize();torch.cuda.reset_peak_memory_stats();tick=time.monotonic()
                     features=fast_features(seq);indices=backbone_indices(features,len(seq));output=model.fold(**features,num_loops=3,num_sampling_steps=50,num_diffusion_samples=1);bb=output.sample_atom_coords.float().cpu().numpy()[0,indices,:];del output;torch.cuda.synchronize();seconds=time.monotonic()-tick
                     if bb.shape!=ref.shape or not np.isfinite(bb).all():raise ValueError('Invalid refold, retain failure in manifest')
+                    if recovered is not None and name==recovered['records'][0]['name'] and index==0:
+                        with h5py.File(c['numerical_recovery']['failed_refolded']) as old_file:previous=old_file[name+'/0'][:]
+                        m['recovery_control']=ca_metrics(previous[:,1],bb[:,1]);atomic_json(a.output/'manifest.json',m)
+                        if m['recovery_control']['ca_rmsd']>.01 or m['recovery_control']['ca_lddt']<.999:raise ValueError('Recovery original-output parity failed')
                     g.create_dataset(str(index),data=bb);metric=usalign_coordinates(c['usalign'],bb[:,1],ref[:,1]);m['records'].append(dict(name=name,sequence_index=index,seed=seed,sc_tm=metric,seconds=seconds,peak_reserved_bytes=torch.cuda.max_memory_reserved(),**ca_metrics(bb[:,1],ref[:,1])))
                     if (r['head']=='experimental' or r.get('repeatability_control',False)) and index==0:
                         torch.manual_seed(seed);repeat=model.fold(**features,num_loops=3,num_sampling_steps=50,num_diffusion_samples=1);again=repeat.sample_atom_coords.float().cpu().numpy()[0,indices,:];del repeat;control=dict(name=name,**ca_metrics(bb[:,1],again[:,1]));m['controls'].append(control);atomic_json(a.output/'manifest.json',m)

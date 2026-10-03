@@ -51,6 +51,8 @@ def screen(c):
 
 
 def audit_inputs(c,check_teacher=False):
+    from teacher_numerical_recovery import audit_recovery
+    audit_recovery(c)
     for key in ('predictions','usalign'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed assay input')
     if check_teacher:

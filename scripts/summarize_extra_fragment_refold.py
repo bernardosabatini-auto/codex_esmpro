@@ -18,6 +18,10 @@ def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error'))
     c=m['config'];audit_inputs(c);records=score_assay(run);diversity=[]
+    if c.get('numerical_recovery'):
+        from teacher_numerical_recovery import audit_recovery
+        original=audit_recovery(c);control=m['recovery_control']
+        if m['sequences']!=original['sequences'] or control['ca_rmsd']>.01 or control['ca_lddt']<.999:raise ValueError('Recovery sequence or numerical parity failed')
     with h5py.File(run/'refolded.h5') as folds,h5py.File(c['predictions']) as raw:
         for r in records:
             bb=raw[r['dataset']][0];fragment=raw['motifs/'+r['target_id']][:];mask=np.ones(len(bb),bool);mask[r['motif_start']:r['motif_start']+len(fragment)]=False
@@ -35,6 +39,7 @@ def analyze(run):
         source=c['native_reuse'];native=json.loads(Path(source['report']).read_text())['native_controls']
     result=dict(status='complete',manifest_sha256=sha(path),refolded_sha256=sha(run/'refolded.h5'),generation_inventory_sha256=c['generation_manifest_sha256'],partition=c['partition'],target_ids=c['target_ids'],screen_rows=c['screen_rows'],records=records,completed_refolds=len(m['records']),native_controls=native,successful_scaffold_diversity=diversity,elapsed_seconds=m['elapsed_seconds'],scope='Disjoint16-family partition; eight fixed-motif designs per selected backbone. Primary and stronger scaffold success require the same valid refold. All raw failures remain in the generation denominator. Diversity is across scaffold designs, potentially with different full sequences.')
     if c.get('native_reuse'):result['reused_native_source']=c['native_reuse']
+    if c.get('numerical_recovery'):result['numerical_recovery']=dict(evidence=c['numerical_recovery'],original_output_parity=m['recovery_control'],policy='Deterministic algorithms; identical eight sequences and seeds; failed run excluded, not pooled.')
     return result
 
 

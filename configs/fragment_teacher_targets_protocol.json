@@ -1,0 +1,14 @@
+{
+  "purpose": "Audit whether existing teacher conformations supply broad training targets compatible with unchanged isolated fragments.",
+  "data_run": "fragment_data_49981806",
+  "maximum_proper_rmsd": 0.5,
+  "maximum_drms": 0.5,
+  "minimum_mean_plddt": 0.8,
+  "minimum_proteins": 256,
+  "minimum_condition_fraction": 0.25,
+  "minimum_bucket_condition_fraction": 0.2,
+  "minimum_center30_fraction": 0.25,
+  "selection": "Training512proteins only. For each of the existing nine unchanged AFDB-derived isolated fragments, retain every one of the16cached ESMFold2 conformations that is coarse-valid, has mean confidence>=.8, and matches the supplied fragment by properCA RMSD<=.5A and dRMS<=.5A. No whole-reference-scaffold agreement selection, development filtering, changed motif sequence, or new teacher inference.",
+  "gate": "At least256proteins must have an eligible condition; at least25percent of all4608conditions and25percent of center30conditions must be eligible; each length bucket must have at least20percent eligible conditions. Preserve failure without loosening the geometric margin or confidence threshold.",
+  "scope": "CPU feasibility audit only. A passing inventory is not designability evidence or authorization-by-surrogate to skip reconstruction/profile checks. Before training, validate cached latent reconstruction and target/motif provenance on a fixed training-only sample. Any training comparison must retain the original fragment features, data draws and null targets, independently sample among compatible teacher endpoints, and use unchanged development conditions with the existing primary and scaffold-only refolding endpoints. No locked tests or development refolds enter training."
+}

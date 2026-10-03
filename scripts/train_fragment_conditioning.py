@@ -46,6 +46,8 @@ def main():
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     warm=c.get('warm_start',False)
+    if c.get('motif_mass') is not None and not c.get('broad_corpus_protocol'):raise ValueError('Unbound region-balanced objective')
+    if c.get('broad_corpus_protocol') and not c.get('extension_protocol'):raise ValueError('Unbound broader continuation')
     if bool(c.get('conditional_time_shift'))!=bool(c.get('time_protocol')):raise ValueError('Unbound conditional time shift')
     if c.get('time_protocol'):
         from fragment_time_shift import audit_config
@@ -204,7 +206,7 @@ def main():
                     coordinates=coordinates.cuda() if geometry else None;null_target=null_target.cuda() if null_target is not None else None
                     z,features,keep,mask=[x.cuda() for x in (z,features,keep,mask)];factor=min((step+1)/100,1)*(.1+.9*.5*(1+math.cos(math.pi*step/1999)))
                     for group in optimizer.param_groups:group['lr']=group['base_lr']*factor
-                    optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates,return_state=bool(c.get('auxiliary_motif')),null_target=null_target,motif_weight=c.get('latent_motif_weight',1.),conditional_time_shift=c.get('conditional_time_shift',0.))
+                    optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates,return_state=bool(c.get('auxiliary_motif')),null_target=null_target,motif_weight=c.get('latent_motif_weight',1.),conditional_time_shift=c.get('conditional_time_shift',0.),motif_mass=c.get('motif_mass'))
                     if null_target is not None:
                         target_trace=dict(step=step+1,conditioned_target_sha256=digest(z),null_target_sha256=digest(null_target),selected_target_sha256=digest(info['target']),dropped_slots=info['dropped'].cpu().tolist())
                         if endpoint_pool is not None:target_trace['candidate_indices']=selected_endpoints

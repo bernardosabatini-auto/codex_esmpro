@@ -5,6 +5,9 @@ from prepare_overfit import sha
 
 
 def audit_extension(c):
+    if c.get('broad_corpus_protocol'):
+        from broad_fragment_training import audit_broad
+        return audit_broad(c)
     path=Path(c['extension_protocol'])
     if sha(path)!=c['extension_protocol_sha256']:raise ValueError('Changed extension protocol')
     spec=json.loads(path.read_text());arm=c['extension_arm'];parent=Path(c['warm_parent_manifest'])

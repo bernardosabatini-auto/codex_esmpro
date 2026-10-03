@@ -17,6 +17,8 @@ def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error','Incomplete'),updates=m.get('updates',0),profile_qualified=False)
     c=m['config'];warm=c.get('warm_start',False)
+    if c.get('motif_mass') is not None and not c.get('broad_corpus_protocol'):raise ValueError('Unbound region-balanced objective')
+    if c.get('broad_corpus_protocol') and not c.get('extension_protocol'):raise ValueError('Unbound broader continuation')
     if bool(c.get('conditional_time_shift'))!=bool(c.get('time_protocol')):raise ValueError('Unbound conditional time shift')
     if c.get('time_protocol'):
         from fragment_time_shift import audit_config

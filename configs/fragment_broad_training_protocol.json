@@ -1,0 +1,24 @@
+{
+  "purpose": "Test broader source-verified supervision and a motif-fraction-independent objective for isolated-fragment generation.",
+  "broad_short_corpus": true,
+  "parent": "fragment_training_50106855",
+  "arms": {
+    "control_weight3": {"corpus": "control512", "motif_mass": null},
+    "broad_weight3": {"corpus": "broad", "motif_mass": null},
+    "control_balanced": {"corpus": "control512", "motif_mass": 0.5},
+    "broad_balanced": {"corpus": "broad", "motif_mass": 0.5}
+  },
+  "seed": 2026100371,
+  "total_prior_updates": 6000,
+  "updates": 2000,
+  "evaluation_steps": [500, 2000],
+  "weight": 3.0,
+  "sampling_control_mode": "same_batch_repeat",
+  "assembly_protocol": "configs/fragment_broad_full_protocol.json",
+  "data": "Require all four independently audited source-backed data shards and exact preservation of the original512 training and16 development inputs. Both corpora add20-residue left/center/right conditions alongside the original nine fractional conditions. Broad data retains only prospectively qualified endpoints, with every rejection retained in the ledger. No refold outcome is a training label.",
+  "objective": "Control uses established residue weight3 on condition-present motifs. Balanced uses half of each condition-present example loss on motif residues and half on scaffold residues, independent of motif size. Null examples remain uniformly residue-weighted; absent or all-residue motifs use the uniform fallback. No decoder gradient or extra noise/time/drop/self-conditioning draws. All other training settings remain inherited.",
+  "training": "Four fresh-optimizer continuations of the same6000-update EMA state. First40-update oneRTX profiles perarm; require finite gradients, all historical and pose controls, <=75GiB. Then2000updates with unchanged bucket batches64/32/16/8, LR, EMA, and original32training/16development evaluation panel. At a fixed corpus, both objectives must have identical target/condition/noise/time/drop and learning-rate traces. Across corpus sizes, match bucket/noise/time/drop/LR schedules; protein IDs necessarily differ. Evaluate8000-update endpoints, without choosing the500-update checkpoint posthoc.",
+  "evaluation": "Evaluate all qualified endpoints on the frozen64additional development families under bothcenter30percent andcenter20residue constraints,4fixed noises/family,50flow steps,AE3,CFG1. Use8fixed-motifCA-onlyProteinMPNN designs per strict raw match and the unchangedFP32refold recipe. Primary success requires motif properCA RMSD and dRMS<=1A plus coarse validity, globalTM>.5 and scaffold-onlyTM>.5 in the SAME refold. Denominator256 outputs perarm/task includes every generation failure. Reuse each task's existing64native controls at exactly its original8attempts, with no attempt pooling. Report successes by family/length, raw retention, global designability, compute and first-qualifying-refold scaffold diversity. No claim about fixed-sequence conformational diversity. Locked tests untouched.",
+  "decision": "No further duration sweep or best-checkpoint selection. Candidate progress requires improved strict same-refold scaffold success across families, with uncertainty reported at family level. Raw motif retention alone cannot establish progress; preserve designability tradeoffs and all failed arms. This is a developmental factorial test, not a blind benchmark or a pure corpus scaling law.",
+  "resources": "At most four oneRTX profiles, followed by at most four oneRTX training jobs with allocations estimated from measured profile time plus broad-data loading overhead. Eightown running-plus-pending GPUs total across all work. Completion watchers mandatory."
+}

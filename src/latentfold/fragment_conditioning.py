@@ -67,7 +67,23 @@ def prepare_fragment_condition(net, adapter, features, keep, mask, dropped, *, c
     return esm, (token, pool, *prepared[2:])
 
 
-def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator, coordinates=None, return_state=False, null_target=None, motif_weight=1., conditional_time_shift=0.):
+def region_balanced_loss(error, keep, mask, dropped, motif_mass):
+    """Fix the motif's loss mass while preserving uniform null-example loss."""
+    if not math.isfinite(motif_mass) or not 0 < motif_mass < 1:
+        raise ValueError('Motif loss mass must lie strictly between zero and one')
+    motif = keep & mask
+    scaffold = mask & ~keep
+    nm, ns = motif.sum(1), scaffold.sum(1)
+    if (mask.sum(1) == 0).any():
+        raise ValueError('Empty training examples are invalid')
+    active = ~dropped & (nm > 0) & (ns > 0)
+    balanced = motif_mass * (error * motif).sum(1) / nm.clamp_min(1)
+    balanced = balanced + (1 - motif_mass) * (error * scaffold).sum(1) / ns.clamp_min(1)
+    uniform = (error * mask).sum(1) / mask.sum(1)
+    return torch.where(active, balanced, uniform).mean()
+
+
+def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator, coordinates=None, return_state=False, null_target=None, motif_weight=1., conditional_time_shift=0., motif_mass=None):
     """Protein-weighted flow matching; fragment dropout preserves a null branch."""
     if target.shape != (*mask.shape, 8) or target.requires_grad or not torch.isfinite(target).all():
         raise ValueError('Fixed finite full-structure latent targets required')
@@ -97,7 +113,9 @@ def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator,
             history = x + (1-tt)*net(x, t, esm, mask, x_sc=None, prepared=detach(prepared))
     velocity = net(x, t, esm, mask, x_sc=history, prepared=prepared)
     error = (velocity - (target-noise)).square().mean(-1)
-    if motif_weight == 1.:
+    if motif_mass is not None:
+        loss = region_balanced_loss(error, keep, mask, dropped, motif_mass)
+    elif motif_weight == 1.:
         loss = ((error*mask).sum(1)/mask.sum(1)).mean()
     else:
         weights = mask * (1 + (motif_weight-1) * (keep & ~dropped[:, None]))

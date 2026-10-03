@@ -1,0 +1,28 @@
+{
+  "purpose": "Matched control for testing compatible-endpoint augmentation across512proteins; both arms start at the same weighted4000-update checkpoint and reach6000updates.",
+  "parents": {
+    "weighted": "fragment_training_50059766"
+  },
+  "seed": 2026100301,
+  "total_prior_updates": 4000,
+  "updates": 2000,
+  "evaluation_steps": [
+    500,
+    2000
+  ],
+  "training": "Same weighted512parent for botharms, fresh optimizer, unchanged2000-update schedule,batches,weight3,and original32capacity/16development evaluations. The control retains original targets; candidate additionally uses the fixed compatible-teacher mixture. No unconditional target changes.",
+  "controls": "Require the512-target decoder qualification report before profiles. Every arm reproduces its own384historical outputs; candidate and control must have identical initialization and all primary draws. Profile40updates perarm, <=75GiB, then measured full allocations.",
+  "evaluation": "Botharms receive fixed288refolds plus exactly8designs for each additional strict raw match. Evaluate original joint motif/global outcome and scaffold-onlyTM>.5in the same refold. Matched frozen development panel, unchanged noise and native controls. No evaluation refolds enter training.",
+  "decision": "One matched2000-update augmentation comparison. A larger dataset is justified by the128-protein fresh-noise scaffold successes, not a reopening of failed plain duration tests. No automatic extra duration or mixture sweep.",
+  "resources": "Two separate one-RTX profiles, then at most two concurrent one-RTX training jobs with walltimes estimated from measured profiles. Eight own running-plus-pending GPUs maximum.",
+  "original_protocol": "configs/fragment_extension_protocol.json",
+  "original_protocol_sha256": "1c67e457a8ab165983e2331e9b57865ff5756ccf0fe90476dbc40938e7121523",
+  "failed_profile": "fragment_training_50039563",
+  "failed_profile_manifest_sha256": "2b26aa378f812d1136c426e4b1868c7a2d676d6224e2117f289c9b996ebda1f5",
+  "sampling_control_mode": "same_batch_repeat",
+  "evaluation_batch_size": 4,
+  "correction": "The first weighted extension profile failed batch1-versus4 latent tolerance0.00016117>1e-4 while historical batch4 outputs were exact. Preserve this failure. Pin every evaluation to its historical batch4 and require same-batch repeated latent agreement<=1e-5 for all four controls. Do not claim cross-batch invariance. Neither sampling noises nor scientific thresholds change. Rerun both profiles under this separately bound protocol.",
+  "training_protein_count": 512,
+  "weight": 3.0,
+  "data_protocol": "configs/fragment_teacher_augmentation_512_protocol.json"
+}

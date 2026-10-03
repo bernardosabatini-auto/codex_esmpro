@@ -17,7 +17,8 @@ def audit_config(c):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed target-augmentation source '+key)
     spec=json.loads(Path(c['augmentation_protocol']).read_text());m=json.loads(Path(c['augmentation_manifest']).read_text());d=json.loads(Path(c['augmentation_report']).read_text());base=json.loads(Path(c['augmentation_baseline_config']).read_text())
     if m['status']!='complete' or d['status']!='complete' or not d['training_gate_passed'] or d['manifest_sha256']!=c['augmentation_manifest_sha256'] or m['targets_sha256']!=c['augmentation_targets_sha256'] or c['fragments_sha256']!=m['config']['fragments_sha256'] or m['config']['protocol_sha256']!=c['augmentation_protocol_sha256'] or spec['mixture_probability']!=.5:raise ValueError('Unqualified target pool')
-    if Path(c['warm_parent_manifest']).parent.name!=spec['parent'] or c['extension_arm']!='weighted' or base['profile_only'] or base['updates']!=2000 or c['seed']!=2026100281:raise ValueError('Wrong matched training parent')
+    if Path(c['warm_parent_manifest']).parent.name!=spec['parent'] or c['extension_arm']!='weighted' or base['profile_only'] or base['updates']!=2000 or c['seed']!=spec.get('training_seed',2026100281):raise ValueError('Wrong matched training parent')
+    if spec.get('training_protein_count')==512 and ('augmentation_baseline_run' not in c or not Path(c['augmentation_baseline_run']).name.startswith('fragment_training_')):raise ValueError('Missing matched breadth control')
     if any(c.get(k)!=v for k,v in base.items() if k not in OPERATIONAL):raise ValueError('Changed non-target training recipe')
     if c['updates']!=(40 if c['profile_only'] else 2000) or c['evaluation_steps']!=([40] if c['profile_only'] else [500,2000]):raise ValueError('Changed exposure')
     if any(c.get(k) for k in ('target_frame_training','time_protocol','rollout_motif','auxiliary_motif','backbone_tokens','fragment_representation')):raise ValueError('Additional undeclared intervention')
@@ -31,7 +32,7 @@ def audit_config(c):
 
 def compare(root,run):
     root,run=Path(root),Path(run);path=run/'manifest.json';m=json.loads(path.read_text());c=m['config'];spec=audit_config(c)
-    basepath=Path(c['augmentation_baseline_profile']) if c['profile_only'] else root/'runs'/spec['matched_control']/'manifest.json';base=json.loads(basepath.read_text())
+    basepath=Path(c['augmentation_baseline_profile']) if c['profile_only'] else (Path(c['augmentation_baseline_run'])/'manifest.json' if c.get('augmentation_baseline_run') else root/'runs'/spec['matched_control']/'manifest.json');base=json.loads(basepath.read_text())
     if m['status']!='complete' or base['status']!='complete' or m['updates']!=base['updates'] or m['adapter_initial']!=base['adapter_initial'] or m['frozen_initial']!=base['frozen_initial']:raise ValueError('Incomplete matched endpoint comparison')
     if len(m['training'])!=c['updates'] or any(any(x[k]!=y[k] for k in TRACE) for x,y in zip(base['training'],m['training'])):raise ValueError('Changed primary random draws')
     if any(base['config'].get(k)!=v for k,v in json.loads(Path(c['augmentation_baseline_config']).read_text()).items() if k not in OPERATIONAL):raise ValueError('Changed actual control configuration')

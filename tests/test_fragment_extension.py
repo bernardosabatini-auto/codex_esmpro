@@ -20,6 +20,12 @@ class ExtensionLineageTests(unittest.TestCase):
             c.update(total_prior_updates=6000,extension_protocol_sha256=sha(protocol),warm_protocol_sha256=sha(protocol))
             self.assertEqual(audit_extension(c),spec)
             with self.assertRaises(ValueError):audit_extension(dict(c,total_prior_updates=4000))
+            spec['training_protein_count']=512;pc['training_protein_count']=512
+            protocol.write_text(json.dumps(spec));manifest.write_text(json.dumps(dict(status='complete',updates=2000,config=pc)))
+            report.write_text(json.dumps(dict(status='complete',manifest_sha256=sha(manifest),total_training_updates=6000)))
+            c.update(training_protein_count=512,extension_protocol_sha256=sha(protocol),warm_protocol_sha256=sha(protocol))
+            self.assertEqual(audit_extension(c),spec)
+            with self.assertRaises(ValueError):audit_extension(dict(c,training_protein_count=128))
             manifest.write_text(json.dumps(dict(status='failed',updates=2000,config=pc)))
             with self.assertRaises(ValueError):audit_extension(c)
 

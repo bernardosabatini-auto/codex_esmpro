@@ -72,7 +72,7 @@ def main():
         from fragment_weight_breadth import audit
         audit(c)
     if c.get('latent_motif_weight') and not c.get('weight_breadth_protocol'):
-        if not warm or c.get('training_protein_count')!=128 or c.get('rollout_motif') or c.get('auxiliary_motif') or c.get('target_frame_training') or c.get('backbone_tokens') or c.get('fragment_representation') or sha(c['latent_weight_protocol'])!=c['latent_weight_protocol_sha256'] or c['latent_motif_weight']!=json.loads(Path(c['latent_weight_protocol']).read_text())['weight']:raise ValueError('Invalid latent motif weighting')
+        if not warm or c.get('training_protein_count')!=(extension_spec.get('training_protein_count',128) if c.get('extension_protocol') else 128) or c.get('rollout_motif') or c.get('auxiliary_motif') or c.get('target_frame_training') or c.get('backbone_tokens') or c.get('fragment_representation') or sha(c['latent_weight_protocol'])!=c['latent_weight_protocol_sha256'] or c['latent_motif_weight']!=json.loads(Path(c['latent_weight_protocol']).read_text())['weight']:raise ValueError('Invalid latent motif weighting')
     if c.get('backbone_tokens'):
         if warm or c['arm']!='full' or c.get('variant')!='geometry' or c.get('fragment_representation') or c.get('auxiliary_motif') or c.get('expanded_fragment_data') or sha(c['backbone_tokens_protocol'])!=c['backbone_tokens_protocol_sha256']:raise ValueError('Invalid direct backbone contrast')
     geometry=c.get('variant')=='geometry'

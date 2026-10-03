@@ -73,18 +73,18 @@ def main():
         mpnn=Path(c['mpnn']);parsed=a.output/'parsed.jsonl';designs=a.output/'mpnn';tick=time.monotonic()
         mode_args=[] if c.get('mpnn_mode')=='backbone' else ['--ca_only']
         model_weights='vanilla_model_weights' if c.get('mpnn_mode')=='backbone' else 'ca_model_weights'
+        from fixed_motif_design import requires_fixed_motifs,verify_fixed_sequences
+        constrained=requires_fixed_motifs(c['entries'])
         with (a.output/'mpnn.log').open('w') as log:
             subprocess.run([sys.executable,str(mpnn/'helper_scripts/parse_multiple_chains.py'),'--input_path',str(inputs),'--output_path',str(parsed)]+mode_args,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=120)
             fixed_args=[]
-            if c.get('assay') in ('fixed_motif','trained_fragment','fragment_fixed_positive','fragment_feedback_profile','fragment_feedback','fragment_strict_followup','fragment_repetition_refold','fragment_refinement','fragment_full_backbone','fragment_validation_refold'):
+            if constrained:
                 from fixed_motif_design import fix_parsed_motifs
                 positions=a.output/'fixed_positions.jsonl';fix_parsed_motifs(parsed,positions,c['entries']);fixed_args=['--fixed_positions_jsonl',str(positions)]
             subprocess.run([sys.executable,str(mpnn/'protein_mpnn_run.py'),'--jsonl_path',str(parsed),'--out_folder',str(designs),*mode_args,'--path_to_model_weights',str(mpnn/model_weights),'--model_name','v_48_020','--num_seq_per_target','8','--sampling_temp','0.1','--seed','1','--batch_size','1']+fixed_args,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=600)
         m['mpnn_seconds']=time.monotonic()-tick
         for r in c['entries']:m['sequences'][r['name']]=design_sequences(designs/'seqs'/(r['name']+'.fa'),r['length'])
-        if c.get('assay') in ('fixed_motif','trained_fragment','fragment_fixed_positive','fragment_feedback_profile','fragment_feedback','fragment_strict_followup','fragment_repetition_refold','fragment_refinement','fragment_full_backbone','fragment_validation_refold'):
-            from fixed_motif_design import verify_fixed_sequences
-            verify_fixed_sequences(m['sequences'],c['entries'])
+        verify_fixed_sequences(m['sequences'],c['entries'])
         if len(list((designs/'seqs').glob('*.fa')))!=len(c['entries']):raise ValueError('Unexpected design coverage')
         atomic_json(a.output/'manifest.json',m);print('MPNN complete',len(c['entries']),flush=True)
         model,m['teacher_adapter']=load_fast_model(a.source/'data/esmfold2_fast');atomic_json(a.output/'manifest.json',m)

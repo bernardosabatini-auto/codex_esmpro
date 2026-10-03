@@ -4,12 +4,16 @@ from pathlib import Path
 from prepare_fragment_endpoint_refold import audit_inputs
 from fragment_refinement_core import score_assay
 from prepare_overfit import sha
+from fixed_motif_design import verify_fixed_sequences
 
 
 def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error'))
-    audit_inputs(m['config']);records=score_assay(run);summaries=[]
+    audit_inputs(m['config'])
+    try:verify_fixed_sequences(m['sequences'],m['config']['entries'])
+    except ValueError as error:return dict(status='invalid',manifest_sha256=sha(path),refolded_sha256=sha(run/'refolded.h5'),error=str(error),excluded_from_comparison=True,scope='Preserved invalid assay: fixed motif sequence was not enforced. No scores or sequence attempts can be pooled into the corrected rerun.')
+    records=score_assay(run);summaries=[]
     for arm in ('native','initial','guided'):
         rr=[r for r in records if r['arm']==arm]
         if len(rr)!=(4 if arm=='native' else 16):raise ValueError('Changed denominator')

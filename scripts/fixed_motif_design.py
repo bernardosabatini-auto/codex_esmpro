@@ -21,3 +21,10 @@ def verify_fixed_sequences(sequences,entries):
     for r in entries:
         start=r.get('fixed_start',0);fragment=r.get('fixed_sequence','');ss=sequences[r['name']]
         if len(ss)!=8 or any(len(s)!=r['length'] or s[start:start+len(fragment)]!=fragment for s in ss):raise ValueError('Fixed motif sequence changed or incomplete designs')
+
+
+def requires_fixed_motifs(entries):
+    """Constraint presence comes from inputs, never an assay-name allowlist."""
+    for row in entries:
+        if ('fixed_start' in row)!=('fixed_sequence' in row):raise ValueError('Incomplete fixed motif declaration')
+    return any(bool(row.get('fixed_sequence')) for row in entries)

@@ -26,7 +26,7 @@ def analyze(run):
         audit_config(c)
     if c.get('extension_protocol'):
         from fragment_extension import audit_extension
-        audit_extension(c)
+        extension_spec=audit_extension(c)
     if warm:
         for key in ('warm_protocol','warm_parent_manifest','warm_parent_report','warm_predictions'):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed continuation source')
@@ -36,7 +36,7 @@ def analyze(run):
         from fragment_weight_breadth import audit
         audit(c)
     if c.get('latent_motif_weight') and not c.get('weight_breadth_protocol'):
-        if not warm or c.get('training_protein_count')!=128 or sha(c['latent_weight_protocol'])!=c['latent_weight_protocol_sha256'] or c['latent_motif_weight']!=json.loads(Path(c['latent_weight_protocol']).read_text())['weight']:raise ValueError('Invalid latent motif weighting')
+        if not warm or c.get('training_protein_count')!=(extension_spec.get('training_protein_count',128) if c.get('extension_protocol') else 128) or sha(c['latent_weight_protocol'])!=c['latent_weight_protocol_sha256'] or c['latent_motif_weight']!=json.loads(Path(c['latent_weight_protocol']).read_text())['weight']:raise ValueError('Invalid latent motif weighting')
     if c.get('backbone_tokens'):
         if warm or c['arm']!='full' or c.get('fragment_representation') or sha(c['backbone_tokens_protocol'])!=c['backbone_tokens_protocol_sha256'] or not m.get('shared_adapter_initial'):raise ValueError('Invalid backbone-token contrast')
     if c.get('fragment_representation'):

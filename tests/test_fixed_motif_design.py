@@ -13,3 +13,14 @@ class FixedMotifTests(unittest.TestCase):
    p.write_text(json.dumps(dict(name='x',seq='ACAAA',seq_chain_A='ACAAA')))
    with self.assertRaisesRegex(ValueError,'Unexpected input sequence'):fix_parsed_motifs(p,q,entries)
 if __name__=='__main__':unittest.main()
+
+
+class ConstraintDispatchTests(unittest.TestCase):
+    def test_new_assay_inputs_cannot_silently_omit_constraints(self):
+        from fixed_motif_design import requires_fixed_motifs,verify_fixed_sequences
+        row=dict(name='new_assay',length=8,head='guided',fixed_start=2,fixed_sequence='CD')
+        self.assertTrue(requires_fixed_motifs([row]))
+        self.assertFalse(requires_fixed_motifs([dict(name='free',length=8)]))
+        with self.assertRaises(ValueError):requires_fixed_motifs([dict(name='bad',fixed_start=2)])
+        with self.assertRaises(ValueError):verify_fixed_sequences({'new_assay':['AAAAAAAA']*8},[row])
+        verify_fixed_sequences({'new_assay':['AACDAAAA']*8},[row])

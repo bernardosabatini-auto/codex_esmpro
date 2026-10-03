@@ -7,7 +7,6 @@ import numpy as np
 from decoder_fragment_variance_core import audit,motif_distances,variance_components
 from evaluate_decoder_fragment_variance import check_backbones
 from fragment_validation_core import raw_rows
-from latentfold.metrics import ca_metrics
 from prepare_overfit import sha
 
 
@@ -62,7 +61,15 @@ def analyze(run):
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs=1,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();d=analyze(a.runs[0]);a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n')
-    a.output.with_suffix('.md').write_text('# Fixed-latent decoder variance\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','per_protein')},indent=2)+'\n```\n')
+    interpretation=''
+    if d['status']=='complete':
+        s=d['summary'][0]
+        interpretation=(f"Across32 proteins and128 fixed generated latents, within-latent decoder variance accounts for {100*s['decoder_fraction_of_error']:.3f}% of squared motif-distance error and {100*s['decoder_fraction_of_variance']:.3f}% of motif-distance variance. "
+                        f"Original raw motif successes: {s['original_diagonal_raw']}/128; oracle any-of-five decoder success: {s['oracle_latents_any_raw']}/128. "
+                        f"Native full-latent controls pass {s['native_raw']}/{s['native_samples']} raw motif checks.\n\n"
+                        "These are finite five-noise variance identities, not causal attribution of every systematic error to the generator. Native controls show that the frozen codec can represent these motifs in their native contexts; they do not prove that every generated scaffold admits the requested motif. "
+                        "The panel is repeatedly used training data. Raw motif geometry does not establish same-refold designability, and oracle decoder selection is not a deployable sampling result.\n\n")
+    a.output.with_suffix('.md').write_text('# Fixed-latent decoder variance\n\n'+interpretation+'```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','per_protein')},indent=2)+'\n```\n')
     print(json.dumps(d.get('summary',d)))
 
 

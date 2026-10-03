@@ -11,7 +11,7 @@ def clustered(values,seed=2026100351):
     return dict(mean=float(x.mean()),ci95=np.quantile(draws,[.025,.975]).tolist(),families=len(x))
 
 
-def summarize(screen,records,native,arms=('control128','augmented128','control512','augmented512'),pairs=None):
+def summarize(screen,records,native,arms=('control128','augmented128','control512','augmented512'),pairs=None,designability_targets=None):
     explicit_pairs=pairs is not None
     pairs=pairs or [dict(label=n,baseline=f'control{n}',candidate=f'augmented{n}') for n in (128,512)]
     expected={(a,i,k) for a in arms for i in native for k in range(4)}
@@ -19,6 +19,7 @@ def summarize(screen,records,native,arms=('control128','augmented128','control51
     if len(native)!=64 or len(keys)!=256*len(arms) or set(keys)!=expected:raise ValueError('Changed complete denominator')
     outcomes={(r['arm'],r['target_id'],r['generation_slot']):r for r in records if r['arm']!='native'}
     selected={(r['arm'],r['target_id'],r['generation_slot']) for r in screen if r['raw_gate_passed']}
+    selected|={(r['arm'],r['target_id'],0) for r in screen if r['target_id'] in (designability_targets or set()) and r['generation_slot']==0}
     if set(outcomes)!=selected or len(outcomes)!=sum(r['arm']!='native' for r in records):raise ValueError('Dropped or duplicate raw-match refold')
     enriched=[]
     for r in screen:
@@ -42,6 +43,25 @@ def summarize(screen,records,native,arms=('control128','augmented128','control51
     return summaries,contrasts
 
 
+def designability_summary(screen,records,targets,arms,pairs):
+    index={(r['arm'],r['target_id'],r['generation_slot']):r for r in records if r['arm']!='native'}
+    panel=[r for r in screen if r['target_id'] in targets and r['generation_slot']==0]
+    if len(targets)!=32 or len(panel)!=32*len(arms):raise ValueError('Incomplete fixed designability panel')
+    rows=[dict(r,valid_designable=index[r['arm'],r['target_id'],0]['valid_designable']) for r in panel]
+    summaries=[];contrasts=[]
+    for cohort in ('all','short','long'):
+        subset=[r for r in rows if cohort=='all' or (r['length']<=256 if cohort=='short' else r['length']>256)]
+        for arm in arms:
+            rr=[r for r in subset if r['arm']==arm]
+            if len(rr)!=(32 if cohort=='all' else 16):raise ValueError('Changed designability stratum')
+            summaries.append(dict(arm=arm,cohort=cohort,samples=len(rr),valid_designable=sum(r['valid_designable'] for r in rr)))
+        for pair in pairs:
+            ids=sorted({r['target_id'] for r in subset})
+            delta=[int(index[pair['candidate'],i,0]['valid_designable'])-int(index[pair['baseline'],i,0]['valid_designable']) for i in ids]
+            contrasts.append(dict(cohort=cohort,baseline_arm=pair['baseline'],candidate_arm=pair['candidate'],candidate_minus_baseline=clustered(delta)))
+    return dict(target_ids=sorted(targets),summaries=summaries,paired_family_contrasts=contrasts)
+
+
 def main():
     p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs=4,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];ds=[];sources=[]
     for run in a.runs:
@@ -51,9 +71,16 @@ def main():
     ids=[i for d in ds for i in d['target_ids']]
     if {d['partition'] for d in ds}!={0,1,2,3} or len(ids)!=64 or len(set(ids))!=64 or len({d['generation_inventory_sha256'] for d in ds})!=1:raise ValueError('Overlapping or mismatched partitions')
     config=json.loads((a.runs[0]/'manifest.json').read_text())['config'];spec=json.loads(Path(config['protocol']).read_text())
-    native={i:r for d in ds for i,r in d['native_controls'].items()};records=[r for d in ds for r in d['records']];summaries,contrasts=summarize([r for d in ds for r in d['screen_rows']],records,native,arms=tuple(spec['parents']),pairs=spec.get('comparisons'))
+    from extra_fragment_design_panel import audit_refold_plan,designability_ids
+    audit_refold_plan(spec)
+    screen=[r for d in ds for r in d['screen_rows']];panel=designability_ids(spec,{r['target_id']:dict(length=r['length']) for r in screen})
+    native={i:r for d in ds for i,r in d['native_controls'].items()};records=[r for d in ds for r in d['records']];summaries,contrasts=summarize(screen,records,native,arms=tuple(spec['parents']),pairs=spec.get('comparisons'),designability_targets=panel)
     if set(native)!=set(ids):raise ValueError('Missing native control')
     d=dict(status='complete',source_reports=sources,summaries=summaries,paired_family_contrasts=contrasts,native_controls=native,completed_refolds=sum(d['completed_refolds'] for d in ds),successful_scaffold_diversity=[r for d in ds for r in d['successful_scaffold_diversity']],scope='Additional development families; not a locked test. Same-refold scaffold success is the endpoint. All256outputs/model retained, with raw failures counted unsuccessful; their unconstrained designability is unmeasured. Bootstrap intervals describe family variation, not training-seed replication. Corpus-size comparisons have different parent histories and update counts. No evaluation labels enter training.')
+    if panel:
+        d['fixed_panel_designability']=designability_summary(screen,records,panel,tuple(spec['parents']),spec['comparisons'])
+        d['reused_native_sources']=[q['reused_native_source'] for q in ds]
+        d['scope']='Additional development comparison of matched8000-update endpoints; not a locked test. Every256output denominator retained. Strict success requires the SAME valid refold. Secondary designability uses a fixed32-family slot0 panel independent of raw success. Original native budgets reused without pooling. Family bootstrap is not training-seed replication. No evaluation labels enter training.'
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n');view={k:v for k,v in d.items() if k not in ('native_controls','successful_scaffold_diversity')};a.output.with_suffix('.md').write_text('# Additional-family augmentation comparison\n\n```json\n'+json.dumps(view,indent=2)+'\n```\n');print(json.dumps(summaries,indent=2))
 
 if __name__=='__main__':main()

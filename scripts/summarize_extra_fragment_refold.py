@@ -30,7 +30,12 @@ def analyze(run):
                 li=l['scaffold_successful_refold_indices'][0];ri=r['scaffold_successful_refold_indices'][0];x=folds[l['name']+'/'+str(li)][:];y=folds[r['name']+'/'+str(ri)][:];mask=np.zeros(len(x),bool);mask[l['motif_start']:l['motif_start']+len(raw['motifs/'+ident])]=True
                 pairs.append(dict(left_slot=l['generation_slot'],right_slot=r['generation_slot'],left_sequence=li,right_sequence=ri,global_tm=usalign_coordinates(c['usalign'],x[:,1],y[:,1]),scaffold_tm=usalign_coordinates(c['usalign'],x[~mask,1],y[~mask,1]),motif_aligned_scaffold_rmsd=scaffold_rmsd(x,y,mask)))
             diversity.append(dict(arm=arm,target_id=ident,successful_backbones=len(rr),pairs=pairs))
-    return dict(status='complete',manifest_sha256=sha(path),refolded_sha256=sha(run/'refolded.h5'),generation_inventory_sha256=c['generation_manifest_sha256'],partition=c['partition'],target_ids=c['target_ids'],screen_rows=c['screen_rows'],records=records,completed_refolds=len(m['records']),native_controls={r['target_id']:{k:r[k] for k in ('strict_joint_success','scaffold_joint_success','valid_designable')} for r in records if r['arm']=='native'},successful_scaffold_diversity=diversity,elapsed_seconds=m['elapsed_seconds'],scope='Disjoint16-family partition; eight fixed-motif designs per selected backbone. Primary and stronger scaffold success require the same valid refold. All raw failures remain in the generation denominator. Diversity is across scaffold designs, potentially with different full sequences.')
+    native={r['target_id']:{k:r[k] for k in ('strict_joint_success','scaffold_joint_success','valid_designable')} for r in records if r['arm']=='native'}
+    if c.get('native_reuse'):
+        source=c['native_reuse'];native=json.loads(Path(source['report']).read_text())['native_controls']
+    result=dict(status='complete',manifest_sha256=sha(path),refolded_sha256=sha(run/'refolded.h5'),generation_inventory_sha256=c['generation_manifest_sha256'],partition=c['partition'],target_ids=c['target_ids'],screen_rows=c['screen_rows'],records=records,completed_refolds=len(m['records']),native_controls=native,successful_scaffold_diversity=diversity,elapsed_seconds=m['elapsed_seconds'],scope='Disjoint16-family partition; eight fixed-motif designs per selected backbone. Primary and stronger scaffold success require the same valid refold. All raw failures remain in the generation denominator. Diversity is across scaffold designs, potentially with different full sequences.')
+    if c.get('native_reuse'):result['reused_native_source']=c['native_reuse']
+    return result
 
 
 def main():

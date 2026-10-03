@@ -11,8 +11,11 @@ def audit_config(c):
     for row in c['sources']:
         if sha(row['path'])!=row['sha256']:raise ValueError('Changed additional-validation source')
     spec=json.loads(Path(c['protocol']).read_text());m=json.loads(Path(c['model_manifest']).read_text());d=json.loads(Path(c['model_report']).read_text());dm=json.loads(Path(c['data_manifest']).read_text());dd=json.loads(Path(c['data_report']).read_text());pc=m['config'];arm=c['arm']
+    from extra_fragment_design_panel import audit_refold_plan
+    audit_refold_plan(spec)
     if spec!=c['spec'] or arm not in spec['parents'] or Path(c['model_manifest']).parent.name!=spec['parents'][arm] or m['status']!='complete' or d['status']!='complete' or d['manifest_sha256']!=sha(c['model_manifest']) or d['total_training_updates']!=spec['total_updates'][arm]:raise ValueError('Changed completed model')
-    if pc.get('training_protein_count')!=int(arm[-3:]) or pc['distance_precision']!='fp64' or c['historical_fragments']!=pc['fragments'] or c['decoder_checkpoint']!=pc['decoder_checkpoint'] or c['control_ids']!=pc['control_ids']:raise ValueError('Changed conditioning architecture or historical inputs')
+    expected_count=spec['training_counts'][arm] if 'training_counts' in spec else int(arm[-3:])
+    if pc.get('training_protein_count')!=expected_count or pc['distance_precision']!='fp64' or c['historical_fragments']!=pc['fragments'] or c['decoder_checkpoint']!=pc['decoder_checkpoint'] or c['control_ids']!=pc['control_ids']:raise ValueError('Changed conditioning architecture or historical inputs')
     run=Path(c['model_manifest']).parent
     if c['checkpoint']!=str(run/'ema_2000.ckpt') or c['historical_predictions']!=str(run/'evaluation_2000.h5'):raise ValueError('Changed final checkpoint')
     if dm['status']!='complete' or dd['status']!='complete' or not dd['generation_gate_passed'] or dd['manifest_sha256']!=sha(c['data_manifest']) or dd['fragments_sha256']!=sha(c['fragments']) or Path(c['data_manifest']).parent.name!=spec['encoded_cohort'] or Path(dm['config']['selection']).parent.name!=spec['selection'] or dm['config']['decoder_checkpoint']!=c['decoder_checkpoint']:raise ValueError('Unqualified additional fragments')

@@ -9,6 +9,13 @@ def audit_extension(c):
     if sha(path)!=c['extension_protocol_sha256']:raise ValueError('Changed extension protocol')
     spec=json.loads(path.read_text());arm=c['extension_arm'];parent=Path(c['warm_parent_manifest'])
     if arm not in spec['parents'] or parent.parent.name!=spec['parents'][arm] or c['warm_protocol']!=c['extension_protocol'] or c['warm_protocol_sha256']!=c['extension_protocol_sha256']:raise ValueError('Wrong extension parent')
+    if spec.get('sampling_control_mode'):
+        root=path.parent.parent
+        failed=root/'runs'/spec['failed_profile']/'manifest.json'
+        if sha(root/spec['original_protocol'])!=spec['original_protocol_sha256'] or sha(failed)!=spec['failed_profile_manifest_sha256']:raise ValueError('Changed original batch failure')
+        failure=json.loads(failed.read_text())
+        if failure['status']!='failed' or failure['updates']!=0 or failure['error']!='ValueError: Initial sampler/batch control failed' or spec['evaluation_batch_size']!=4:raise ValueError('Wrong original batch failure')
+    if c.get('sampling_control_mode')!=spec.get('sampling_control_mode'):raise ValueError('Changed batch control scope')
     m=json.loads(parent.read_text());report=json.loads(Path(c['warm_parent_report']).read_text());pc=m['config']
     if m['status']!='complete' or m['updates']!=2000 or report['status']!='complete' or report['manifest_sha256']!=sha(parent) or report['total_training_updates']!=4000:raise ValueError('Unaudited extension parent')
     keys=('fragments_sha256','batches','evaluation_train_ids','initial_predictions_sha256','decoder_checkpoint_sha256','distance_precision','geometry_protocol_sha256')
@@ -21,3 +28,8 @@ def audit_extension(c):
         p=json.loads(Path(c['profile_report']).read_text())
         if not p['profile_qualified'] or p['config']['extension_arm']!=arm or any(p['config'][k]!=c[k] for k in ('checkpoint_sha256','fragments_sha256','extension_protocol_sha256','seed')):raise ValueError('Wrong extension profile')
     return spec
+
+
+def validate_capacity_panel(c,parent_config,training_ids):
+    expected=parent_config["evaluation_train_ids"] if c.get("extension_protocol") else sorted(training_ids)
+    if c["evaluation_train_ids"]!=expected:raise ValueError("Changed capacity panel")

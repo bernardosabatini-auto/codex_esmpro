@@ -1,0 +1,26 @@
+{
+  "purpose": "Test whether further supervised conditional training converts the fixed3xlatent weighting's raw-retention improvement into strict same-refold designability.",
+  "parents": {
+    "plain": "fragment_training_49951202",
+    "weighted": "fragment_training_50019364"
+  },
+  "seed": 2026100261,
+  "total_prior_updates": 4000,
+  "updates": 2000,
+  "evaluation_steps": [
+    500,
+    2000
+  ],
+  "training": "Continue each matched128-protein arm from its own2000-update EMA and adapter, with a fresh optimizer and the unchanged2000-update schedule. Same new primary draws across arms; no new data, weight sweep, frame changes or decoder loss. Both arms reach6000total updates including the shared2000-update32-protein stage.",
+  "controls": "Each arm must reproduce its own384historical outputs before training; the two arms intentionally start from different weights. Audit matched primary traces across the original pair and this continuation pair. Profile40updates per arm before full training, require<=75GiB. Retain original32capacity and16development families, identical four sampling noises and supplied fragments.",
+  "evaluation": "Strict raw proper-fit analysis at500/2000, followed by unchanged36-backbone/288-refold final assay for both arms regardless of raw results. Every raw strict match outside that assay receives exactly eight supplemental refolds; reuse overlapping fixed-assay outputs. Require retention and global agreement in the same valid refold. All development failures remain in denominators; locked tests unscored.",
+  "decision": "Fixed2000-update continuation only. No automatic further continuation. Assess training-capacity change, global designability and strict retention separately. If neither arm yields strict-refold improvement, close this duration test; additional duration requires a new supported hypothesis.",
+  "resources": "Two separate one-RTX profiles, then at most two concurrent one-RTX training jobs with walltimes estimated from measured profiles. Eight own running-plus-pending GPUs maximum.",
+  "original_protocol": "configs/fragment_extension_protocol.json",
+  "original_protocol_sha256": "1c67e457a8ab165983e2331e9b57865ff5756ccf0fe90476dbc40938e7121523",
+  "failed_profile": "fragment_training_50039563",
+  "failed_profile_manifest_sha256": "2b26aa378f812d1136c426e4b1868c7a2d676d6224e2117f289c9b996ebda1f5",
+  "sampling_control_mode": "same_batch_repeat",
+  "evaluation_batch_size": 4,
+  "correction": "The first weighted extension profile failed batch1-versus4 latent tolerance0.00016117>1e-4 while historical batch4 outputs were exact. Preserve this failure. Pin every evaluation to its historical batch4 and require same-batch repeated latent agreement<=1e-5 for all four controls. Do not claim cross-batch invariance. Neither sampling noises nor scientific thresholds change. Rerun both profiles under this separately bound protocol."
+}

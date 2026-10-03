@@ -57,7 +57,8 @@ def main():
         if not warm or sha(c['expanded_protocol'])!=c['expanded_protocol_sha256']:raise ValueError('Invalid expanded continuation')
         parent_config=json.loads(Path(c['warm_parent_manifest']).read_text())['config']
         with h5py.File(parent_config['fragments']) as original:
-            if (parent_config['evaluation_train_ids'] if c.get('extension_protocol') else sorted(original['train']))!=c['evaluation_train_ids']:raise ValueError('Changed original capacity panel')
+            from fragment_extension import validate_capacity_panel
+            validate_capacity_panel(c,parent_config,original['train'])
     if c.get('fragment_representation'):
         if c['fragment_representation']!='geometry_sequence' or warm or c['arm']!='full' or c.get('variant')!='geometry' or c.get('auxiliary_motif') or c.get('expanded_fragment_data') or sha(c['representation_protocol'])!=c['representation_protocol_sha256']:raise ValueError('Invalid representation contrast')
     if c.get('latent_motif_weight'):
@@ -142,8 +143,14 @@ def main():
                                 if cohort=='development':m['initial_controls'].append(control)
                                 if control['latent_max_abs']>1e-5 or control['ca_rmsd']>.2 or control['ca_lddt']<.99 or not control['validity_identical']:raise ValueError('Historical null parity failed')
                         if step==0 and mode=='conditioned' and ident in c['control_ids']:
-                            esm=features.new_zeros(1,n,model.cond_norm.normalized_shape[0]);original=torch.from_numpy(historical[f'{cohort}/{mode}/{ident}/latent'][:1]).cuda() if warm else sample_unconditional(model,esm,mask[:1],noise=noise[:1],steps=50);single=sample_fragment(model,adapter,features[:1],keep[:1],mask[:1],noise=noise[:1],coordinates=coordinates[:1] if geometry else None);control=dict(target_id=ident,original_max_abs=float((original-(z[:1] if warm else single)).abs().max()),batched_max_abs=float((single-z[:1]).abs().max()));m['sampling_controls'].append(control)
-                            if control['original_max_abs']>1e-5 or control['batched_max_abs']>1e-4:raise ValueError('Initial sampler/batch control failed')
+                            if c.get('sampling_control_mode')=='same_batch_repeat':
+                                repeated=sample_fragment(model,adapter,features,keep,mask,noise=noise,coordinates=coordinates)
+                                original=torch.from_numpy(historical[f'{cohort}/{mode}/{ident}/latent'][:]).cuda()
+                                control=dict(target_id=ident,kind='same_batch_repeat',original_max_abs=float((original-z).abs().max()),batched_max_abs=float((repeated-z).abs().max()))
+                            else:
+                                esm=features.new_zeros(1,n,model.cond_norm.normalized_shape[0]);original=torch.from_numpy(historical[f'{cohort}/{mode}/{ident}/latent'][:1]).cuda() if warm else sample_unconditional(model,esm,mask[:1],noise=noise[:1],steps=50);single=sample_fragment(model,adapter,features[:1],keep[:1],mask[:1],noise=noise[:1],coordinates=coordinates[:1] if geometry else None);control=dict(target_id=ident,original_max_abs=float((original-(z[:1] if warm else single)).abs().max()),batched_max_abs=float((single-z[:1]).abs().max()))
+                            m['sampling_controls'].append(control)
+                            if control['original_max_abs']>1e-5 or control['batched_max_abs']>(1e-5 if c.get('sampling_control_mode')=='same_batch_repeat' else 1e-4):raise ValueError('Initial sampler/batch control failed')
                         if geometry and mode=='conditioned' and ident in c['control_ids']:
                             cc=coordinates.double() if c.get('distance_precision')=='fp64' else coordinates;rotations=[('quarter',cc.new_tensor([[0,-1,0],[1,0,0],[0,0,1]]))]
                             if c.get('distance_precision')=='fp64':

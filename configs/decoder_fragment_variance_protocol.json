@@ -1,0 +1,18 @@
+{
+  "purpose": "Locate isolated-fragment error at fixed generated latents before considering decoder-side conditioning. No model training or performance promotion.",
+  "baseline_generation": "extra_fragment_validation_50188437",
+  "parent": "fragment_training_50106855",
+  "condition": "c20_center",
+  "targets": 32,
+  "flow_samples": 4,
+  "decoder_samples": 5,
+  "decoder_steps": 3,
+  "precision": "fp32",
+  "seed": 2026100405,
+  "decoder_stream": "decoder:0",
+  "design": "Cross all four archived flow latents with the SAME five decoder noise draws per protein. Draw indices0..3 reproduce the original diagonal; index4 is additional. Decode full native reference_z with the same five noises. All32 prior training-only diagnostic proteins and all generated latents retained, without outcome selection. Native latents are oracle reconstruction controls, never inference inputs for generated samples.",
+  "controls": "All128 original diagonal structures must match historical CA RMSD<=0.2A, CA-lDDT>=0.99 and identical coarse-valid/strict-raw decisions. All32 native decoder0 outputs require unpadded single-versus-batch agreement under the same limits and decisions. Exact archived latent arrays and complete finite outputs; unchanged decoder checkpoint. No changed noise, steps, weights, input-fragment encoding or tolerance on failure.",
+  "analysis": "For each protein, represent the supplied motif and every output by all190 CA pair distances. Decompose average squared motif distance error into error of each latent's mean decoder output distance vector plus within-latent decoder variance. Separately decompose total output distance variance into between-latent and within-latent components. Verify both exact identities. Report per-protein and length summaries, proper CA RMSD, original strict raw gates, geometry, and native controls. Any best-of-five raw coverage is explicitly oracle sensitivity, never a deployable selection result.",
+  "scope": "Mechanistic diagnosis on a repeated training-only panel. No new teacher labels, refolds, checkpoint selection, training, designability/generalization claim, or locked-test use. This does not reopen decoder step-count sweeps, which previously gave minimal global gains.",
+  "resources": "One RTX,10-minute allocation,480-second work cap,peak<=75GiB. Inherit audited four-sample exact-length decoder inference from the baseline generation. Record timings and memory; no expansion before completed controls. At most8 own running-plus-pending GPUs."
+}

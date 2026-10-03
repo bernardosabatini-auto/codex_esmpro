@@ -19,7 +19,7 @@ def main():
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     for dep in c['dependencies']+c['teacher_artifacts']:
         if sha(dep['path'])!=dep['sha256']:raise ValueError('Changed dependency '+dep['path'])
-    expected_count={'generative_pilot':52,'noise_contact':28,'isolated_motif':20,'fixed_motif':20,'trained_fragment':36,'fragment_fixed_positive':4,'fragment_feedback_profile':2,'fragment_feedback':24,'fragment_strict_followup':c.get('expected_backbones',4),'fragment_repetition_refold':c.get('expected_backbones'),'fragment_refinement':6,'fragment_full_backbone':4,'fragment_endpoint_refold':36,'fragment_validation_refold':c.get('expected_backbones'),'extra_fragment_refold':c.get('expected_backbones')}.get(c.get('assay','generative_pilot'))
+    expected_count={'generative_pilot':52,'noise_contact':28,'isolated_motif':20,'fixed_motif':20,'trained_fragment':36,'fragment_fixed_positive':4,'fragment_feedback_profile':2,'fragment_feedback':24,'fragment_strict_followup':c.get('expected_backbones',4),'fragment_repetition_refold':c.get('expected_backbones'),'fragment_refinement':6,'fragment_full_backbone':4,'fragment_endpoint_refold':36,'fragment_validation_refold':c.get('expected_backbones'),'extra_fragment_refold':c.get('expected_backbones'),'fragment_source_refold':c.get('expected_backbones')}.get(c.get('assay','generative_pilot'))
     if c['num_sequences']!=8 or c['temperature']!=.1 or expected_count is None or len(c['entries'])!=expected_count:raise ValueError('Unexpected design profile')
     if c.get('assay')=='noise_contact':
         from prepare_noise_designability import audit_inputs
@@ -43,6 +43,9 @@ def main():
         from prepare_fragment_repetition_refold import audit_inputs
         audit_inputs(c,check_teacher=False)
     if c.get('mpnn_mode','ca') not in ('ca','backbone') or (c.get('mpnn_mode')=='backbone')!=(c.get('assay')=='fragment_full_backbone'):raise ValueError('Undeclared MPNN design mode')
+    if c.get('assay')=='fragment_source_refold':
+        from prepare_fragment_source_refold import audit_inputs
+        audit_inputs(c)
     if c.get('assay')=='extra_fragment_refold':
         from prepare_extra_fragment_refold import audit_inputs
         audit_inputs(c)

@@ -99,7 +99,7 @@ def _record(path, m, entry, item, arm, slot, usalign):
 
 def collect_covered(c, selected):
     _, reused = split_coverage(c, selected)
-    records, native_done = [], set()
+    records, native_done = [], {r['target_id'] for r in c['entries'] if r['arm']=='native'}
     for source, entry, item in reused:
         path, m, _ = _completed_source(source['run'], c)
         if m['config'] != json.loads(Path(source['config']).read_text()):

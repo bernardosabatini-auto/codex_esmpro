@@ -1,0 +1,31 @@
+{
+  "purpose": "Complete both512-protein64-sample screens with exactlyeight designs perraw match andone fixed-motif native budget perselected family.",
+  "sources": [
+    [
+      "control512",
+      "fragment_training_50106855",
+      "development/conditioned"
+    ],
+    [
+      "augmented512",
+      "fragment_training_50108001",
+      "development/conditioned"
+    ]
+  ],
+  "covered_assays": [
+    [
+      "control512",
+      "runs/fragment_aug512_control_designability.json",
+      "trained_fragment_designability_50110856",
+      "fragment_fixed_positive_49906292"
+    ],
+    [
+      "augmented512",
+      "runs/fragment_aug512_candidate_designability.json",
+      "trained_fragment_designability_50111623",
+      "fragment_fixed_positive_49906292"
+    ]
+  ],
+  "expected_backbones": 14,
+  "decision": "Eleven raw matches total. Reuse P62593slot1 fromeach fixedassay. Nine newgenerated backbones andfive nativecontrols require112newrefolds;16refolds reused. P62593 receives its single native budget inthis supplemental assay, becauseanother generated slot also needs refolding; do not pool orduplicate old native attempts. Preserve64denominator perarm. Require SAME validrefold withglobalTM>.5,proper motifRMSD/dRMS<=1A,andscaffold-onlyTM>.5supplement. Retainallfailures."
+}

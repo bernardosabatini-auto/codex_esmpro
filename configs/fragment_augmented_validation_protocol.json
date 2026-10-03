@@ -1,0 +1,30 @@
+{
+  "purpose": "Prospective paired fresh-noise comparison of the best 6000-update reference and compatible-teacher-augmented 8000-update deployment candidate.",
+  "parents": {
+    "reference6000": "fragment_training_50043086",
+    "augmented8000": "fragment_training_50085613"
+  },
+  "discovery_report": "fragment_strict_followup_50095232",
+  "condition": "f30_center",
+  "focus_id": "crypticpocket__P62593__3e6631cbb03c",
+  "seed": 2026100291,
+  "historical_seed": 2026100211,
+  "panel_samples": 4,
+  "focus_samples": 16,
+  "batch_size": 4,
+  "steps": 50,
+  "decoder_steps": 3,
+  "guidance": 1,
+  "generation_work_cap_seconds": 840,
+  "inventory": "All16unchanged development families receive four new paired noises perarm:64outputs perarm. The selected P62593case also receives indices4..15, giving16fresh samples perarm for that case.76unique outputs perarm,152total. The two analysis views overlap by four focus samples; never pool their denominators or refold a duplicate twice.",
+  "controls": "Historical batch4latent tolerance1e-5,CA RMSD<=.2A,lDDT>=.99,identical coarse-validity and strict-raw decisions; same-batch4repeat<=1e-5 and supplied-fragment rigid-pose latent tolerance1e-4 for each arm/family. Record every output and timing. No batch-size, guidance, seed or threshold sweep.",
+  "refolding": "Refold every strict raw match exactly once with eight CA-only ProteinMPNN designs,T.1,seed1,fixed supplied motif residues,guarded FP32teacher3loops50steps1sample. Native fixed-motif controls for every selected family, plus P62593even if no raw matches. Keep all raw failures in the appropriate64or16denominator. Strict success requires both proper motif RMSD and motif dRMS<=1A in raw and the SAME coarse-valid refold with global scTM>0.5. The prospectively required stronger endpoint also requires scaffold-only TM>0.5 in that SAME qualifying refold. Report primary and stronger endpoints separately.",
+  "diversity": "Compute diversity among first scaffold-qualified refolds of distinct successful generated backbones, including global TM, scaffold-only TM, and motif-aligned scaffold RMSD. Fewer than two successful backbones per family means diversity is undefined. Do not select refolds to maximize diversity.",
+  "scope": "Reused development families and one post-selected case, with prospective fresh noise. This tests stochastic repeatability and conditional diversity, not independent-protein validation. No development refolds become training labels; locked tests remain unscored. Keep the failed fixed-panel and other recipe results intact. This compares deployment candidates at different training exposures, not a target-only attribution; the matched 8000-update target-only comparison remains separate. Preserve original seed2026100270 validation. No significance or broad generalization claim from a handful of successes.",
+  "total_updates": {
+    "reference6000": 6000,
+    "augmented8000": 8000
+  },
+  "discovery_arm": "teacher_augmented",
+  "discovery_scaffold_report": "fragment_scaffold_supplement_50095232"
+}

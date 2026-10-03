@@ -29,7 +29,7 @@ def audit_config(c):
     if set(c['models'])!=set(spec['parents']) or len(c['target_ids'])!=16 or spec['focus_id'] not in c['target_ids']:raise ValueError('Changed validation inventory')
     for arm,r in c['models'].items():
         m=json.loads(Path(r['manifest']).read_text());d=json.loads(Path(r['report']).read_text())
-        if Path(r['manifest']).parent.name!=spec['parents'][arm] or m['status']!='complete' or d['status']!='complete' or d['manifest_sha256']!=sha(r['manifest']) or d['total_training_updates']!=6000:raise ValueError('Unaudited validation model')
+        if Path(r['manifest']).parent.name!=spec['parents'][arm] or m['status']!='complete' or d['status']!='complete' or d['manifest_sha256']!=sha(r['manifest']) or d['total_training_updates']!=spec.get('total_updates',{}).get(arm,6000):raise ValueError('Unaudited validation model')
         for key in ('fragments','decoder_checkpoint','native_predictions'):
             source='initial_predictions' if key=='native_predictions' else key
             if c[key]!=m['config'][source]:raise ValueError('Different validation input')
@@ -37,4 +37,13 @@ def audit_config(c):
     with h5py.File(c['fragments']) as f:
         if sorted(f['development'])!=c['target_ids']:raise ValueError('Changed entire development panel')
     d=json.loads(Path(c['discovery_report']).read_text())
-    if d['status']!='complete' or not d['native_strict_controls'][spec['focus_id']] or not any(r['target_id']==spec['focus_id'] and r['arm']=='weighted_extended' and r['strict_joint_success'] for r in d['records']):raise ValueError('Unqualified discovery')
+    if d['status']!='complete' or not d['native_strict_controls'][spec['focus_id']] or not any(r['target_id']==spec['focus_id'] and r['arm']==spec.get('discovery_arm','weighted_extended') and r['strict_joint_success'] for r in d['records']):raise ValueError('Unqualified discovery')
+
+    if spec.get('discovery_scaffold_report'):
+        scaffold=json.loads(Path(c['discovery_scaffold_report']).read_text())
+        if scaffold['status']!='complete' or scaffold['source_report_sha256']!=sha(c['discovery_report']):raise ValueError('Changed discovery scaffold evidence')
+        require_scaffold_discovery(spec,scaffold['rows'])
+
+
+def require_scaffold_discovery(spec,rows):
+    if not any(r['target_id']==spec['focus_id'] and r['arm']==spec['discovery_arm'] and r['primary_joint_success'] and r['scaffold_joint_success'] for r in rows):raise ValueError('Discovery lacks same-refold scaffold agreement')

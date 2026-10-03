@@ -1,0 +1,111 @@
+# Learned inpainting failure localization
+
+```json
+{
+  "status": "complete",
+  "source_report_sha256": "6155a258acbe48bfb7646527eb1b21574ee9852fec78793483233cfc1b90e6c8",
+  "manifest_sha256": "7d245d814da22ff241a6c9e8d5991dc8d2addb983f73ccc82a784cd62eac2772",
+  "summary": [
+    {
+      "arm": "parent",
+      "samples": 128,
+      "motif_fit_without_geometry": 25,
+      "peptide_failure": 0,
+      "clash_failure": 0,
+      "gap_failure": 0,
+      "editable_peptide_outliers": 1,
+      "editable_ca_gaps": 0,
+      "boundary_peptide_outliers": 0,
+      "boundary_ca_gaps": 0,
+      "fixed_peptide_outliers": 72,
+      "fixed_ca_gaps": 0,
+      "clashes_touching_editable": 1,
+      "clashes_fixed_only": 3
+    },
+    {
+      "arm": "native_direct",
+      "samples": 128,
+      "motif_fit_without_geometry": 128,
+      "peptide_failure": 0,
+      "clash_failure": 0,
+      "gap_failure": 0,
+      "editable_peptide_outliers": 13,
+      "editable_ca_gaps": 0,
+      "boundary_peptide_outliers": 1,
+      "boundary_ca_gaps": 0,
+      "fixed_peptide_outliers": 127,
+      "fixed_ca_gaps": 0,
+      "clashes_touching_editable": 0,
+      "clashes_fixed_only": 0,
+      "mean_editable_latent_mse_to_native": 0.0
+    },
+    {
+      "arm": "generated_cond",
+      "samples": 128,
+      "motif_fit_without_geometry": 25,
+      "peptide_failure": 0,
+      "clash_failure": 5,
+      "gap_failure": 1,
+      "editable_peptide_outliers": 6,
+      "editable_ca_gaps": 0,
+      "boundary_peptide_outliers": 22,
+      "boundary_ca_gaps": 14,
+      "fixed_peptide_outliers": 76,
+      "fixed_ca_gaps": 0,
+      "clashes_touching_editable": 10,
+      "clashes_fixed_only": 3
+    },
+    {
+      "arm": "generated_null",
+      "samples": 128,
+      "motif_fit_without_geometry": 7,
+      "peptide_failure": 0,
+      "clash_failure": 9,
+      "gap_failure": 0,
+      "editable_peptide_outliers": 2,
+      "editable_ca_gaps": 0,
+      "boundary_peptide_outliers": 22,
+      "boundary_ca_gaps": 13,
+      "fixed_peptide_outliers": 79,
+      "fixed_ca_gaps": 1,
+      "clashes_touching_editable": 28,
+      "clashes_fixed_only": 3
+    },
+    {
+      "arm": "native_cond",
+      "samples": 128,
+      "motif_fit_without_geometry": 82,
+      "peptide_failure": 1,
+      "clash_failure": 3,
+      "gap_failure": 0,
+      "editable_peptide_outliers": 11,
+      "editable_ca_gaps": 1,
+      "boundary_peptide_outliers": 14,
+      "boundary_ca_gaps": 8,
+      "fixed_peptide_outliers": 130,
+      "fixed_ca_gaps": 1,
+      "clashes_touching_editable": 10,
+      "clashes_fixed_only": 0,
+      "mean_editable_latent_mse_to_native": 0.04792320530361849
+    },
+    {
+      "arm": "native_null",
+      "samples": 128,
+      "motif_fit_without_geometry": 29,
+      "peptide_failure": 1,
+      "clash_failure": 1,
+      "gap_failure": 0,
+      "editable_peptide_outliers": 14,
+      "editable_ca_gaps": 2,
+      "boundary_peptide_outliers": 16,
+      "boundary_ca_gaps": 18,
+      "fixed_peptide_outliers": 132,
+      "fixed_ca_gaps": 2,
+      "clashes_touching_editable": 9,
+      "clashes_fixed_only": 0,
+      "mean_editable_latent_mse_to_native": 0.08233377194778768
+    }
+  ],
+  "scope": "Post hoc failure localization on the same training diagnostic. Bond/clash/gap failure categories overlap. Link/pair counts are totals over128 samples, not independent observations. No altered gate or new labels; native-context error is an oracle capacity measure, not generated-structure accuracy."
+}
+```

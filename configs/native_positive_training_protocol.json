@@ -1,0 +1,36 @@
+{
+  "parent": "fragment_training_50106855",
+  "seed": 2026100421,
+  "updates": 400,
+  "profile_updates": 40,
+  "beta": 0.5,
+  "adapter_lr": 3e-05,
+  "gradient_clip": 1.0,
+  "optimizer": {
+    "name": "AdamW",
+    "betas": [
+      0.9,
+      0.95
+    ],
+    "weight_decay": 0.01
+  },
+  "warmup_updates": 20,
+  "lr_schedule": "Cosine to0.1floor over400updates; profiles use the identical initial40updates.",
+  "batches": {
+    "128": 16,
+    "256": 8,
+    "384": 4,
+    "512": 2
+  },
+  "adapter_ema_decay": 0.99,
+  "purpose": "Expand strict same-refold-qualified positive coverage, holding the ten-anchor positive-only recipe fixed.",
+  "arms": {
+    "positive_coverage": {
+      "negative_weight": 0.0
+    }
+  },
+  "coverage_protocol": "configs/native_positive_coverage_protocol.json",
+  "training": "Frozen parent generator; existing adapter only; positive reference-field regression with no negative endpoint pass. Identical numeric recipe, initial controls and random noise/time/history schedule versus old positive-only control. Use ALL new qualified positives plus original ten; no ranking.",
+  "profile": "40-update profile with frozen/null/pose and saved-array controls, matched against native_anchor_training_50206089. Fixed400 endpoint only after profile qualification. No outcome-based checkpoint selection.",
+  "evaluation": "As fixed in native_positive_coverage_protocol.json; same32 diagnostic proteins/four noises/eight sequence attempts, same-valid-refold motif/global/scaffold success. Locked tests untouched."
+}

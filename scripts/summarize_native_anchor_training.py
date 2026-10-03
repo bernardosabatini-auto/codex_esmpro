@@ -23,11 +23,15 @@ def analyze(run):
         length=active[step%len(active)];batch=spec['batches'][str(length)];factor=min((step+1)/spec['warmup_updates'],1)*(.1+.9*.5*(1+math.cos(math.pi*step/(spec['updates']-1))))
         if row['step']!=step+1 or row['length']!=length or row['batch']!=batch or len(row['ids'])!=batch or row['learning_rate_factor']!=factor:raise ValueError('Changed draw/schedule')
         if any(i not in data or data[i]['bucket']!=length for i in row['ids']):raise ValueError('Unqualified training example')
-        positive=torch.zeros(batch,length,8);negative=torch.zeros_like(positive)
+        positive=torch.zeros(batch,length,8);negative=None if c.get('positive_coverage_training') else torch.zeros_like(positive)
         for k,ident in enumerate(row['ids']):
-            n=data[ident]['length'];positive[k,:n]=data[ident]['positive'];negative[k,:n]=data[ident]['negative']
-        if tensor_hash(positive)!=row['positive_sha256'] or tensor_hash(negative)!=row['negative_sha256']:raise ValueError('Changed actual label draw')
-        if any(not math.isfinite(row[k]) for k in ('loss','gradient_norm','positive_branch_loss','negative_branch_loss','positive_flow_error','negative_flow_error')) or row['gradient_norm']<=0 or row['loss']<0:raise ValueError('Invalid training loss/gradient')
+            n=data[ident]['length'];positive[k,:n]=data[ident]['positive']
+            if negative is not None:negative[k,:n]=data[ident]['negative']
+        if tensor_hash(positive)!=row['positive_sha256'] or (negative is not None and tensor_hash(negative)!=row['negative_sha256']):raise ValueError('Changed actual label draw')
+        fields=['loss','gradient_norm','positive_branch_loss','positive_flow_error']
+        if negative is not None:fields+=['negative_branch_loss','negative_flow_error']
+        elif any(k.startswith('negative_') for k in row):raise ValueError('Unexpected negative training branch')
+        if any(not math.isfinite(row[k]) for k in fields) or row['gradient_norm']<=0 or row['loss']<0:raise ValueError('Invalid training loss/gradient')
     ckpath=run/f'ema_{count}.ckpt'
     if sha(ckpath)!=m['checkpoint_sha256']:raise ValueError('Changed saved checkpoint')
     ck=torch.load(ckpath,map_location='cpu',weights_only=False,mmap=True);parent=torch.load(c['checkpoint'],map_location='cpu',weights_only=False,mmap=True)

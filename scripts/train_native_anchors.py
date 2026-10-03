@@ -77,10 +77,11 @@ def main():
             for step in range(c['updates']):
                 if time.monotonic()-tick>c['work_cap_seconds']:raise TimeoutError('Native training cap')
                 length=active[step%len(active)];batch=spec['batches'][str(length)];ids=order.choice(buckets[length],size=batch).tolist()
-                positive=torch.zeros(batch,length,8);negative=torch.zeros_like(positive);features=torch.zeros(batch,length,29);keep=torch.zeros(batch,length,dtype=torch.bool);mask=torch.zeros_like(keep);coords=torch.zeros(batch,length,3)
+                positive=torch.zeros(batch,length,8);negative=None if c.get('positive_coverage_training') else torch.zeros_like(positive);features=torch.zeros(batch,length,29);keep=torch.zeros(batch,length,dtype=torch.bool);mask=torch.zeros_like(keep);coords=torch.zeros(batch,length,3)
                 for k,ident in enumerate(ids):
-                    v=data[ident];n=v['length'];positive[k,:n]=v['positive'];negative[k,:n]=v['negative'];features[k,:n]=v['features'];keep[k,:n]=v['keep'];coords[k,:n]=v['coordinates'];mask[k,:n]=True
-                positive,negative,features,keep,mask,coords=[x.cuda() for x in (positive,negative,features,keep,mask,coords)]
+                    v=data[ident];n=v['length'];positive[k,:n]=v['positive'];features[k,:n]=v['features'];keep[k,:n]=v['keep'];coords[k,:n]=v['coordinates'];mask[k,:n]=True
+                    if negative is not None:negative[k,:n]=v['negative']
+                positive,negative,features,keep,mask,coords=[x.cuda() if x is not None else None for x in (positive,negative,features,keep,mask,coords)]
                 factor=min((step+1)/spec['warmup_updates'],1)*(.1+.9*.5*(1+math.cos(math.pi*step/(spec['updates']-1))))
                 for group in optimizer.param_groups:group['lr']=spec['adapter_lr']*factor
                 optimizer.zero_grad(set_to_none=True)
@@ -92,8 +93,9 @@ def main():
                     for key,value in adapter.state_dict().items():
                         if value.is_floating_point():ema[key].lerp_(value,1-spec['adapter_ema_decay'])
                 m['updates']=step+1;m['training'].append(dict(step=step+1,length=length,batch=batch,ids=ids,loss=float(loss.detach()),gradient_norm=float(norm),learning_rate_factor=factor,
-                    positive_sha256=tensor_hash(positive),negative_sha256=tensor_hash(negative),noise_sha256=tensor_hash(info['noise']),time_sha256=tensor_hash(info['t']),rng_sha256=tensor_hash(rng.get_state()),self_conditioned=info['self_conditioned'],
-                    **{k:float(info[k]) for k in ('positive_branch_loss','negative_branch_loss','positive_flow_error','negative_flow_error')}))
+                    positive_sha256=tensor_hash(positive),noise_sha256=tensor_hash(info['noise']),time_sha256=tensor_hash(info['t']),rng_sha256=tensor_hash(rng.get_state()),self_conditioned=info['self_conditioned'],
+                    **({} if negative is None else dict(negative_sha256=tensor_hash(negative))),
+                    **{k:float(info[k]) for k in ('positive_branch_loss','negative_branch_loss','positive_flow_error','negative_flow_error') if k in info}))
                 if (step+1)%10==0:atomic_json(a.output/'manifest.json',m);print('update',step+1,'loss',float(loss.detach()),flush=True)
                 del loss,info,positive,negative,features,keep,mask,coords
         torch.cuda.synchronize();m.update(training_seconds=time.monotonic()-start,peak_reserved_GiB=torch.cuda.max_memory_reserved()/2**30,generator_final=state_hash(net.state_dict()),reference_final=state_hash(reference.state_dict()),adapter_final=state_hash(adapter.state_dict()))

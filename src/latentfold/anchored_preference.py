@@ -33,9 +33,10 @@ def native_preference_flow_loss(net,adapter,reference_adapter,positive,negative,
                                 features,keep,mask,*,coordinates,generator,beta=.5,negative_weight=1.):
     if any(p.requires_grad for p in net.parameters()) or any(p.requires_grad for p in reference_adapter.parameters()):
         raise ValueError('This experiment requires a frozen generator and reference adapter')
-    if positive.requires_grad or negative.requires_grad or positive.shape!=negative.shape or positive.shape!=(*mask.shape,8):
+    if negative is None and negative_weight!=0:raise ValueError('A negative endpoint is required for contrastive training')
+    if positive.requires_grad or (negative is not None and (negative.requires_grad or positive.shape!=negative.shape)) or positive.shape!=(*mask.shape,8):
         raise ValueError('Fixed matching native/generated latent endpoints required')
-    if not torch.isfinite(positive).all() or not torch.isfinite(negative).all():raise ValueError('Nonfinite endpoint')
+    if not torch.isfinite(positive).all() or (negative is not None and not torch.isfinite(negative).all()):raise ValueError('Nonfinite endpoint')
     noise=torch.randn(positive.shape,device=positive.device,generator=generator)
     t=torch.sigmoid(torch.randn(len(positive),device=positive.device,generator=generator)).clamp(1e-4,1-1e-4)
     history_enabled=bool(torch.rand((),device=positive.device,generator=generator)<.5)
@@ -52,7 +53,14 @@ def native_preference_flow_loss(net,adapter,reference_adapter,positive,negative,
             reference=fragment_velocity(net,reference_adapter,x,t,reference_esm,mask,x_sc=history,prepared=reference_prepared)
         current=fragment_velocity(net,adapter,x,t,esm,mask,x_sc=history,prepared=prepared)
         return current,reference,target
-    p,pr,pt=branch(positive);n,nr,nt=branch(negative)
-    loss,info=anchored_branch_loss(p,pr,pt,n,nr,nt,mask,beta=beta,negative_weight=negative_weight)
+    p,pr,pt=branch(positive)
+    if negative is None:
+        # Reuse the exact scalar objective/validation with detached fields. This
+        # executes one endpoint forward pass and supplies no negative labels.
+        loss,info=anchored_branch_loss(p,pr,pt,p.detach(),pr,pt,mask,beta=beta,negative_weight=0.)
+        info={k:v for k,v in info.items() if k.startswith('positive_')}
+    else:
+        n,nr,nt=branch(negative)
+        loss,info=anchored_branch_loss(p,pr,pt,n,nr,nt,mask,beta=beta,negative_weight=negative_weight)
     info.update(noise=noise.detach(),t=t.detach(),self_conditioned=history_enabled)
     return loss,info

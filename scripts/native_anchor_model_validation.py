@@ -42,23 +42,37 @@ def audit_generation(c):
     m=json.loads(Path(c['model_manifest']).read_text());d=json.loads(Path(c['model_report']).read_text());mc=m['config']
     paired=json.loads(Path(c['matched_training_report']).read_text())
     run=Path(c['model_manifest']).parent
+    coverage=bool(spec.get('positive_coverage_model_validation'))
+    if coverage != bool(mc.get('positive_coverage_training')):raise ValueError('Changed model lineage')
+    bound_training=(any(r['path']==c['model_manifest'] and r['sha256']==sha(c['model_manifest']) for r in paired['sources'])
+                    and any(r['path']==c['model_report'] and r['sha256']==sha(c['model_report']) for r in paired['sources'])) if coverage else any(r['manifest_sha256']==sha(c['model_manifest']) and r['report_sha256']==sha(c['model_report']) for r in paired['sources'])
     if (m['status']!='complete' or d['status']!='complete' or not d['numerically_qualified']
             or mc['profile_only'] or mc['updates']!=400 or d['updates']!=400
             or d['manifest_sha256']!=sha(c['model_manifest'])
             or c['checkpoint']!=str(run/'ema_400.ckpt') or d['checkpoint_sha256']!=verified[c['checkpoint']]
             or c['historical_predictions']!=str(run/'evaluation_400.h5')
-            or c['arm']!=mc['arm'] or c['arm'] not in ('positive','contrastive')
+            or c['arm']!=mc['arm'] or c['arm'] not in (('positive_coverage',) if coverage else ('positive','contrastive'))
             or mc['checkpoint']!=bc['checkpoint'] or c['decoder_checkpoint']!=mc['decoder_checkpoint']
             or c['historical_fragments']!=mc['fragments'] or c['control_ids']!=mc['control_ids']
             or mc['sampling_seed']!=spec['historical_seed'] or m['peak_reserved_GiB']>75
             or paired['status']!='complete' or not paired['qualified'] or paired['profile_only']
             or paired['matched_updates']!=400 or paired['protocol_sha256']!=sha(mc['protocol'])
             or Path(mc['protocol']).name!=Path(spec['training_protocol']).name
-            or not any(r['manifest_sha256']==sha(c['model_manifest']) and r['report_sha256']==sha(c['model_report']) for r in paired['sources'])):
+            or not bound_training):
         raise ValueError('Unqualified final400 model or matched inference profile')
     labels=json.loads(Path(mc['labels_manifest']).read_text())
-    label_generation=json.loads(Path(labels['generation_manifest']).read_text())
-    if set(c['target_ids']) & set(label_generation['config']['target_ids']):
+    if coverage:
+        from native_positive_training_core import audit as audit_training
+        audit_training(mc)
+        if paired['labels_manifest_sha256']!=sha(mc['labels_manifest']):raise ValueError('Changed evaluated label set')
+        original=json.loads(Path(labels['original_labels']).read_text())
+        label_generation=json.loads(Path(original['generation_manifest']).read_text())
+        qualification=json.loads(Path(labels['qualification']).read_text())
+        excluded=set(label_generation['config']['target_ids'])|{r['target_id'] for r in qualification['rows']}
+    else:
+        label_generation=json.loads(Path(labels['generation_manifest']).read_text())
+        excluded=set(label_generation['config']['target_ids'])
+    if set(c['target_ids']) & excluded:
         raise ValueError('Diagnostic targets overlap native-anchor source cohort')
     if set(c['control_ids']) & set(c['target_ids']):raise ValueError('Historical control overlaps diagnostic')
     return spec
@@ -67,7 +81,8 @@ def audit_generation(c):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--run',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
     root=Path(__file__).resolve().parents[1];run=a.run.resolve()
-    protocol=root/'configs/native_anchor_model_validation_protocol.json';spec=json.loads(protocol.read_text())
+    m=json.loads((run/'manifest.json').read_text());mc=m['config'];coverage=bool(mc.get('positive_coverage_training'))
+    protocol=root/('configs/native_positive_model_validation_protocol.json' if coverage else 'configs/native_anchor_model_validation_protocol.json');spec=json.loads(protocol.read_text())
     baseline=root/'runs'/spec['baseline_generation'];base=json.loads((baseline/'manifest.json').read_text())
     m=json.loads((run/'manifest.json').read_text());mc=m['config'];c=copy.deepcopy(base['config'])
     c.update(arm=mc['arm'],spec=spec,control_ids=mc['control_ids'])
@@ -80,8 +95,11 @@ def main():
                      ('model_manifest',run/'manifest.json'),('model_report',root/'reports'/(run.name+'.json')),
                      ('checkpoint',run/'ema_400.ckpt'),('historical_predictions',run/'evaluation_400.h5'),
                      ('historical_fragments',mc['fragments']),('decoder_checkpoint',mc['decoder_checkpoint']),
-                     ('matched_training_report',root/'reports/native_anchor_training_full_20261003.json')]:c[key]=bind(path)
-    labels=json.loads(Path(mc['labels_manifest']).read_text());bind(mc['labels_manifest']);bind(labels['generation_manifest']);bind(mc['protocol'])
+                     ('matched_training_report',root/('reports/native_positive_training_full_20261003.json' if coverage else 'reports/native_anchor_training_full_20261003.json'))]:c[key]=bind(path)
+    labels=json.loads(Path(mc['labels_manifest']).read_text());bind(mc['labels_manifest']);bind(mc['protocol'])
+    if coverage:
+        bind(labels['qualification']);bind(labels['original_labels'])
+    else:bind(labels['generation_manifest'])
     audit_generation(c)
     with a.output.open('x') as f:json.dump(c,f,indent=2)
     print(c['arm'],len(c['target_ids']),'targets; full128-output refolding required')

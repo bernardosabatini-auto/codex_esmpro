@@ -20,6 +20,9 @@ def state_hash(state):
 
 
 def audit(c):
+    if c.get('positive_coverage_training'):
+        from native_positive_training_core import audit as audit_positive
+        return audit_positive(c)
     for source in c['sources']:
         if sha(source['path'])!=source['sha256']:raise ValueError('Changed native-training source: '+source['path'])
     spec=json.loads(Path(c['protocol']).read_text());labels=json.loads(Path(c['labels_manifest']).read_text())
@@ -46,6 +49,9 @@ def audit(c):
 
 
 def load_pairs(c):
+    if c.get('positive_coverage_training'):
+        from native_positive_training_core import load_positives
+        return load_positives(c)
     spec,labels=audit(c);data={}
     gm=json.loads(Path(labels['generation_manifest']).read_text());gc=gm['config']
     with h5py.File(labels['pairs']) as f,h5py.File(c['fragments']) as fr,h5py.File(c['initial_predictions']) as gen:

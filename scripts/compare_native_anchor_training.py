@@ -21,7 +21,8 @@ def ready_command(root):
         output=root/'reports'/('native_anchor_training_'+phase+'_20261003')
         if output.with_suffix('.json').exists():continue
         return [str(root/'scripts/compare_native_anchor_training.py'),'--runs',*[str(root/f'runs/native_anchor_training_{i}') for i in ids],'--output',str(output)]
-    return None
+    from compare_native_positive_training import ready_command as ready_positive
+    return ready_positive(root)
 
 
 def check_draws(a,b):

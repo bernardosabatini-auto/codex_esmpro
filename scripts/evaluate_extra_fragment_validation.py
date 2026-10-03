@@ -6,7 +6,7 @@ from latentfold.checkpoints import load_legacy
 from latentfold.decoder import load_proteinae
 from latentfold.flow import target_noise
 from latentfold.fragment_conditioning import sample_fragment
-from latentfold.fragment_geometry_conditioning import FragmentGeometryAdapter
+from latentfold.fragment_cross_attention import load_fragment_adapter
 from latentfold.precision import inference_precision
 from latentfold.metrics import ca_metrics
 from fragment_validation_core import raw_rows
@@ -22,7 +22,7 @@ def main():
     try:
         torch.set_num_threads(2);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85);telemetry=Telemetry(a.output,True)
         decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval().requires_grad_(False);net,_=load_legacy(c['checkpoint'],trusted_pickle=True);net.cuda().eval().requires_grad_(False)
-        ck=torch.load(c['checkpoint'],map_location='cpu',weights_only=False,mmap=True);adapter=FragmentGeometryAdapter(net.d_model,n_layers=len(net.blocks),n_heads=net.n_heads,distance_precision='fp64').cuda().eval().requires_grad_(False);adapter.load_state_dict(ck['fragment_adapter']);del ck
+        ck=torch.load(c['checkpoint'],map_location='cpu',weights_only=False,mmap=True);adapter=load_fragment_adapter(ck,net).cuda().eval().requires_grad_(False);del ck
         historical=load_conditions(c['historical_fragments'],c['control_ids']);new=load_conditions(c['fragments'],c['target_ids'],spec.get('condition','f30_center'))
         def sample(ident,item,seed,posed=False,decode=True,drop=False):
             n=item['length'];features=item['features'][None].expand(4,-1,-1).cuda();keep=item['keep'][None].expand(4,-1).cuda();coords=item['coordinates'][None].expand(4,-1,-1).cuda();mask=torch.ones(4,n,dtype=torch.bool,device='cuda')

@@ -80,7 +80,7 @@ def main():
                 successful_scaffold_diversity=[r for d in new for r in d['successful_scaffold_diversity']],
                 scope='Repeated64-family development panel, not independent confirmation. Full256sample denominators. Same-refold motif/global/scaffold gates. Fixed32-panel designability only for new and matched-full arms; parent lacks this panel. Original eight-attempt budgets reused without pooling; teacher RNG is not claimed paired. No evaluation labels train models.')
     args.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n')
-    lines=['# Frozen learned-generator result','',result['scope'],'',
+    lines=['# '+plan.get('report_title','Frozen learned-generator result'),'',result['scope'],'',
            '|Arm|Raw retained /256|Strong same-refold /256|Successful families|Fixed-panel designability /32|',
            '|---|---:|---:|---:|---:|']
     if result['numerical_recoveries']:

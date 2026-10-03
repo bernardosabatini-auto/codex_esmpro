@@ -9,14 +9,14 @@ from watch_jobs import write_json
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--study',choices=('broad','frozen','quality'),default='broad');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--study',choices=('broad','frozen','quality','cross'),default='broad');args=parser.parse_args()
     study=args.study;arms,conditions=graph_layout(study)
     root = Path(__file__).resolve().parents[1]
     campaign = json.loads((root / 'runs/current_campaign.json').read_text())
-    parents = campaign[dict(frozen='frozen_generator_training_jobs',quality='fragment_quality_training_jobs',broad='broad_training_jobs')[study]]
+    parents = campaign[dict(cross='fragment_cross_training_jobs',frozen='frozen_generator_training_jobs',quality='fragment_quality_training_jobs',broad='broad_training_jobs')[study]]
     jobs = json.loads((root / 'runs/jobs.json').read_text())['jobs']
     watch = json.loads((root / 'runs/watch/state.json').read_text())
-    training_protocol=root/dict(frozen='configs/fragment_frozen_trunk_protocol.json',quality='configs/fragment_quality_training_protocol.json',broad='configs/fragment_broad_training_protocol.json')[study]
+    training_protocol=root/dict(cross='configs/fragment_cross_training_protocol.json',frozen='configs/fragment_frozen_trunk_protocol.json',quality='configs/fragment_quality_training_protocol.json',broad='configs/fragment_broad_training_protocol.json')[study]
     plan = dict(status='active', study=study, parents=parents,
                 training_protocol_sha256=sha(training_protocol),
                 scope=f'Fixed final endpoints only: match2000 training draws,{len(arms)*len(conditions)} generation jobs,{4*len(conditions)} refold partitions,{len(conditions)} endpoint comparisons. No hypothesis selection or conversation wakeup. All submissions use the eight-GPU registered guard. Stop this timer on pause/revocation; retain completion monitoring.')
@@ -34,7 +34,7 @@ def main():
         'summarize_teacher_repeatability_probe.py')
     files = [root / 'scripts' / s for s in script_names] + list((root / 'src').rglob('*.py'))
     files += [root / generation_paths(study,c,arms[0])[2] for c in conditions]
-    files += [root / dict(frozen='configs/fragment_frozen_refold_protocol.json',quality='configs/fragment_quality_refold_protocol.json',broad='configs/fragment_broad_refold_protocol.json')[study], training_protocol, root / 'slurm/broad_refold_template_rtx.sbatch']
+    files += [root / dict(cross='configs/fragment_cross_refold_protocol.json',frozen='configs/fragment_frozen_refold_protocol.json',quality='configs/fragment_quality_refold_protocol.json',broad='configs/fragment_broad_refold_protocol.json')[study], training_protocol, root / 'slurm/broad_refold_template_rtx.sbatch']
     files += [root / generation_paths(study,c,a)[0] for c in conditions for a in arms]
     if study=='frozen':
         files += [root/'scripts'/s for s in ('compare_frozen_fragment_training.py','compare_frozen_fragment_refolds.py','broad_fragment_training.py','fragment_extension.py','train_fragment_conditioning.py','summarize_fragment_training.py')]
@@ -42,6 +42,9 @@ def main():
     if study=='quality':
         files += [root/'scripts'/s for s in ('compare_fragment_quality_training.py','compare_frozen_fragment_refolds.py','fragment_quality_training.py','broad_fragment_training.py','fragment_extension.py','train_fragment_conditioning.py','summarize_fragment_training.py','teacher_numerical_recovery.py')]
         files += [root/'configs/fragment_quality_comparison_protocol.json']
+    if study=='cross':
+        files += [root/'scripts'/s for s in ('compare_fragment_cross_training.py','compare_frozen_fragment_refolds.py','fragment_cross_training.py','fragment_quality_training.py','broad_fragment_training.py','fragment_extension.py','train_fragment_conditioning.py','summarize_fragment_training.py')]
+        files += [root/'configs/fragment_cross_comparison_protocol.json']
     plan['code_sha256'] = {str(p.relative_to(root)): sha(p) for p in files}
     path = root / f'runs/{study}_fragment_followups.json'
     name = f'esm-proae-{study}-fragment-followups'

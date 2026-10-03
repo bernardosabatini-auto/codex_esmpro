@@ -79,3 +79,24 @@ class FragmentCrossAttentionAdapter(FragmentGeometryAdapter):
                                                   attn_mask=bias, dropout_p=0.)
         attended = attended.transpose(1, 2).reshape(batch, length, self.cross_width)
         return hidden + self.cross_outputs[layer](attended) * gate
+
+
+def load_fragment_adapter(checkpoint, net):
+    """Restore the declared conditioning architecture, rejecting silent fallback."""
+    spec = dict(checkpoint['adapter_config'])
+    variant = spec.pop('variant')
+    declared = checkpoint.get('experiment', {}).get('fragment_cross_attention')
+    if (spec['output_width'] != net.d_model or spec['n_layers'] != len(net.blocks)
+            or spec['n_heads'] != net.n_heads):
+        raise ValueError('Fragment/generator architecture mismatch')
+    if variant == 'cross_attention':
+        actual = {k: spec[k] for k in ('cross_width', 'cross_heads', 'cross_route')}
+        if actual != declared:
+            raise ValueError('Checkpoint routing differs from training declaration')
+        module = FragmentCrossAttentionAdapter(**spec)
+    elif variant == 'geometry' and not declared:
+        module = FragmentGeometryAdapter(**spec)
+    else:
+        raise ValueError('Unsupported fragment checkpoint architecture')
+    module.load_state_dict(checkpoint['fragment_adapter'], strict=True)
+    return module

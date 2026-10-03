@@ -4,7 +4,7 @@ import unittest
 import torch
 
 from latentfold.fragment_conditioning import fragment_features, fragment_flow_loss, sample_fragment
-from latentfold.fragment_cross_attention import FragmentCrossAttentionAdapter
+from latentfold.fragment_cross_attention import FragmentCrossAttentionAdapter, load_fragment_adapter
 from latentfold.fragment_geometry_conditioning import FragmentGeometryAdapter
 from latentfold.pair_model import PairFlowNet
 
@@ -118,6 +118,19 @@ class CrossAttentionTests(unittest.TestCase):
         state.pop('hidden.weight')
         with self.assertRaisesRegex(ValueError, 'Incompatible parent'):
             self.adapter.load_parent(state)
+
+    def test_checkpoint_restores_route_and_rejects_silent_fallback(self):
+        self.activate(self.adapter)
+        architecture = dict(cross_width=8, cross_heads=2, cross_route='all')
+        checkpoint = dict(adapter_config=dict(output_width=16, n_layers=2, n_heads=2,
+            distance_precision='fp64', variant='cross_attention', **architecture),
+            experiment=dict(fragment_cross_attention=architecture),
+            fragment_adapter=self.adapter.state_dict())
+        loaded = load_fragment_adapter(checkpoint, self.net).eval()
+        torch.testing.assert_close(self.sample(loaded), self.sample(self.adapter), rtol=0, atol=0)
+        checkpoint['adapter_config']['cross_route'] = 'motif'
+        with self.assertRaisesRegex(ValueError, 'routing differs'):
+            load_fragment_adapter(checkpoint, self.net)
 
 
 if __name__ == '__main__':

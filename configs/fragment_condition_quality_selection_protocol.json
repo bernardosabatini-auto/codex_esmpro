@@ -1,0 +1,14 @@
+{
+  "purpose": "Construct a training-only matched intervention on fragment source confidence before deciding whether new training is justified.",
+  "seed": 2026100389,
+  "conditions": ["c20_left", "c20_center", "c20_right"],
+  "corpus": "runs/broad_fragment_corpora_20261003/broad/fragments.h5",
+  "quality_report": "reports/fragment_condition_quality_20261003.json",
+  "proteins": 7941,
+  "control": "Within each128-residue length bucket, SHA-order all proteins independently of quality and assign left/center/right round-robin. Exactly one unchanged20-residue condition per protein.",
+  "candidate": "Maximize total fragment mean AFDB pLDDT over the SAME proteins with exactly the SAME left/center/right counts in each length bucket. Use only existing, independently encoded fragment inputs. No coordinate changes, new encoding, target filtering, refold selection, or development data.",
+  "minimum_overall_confidence_gain": 5.0,
+  "minimum_bucket_confidence_gain": 2.0,
+  "gate": "These prospectively declared confidence-separation gates establish whether a meaningful matched input-quality experiment is feasible. They do not certify designability or authorize skipping matched40-update GPU profiles. Preserve a failed gate without relaxing it.",
+  "scope": "CPU preparation only. Subsequent paired training must use identical parent, frozen-generator policy, protein/noise/time/dropout/LR draws, condition count and length/placement frequencies. Record expected condition-identity differences explicitly. Both arms restrict training to one20-residue fragment per protein, so comparisons to earlier12-condition recipes are descriptive only. Training-source confidence can covary with fragment structure and sequence; do not claim a pure confidence effect. No evaluation labels enter this selection."
+}

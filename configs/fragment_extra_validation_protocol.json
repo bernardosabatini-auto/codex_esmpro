@@ -1,0 +1,27 @@
+{
+  "purpose": "Test the target-augmentation effect on64additional experimental fragment families, with matched controls at each training-corpus size.",
+  "parents": {
+    "control128": "fragment_training_50081718",
+    "augmented128": "fragment_training_50085613",
+    "control512": "fragment_training_50106855",
+    "augmented512": "fragment_training_50108001"
+  },
+  "total_updates": {"control128": 8000, "augmented128": 8000, "control512": 6000, "augmented512": 6000},
+  "encoded_cohort": "extra_fragment_data_50110969",
+  "selection": "fragment_extra_development_20261003",
+  "seed": 2026100351,
+  "historical_seed": 2026100211,
+  "samples": 4,
+  "steps": 50,
+  "decoder_steps": 3,
+  "batch_size": 4,
+  "guidance": 1,
+  "work_cap_seconds": 1080,
+  "controls": "Eachmodel reproduces its own four historical control families: latent1e-5,CA RMSD<=.2A,lDDT>=.99,and identical raw-validity/strict decisions. Every newfamily gets same-batch repeat<=1e-5and supplied-fragment rigid-pose latent control<=1e-4. No correction, noise retry, reflow, ranking, or strength sweep.",
+  "inventory": "Exactly64newfamilies times4paired noises permodel:256perarm,1024total. Historical controls are separate and never enter those denominators. Retain the one input whose isolated-codec roundtrip exceeds.5A.",
+  "refolding": "Every raw strict match receives exactly8fixed-motif CA-only ProteinMPNNv48_020designs,T.1,seed1,guarded FP32teacher3loops50steps1sample. Every64native construct receives one8design fixed-motif positive-control assay, shared acrossarms. No attempt pooling. Raw failures remain in the full256denominator; their unconstrained global designability is unmeasured.",
+  "endpoint": "Generated backbone coarse-valid and propermotifCA RMSD/dRMS<=1A; one SAME refold must be coarse-valid, retain both1Amotiflimits, agree globallyTM>.5and have scaffold-onlyTM>.5. Report original primary criterion separately. Native control failures remain visible. Diversity only among distinct qualifying backbones, using first qualifying refold perbackbone.",
+  "analysis": "Compare augmented128againstcontrol128,andaugmented512againstcontrol512 on identical cases/noises. Corpus-size comparisons also differ in training exposure and parent history, so do not attribute them solely to breadth. Report short/long strata and family-clustered uncertainty; no significance claims from unreplicated tiny counts.",
+  "scope": "Additional development replication on previously unused conditioning families from an already-used prediction-development corpus. Sequence exclusions are heuristic; frozen-model pretraining exposure is unknown. All locked tests remain unscored and no new evaluation outputs enter training.",
+  "resources": "At most4independent oneRTXgeneration jobs,20minutes each; teacher refolding sized from actual selected inventory. Eightown running-plus-pending GPUs maximum."
+}

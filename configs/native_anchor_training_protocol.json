@@ -1,0 +1,49 @@
+{
+  "purpose": "Test whether validated native-positive and generated-negative contrasts improve isolated-fragment generation beyond positive-only updates.",
+  "conditional_on": "Every gate in reports/native_anchor_comparison_20261003.json must pass; otherwise do not prepare labels or launch training.",
+  "parent": "fragment_training_50106855",
+  "qualification_protocol": "configs/native_anchor_calibration_protocol.json",
+  "label_generation": "extra_fragment_validation_50194966",
+  "arms": {
+    "positive": {
+      "negative_weight": 0.0
+    },
+    "contrastive": {
+      "negative_weight": 1.0
+    }
+  },
+  "seed": 2026100421,
+  "updates": 400,
+  "profile_updates": 40,
+  "beta": 0.5,
+  "adapter_lr": 3e-05,
+  "gradient_clip": 1.0,
+  "optimizer": {
+    "name": "AdamW",
+    "betas": [
+      0.9,
+      0.95
+    ],
+    "weight_decay": 0.01
+  },
+  "warmup_updates": 20,
+  "lr_schedule": "Cosine to0.1floor over400updates; profiles use the identical initial40updates.",
+  "batches": {
+    "128": 16,
+    "256": 8,
+    "384": 4,
+    "512": 2
+  },
+  "data": "Use ALL independently confirmed pairs, with no ranking among qualified proteins. Positive=stored full native reference_z; negative=exact stored generated latent from the preregistered discovery-selected slot. Supplied inputs remain isolated20-residue codes,sequence,and intramotif coordinates only. No full native structure enters inference conditioning.",
+  "training": "Freeze the entire6000parent generator. Train its existing geometry/token fragment adapter only; no new architecture. Keep a frozen copy of the original adapter to compute the reference field. Both arms start with identical tensors and matched protein/noise/time/self-conditioning draws. Cycle only represented length buckets; sample proteins uniformly within each bucket with replacement.",
+  "objective": "Let delta=v_train-v_reference. Regress v_reference+beta*delta toward the native-endpoint flow target. The contrastive arm additionally regresses v_reference-beta*delta toward the generated-negative endpoint flow target. Sum nonnegative branch losses, each protein-weighted over valid residues; do not divide by1+negative_weight. Shared fresh Gaussian noise and sigmoid-normal time for the paired endpoints. No reuse of generation noise as training noise. No motif loss weighting.",
+  "reference": "Reference field uses the frozen parent adapter and generator at each branch interpolation state. On50percent of updates, obtain self-conditioning from the reference field with no gradients; pass that same reference history to train/reference predictions for that branch. No dropped-fragment training examples: the frozen generator and zeroed dropped adapter guarantee an unchanged null branch, which is checked numerically.",
+  "theory": "This is an empirical fixed-reference contrastive regression experiment inspired by the symmetric branch construction in https://arxiv.org/html/2609.09905v1 . It is not a claim of exact likelihood/DPO/KL optimization: our sampler includes self-conditioning and terminal latent normalization, and the reference is frozen rather thanEMA.",
+  "profile": "Two40-update singleRTX profiles before400updates. Require exact matched draws and initialization, historical generation parity, unchanged generator and null outputs, supplied-fragment pose invariance, finite nonzero adapter gradients/updates, and peak memory<=75GiB. Do not use motif/quality gains to select a profile.",
+  "evaluation": "Final400-update checkpoint only for decisions. Evaluate both arms on the earlier32-protein training-only preference cohort, disjoint from the16anchor-source cohort: four original fixed noises each,50Euler/AE3/CFG1. Refold ALL128outputs perarm with eight fixed-motif designs, deterministicFP32 teacher3loops50steps. Reuse the original parent128outputs/1024refolds and32native budgets without pooling. Report valid-global designability, strict same-refold motif/global/scaffold success, length strata, and family uncertainty. This is a repeated training-only diagnostic, not independent generalization.",
+  "diversity": "Compare all six pairwise structural agreements per condition across four noises; report diversity among jointly successful samples separately. Greater structural variation alone is not a quality gain.",
+  "decision": "No LR,beta,loss-weight,checkpoint or duration sweep. Compare contrastive versus positive-only AND6000parent. Any next development assay requires improved strict success with retained designability and family coverage; improvement on this diagnostic does not establish generalization. Locked tests stay unscored.",
+  "resources": "At most8own running-plus-pending GPUs. SingleGPU profiles and matched400-update runs; full runtimes determined from profiles. Preserve every failure.",
+  "adapter_ema_decay": 0.99,
+  "checkpoint": "Use final400-update adapterEMA with the unchanged parent generator; no checkpoint selection."
+}

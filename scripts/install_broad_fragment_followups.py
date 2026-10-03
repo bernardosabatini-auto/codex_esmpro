@@ -57,10 +57,10 @@ TimeoutStartSec=900
 ExecStart=/n/home08/bsabatini/.conda/envs/proteinae/bin/python {root}/scripts/broad_fragment_followups.py
 '''
     timer = f'''[Unit]
-Description=Check fixed broad-fragment follow-ups every minute
+Description=Check fixed broad-fragment follow-ups every fifteen seconds
 [Timer]
 OnBootSec=30s
-OnUnitInactiveSec=60s
+OnUnitInactiveSec=15s
 Unit={name}.service
 [Install]
 WantedBy=timers.target

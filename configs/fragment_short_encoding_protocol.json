@@ -1,0 +1,11 @@
+{
+  "purpose": "Isolate a second constraint-size task:20residue center motifs on the same64families, with native controls and a conditioned-versus-null model contrast planned after codec qualification.",
+  "seed": 2026100361,
+  "decoder_steps": 3,
+  "condition": "c20_center",
+  "encoding": "Crop exactly20center residues before FP64 canonicalization; encode only cropped N/CA/C/O through frozen FP32 ProteinAE; layer-normalize8latent channels perresidue. Store only fragment sequence in conditioning. Preserve full native backbones separately for positive controls.",
+  "controls": "All64fragments: rigid90degree rotation plus translation before canonicalization must reproduce coordinates and encoded latents within1e-4. Four original control fragments must reproduce archived isolated latents within1e-5. FixedAE3noise, no seed selection. Max75GiB and780seconds.",
+  "quality_gate": "At least90percent of all64isolated-fragment roundtrips satisfy both properCA RMSD<=.5AanddRMS<=.5A. Every numerical control must pass. No individual fragment is dropped, even if its roundtrip is poor. Stop on a failed cohort gate.",
+  "scope": "Preprocessing only: no conditioning-model predictions, no test-set scoring, no model-outcome selection. Full experimental construct coordinates never enter fragment encoding. This cohort is additional development data; locked tests remain excluded.",
+  "fragment_length": 20
+}

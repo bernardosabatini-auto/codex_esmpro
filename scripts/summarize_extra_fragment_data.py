@@ -18,8 +18,8 @@ def analyze(run):
         for ident in c['control_ids']:
             if np.max(abs(out['historical/'+ident+'/latent'][:]-old['development/'+ident+'/conditions/f30_center/latent'][:]))>1e-5:raise ValueError('Historical latent control failed')
         for ident in c['target_ids']:
-            bb=src[ident+'/backbone'][:];st,seq,fragment,_=crop_condition(bb,rows[ident]['sequence']);g=out['development/'+ident];q=g['conditions/f30_center']
-            if g.attrs['length']!=len(bb) or g.attrs['family']!=rows[ident]['family'] or set(g['conditions'])!={'f30_center'} or q.attrs['start']!=st or q.attrs['sequence']!=seq or not np.array_equal(q['fragment'][:],fragment) or not np.array_equal(out['references/'+ident+'/backbone'][:],bb):raise ValueError('Changed crop or source backbone')
+            bb=src[ident+'/backbone'][:];st,seq,fragment,_=crop_condition(bb,rows[ident]['sequence'],c['spec'].get('fragment_length'));g=out['development/'+ident];q=g['conditions/'+c['spec']['condition']]
+            if g.attrs['length']!=len(bb) or g.attrs['family']!=rows[ident]['family'] or set(g['conditions'])!={c['spec']['condition']} or q.attrs['start']!=st or q.attrs['sequence']!=seq or not np.array_equal(q['fragment'][:],fragment) or not np.array_equal(out['references/'+ident+'/backbone'][:],bb):raise ValueError('Changed crop or source backbone')
             z=q['latent'][:]
             if z.shape!=(len(fragment),8) or not np.isfinite(z).all() or np.max(abs(q['pose_fragment'][:]-fragment))>1e-4 or np.max(abs(q['pose_latent'][:]-z))>1e-4:raise ValueError('Invalid fragment representation or pose control')
             fit=motif_fit(q['roundtrip'][:],fragment,0);record=next(r for r in m['records'] if r['target_id']==ident)

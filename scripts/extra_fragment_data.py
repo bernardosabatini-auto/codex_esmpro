@@ -6,8 +6,10 @@ from generate_isolated_motif import canonical_fragment
 from prepare_overfit import sha
 
 
-def crop_condition(backbone,sequence):
-    n=len(sequence);k=max(8,int(.3*n));start=(n-k)//2
+def crop_condition(backbone,sequence,fragment_length=None):
+    n=len(sequence);k=max(8,int(.3*n)) if fragment_length is None else fragment_length
+    if type(k) is not int or not 1<=k<=n:raise ValueError('Invalid explicit fragment length')
+    start=(n-k)//2
     if backbone.shape!=(n,4,3):raise ValueError('Wrong complete reference shape')
     fragment,degenerate=canonical_fragment(backbone[start:start+k].astype(np.float64))
     return start,sequence[start:start+k],fragment,degenerate

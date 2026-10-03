@@ -27,7 +27,9 @@ def analyze(run):
             passing=[k for k in r['successful_refold_indices'] if r['refolds'][k]['scaffold_tm']>.5] if r['raw_gate_passed'] else []
             r.update(scaffold_successful_refold_indices=passing,scaffold_joint_success=bool(passing))
     params={k:spec['preference'][k] for k in ('minimum_quality','discovery_margin','confirmation_margin')}
-    if spec.get('native_anchor_calibration'):
+    if spec.get('native_anchor_model_validation'):
+        prefs=[]
+    elif spec.get('native_anchor_calibration'):
         from native_anchor_calibration import native_pair
         generation=json.loads(Path(c['generation_report']).read_text())
         for r in records:

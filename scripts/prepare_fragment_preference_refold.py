@@ -59,7 +59,7 @@ def audit_inputs(c):
         wanted=[]
         for row in rows:
             q=fr['train/'+row['id']+'/conditions/c20_center']
-            for slot in range(4):wanted.append(make_entry(row,q,slot,len(wanted)))
+            for slot in range(4):wanted.append(make_entry(row,q,slot,len(wanted),arm=gc['arm']))
             if native:
                 for slot in range(2):wanted.append(make_entry(row,q,slot,len(wanted),arm='native_latent'))
         if c['entries']!=wanted or set(out)!={'motifs'}|{r['dataset'] for r in wanted} or set(out['motifs'])!={r['id'] for r in rows}:
@@ -98,7 +98,7 @@ def main():
                 q=fr['train/'+row['id']+'/conditions/c20_center']
                 out.create_dataset('motifs/'+row['id'],data=q['fragment'][:])
                 for slot in range(4):
-                    entry=make_entry(row,q,slot,len(c['entries']));c['entries'].append(entry)
+                    entry=make_entry(row,q,slot,len(c['entries']),arm=gc['arm']);c['entries'].append(entry)
                     out.create_dataset(entry['dataset'],data=gen['new/'+row['id']+'/backbone'][slot][None])
                 if native:
                     for slot in range(2):

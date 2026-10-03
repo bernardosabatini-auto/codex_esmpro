@@ -40,6 +40,9 @@ def select_sources(spec, inventory, excluded, *, per_bucket=8):
 
 
 def audit_generation(c):
+    if c.get('spec',{}).get('native_anchor_model_validation'):
+        from native_anchor_model_validation import audit_generation as audit_model
+        return audit_model(c)
     for source in c['sources']:
         if sha(source['path']) != source['sha256']: raise ValueError('Changed calibration source')
     spec = json.loads(Path(c['protocol']).read_text())

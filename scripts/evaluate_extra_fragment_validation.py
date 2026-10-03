@@ -24,7 +24,7 @@ def main():
         decoder=load_proteinae(a.source/'ProteinAE_v1',Path(c['decoder_checkpoint']),steps=3).cuda().eval().requires_grad_(False);net,_=load_legacy(c['checkpoint'],trusted_pickle=True);net.cuda().eval().requires_grad_(False)
         ck=torch.load(c['checkpoint'],map_location='cpu',weights_only=False,mmap=True);adapter=load_fragment_adapter(ck,net).cuda().eval().requires_grad_(False);del ck
         history_cohort=spec.get('historical_cohort','development')
-        historical=load_conditions(c['historical_fragments'],c['control_ids'],cohort=history_cohort);new=load_conditions(c['fragments'],c['target_ids'],spec.get('condition','f30_center'),cohort=spec.get('cohort','development'))
+        historical=load_conditions(c['historical_fragments'],c['control_ids'],spec.get('historical_condition','f30_center'),cohort=history_cohort);new=load_conditions(c['fragments'],c['target_ids'],spec.get('condition','f30_center'),cohort=spec.get('cohort','development'))
         def sample(ident,item,seed,posed=False,decode=True,drop=False):
             n=item['length'];features=item['features'][None].expand(4,-1,-1).cuda();keep=item['keep'][None].expand(4,-1).cuda();coords=item['coordinates'][None].expand(4,-1,-1).cuda();mask=torch.ones(4,n,dtype=torch.bool,device='cuda')
             if posed:coords=(coords.double()@coords.new_tensor([[0,-1,0],[1,0,0],[0,0,1]],dtype=torch.float64)+coords.new_tensor([11,7,-3],dtype=torch.float64))*keep[...,None]
@@ -33,7 +33,7 @@ def main():
             dn=torch.cat([target_noise([ident],[4*n],3,seed=seed,sample_index=k,stream='decoder:0',device='cuda') for k in range(4)])*decoder.fm.scale_ref;_,bb=decoder(z,mask,noise=dn,return_backbone=True);return z.cpu().numpy(),bb.cpu().numpy()
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'predictions.h5','x') as out,h5py.File(c['historical_predictions']) as old:
             for ident,item in historical.items():
-                z,bb=sample(ident,item,spec['historical_seed']);reference=old[history_cohort+'/conditioned/'+ident];rb=reference['backbone'][:];scores=[ca_metrics(x[:,1],y[:,1]) for x,y in zip(bb,rb)];left=raw_rows(bb,item['fragment'],item['start'],c['arm'],ident,item['family']);right=raw_rows(rb,item['fragment'],item['start'],c['arm'],ident,item['family'])
+                z,bb=sample(ident,item,spec['historical_seed']);reference=old[spec.get('historical_prefix',history_cohort+'/conditioned')+'/'+ident];rb=reference['backbone'][:];scores=[ca_metrics(x[:,1],y[:,1]) for x,y in zip(bb,rb)];left=raw_rows(bb,item['fragment'],item['start'],c['arm'],ident,item['family']);right=raw_rows(rb,item['fragment'],item['start'],c['arm'],ident,item['family'])
                 r=dict(kind='historical',target_id=ident,latent_max_abs=float(np.max(abs(z-reference['latent'][:]))),max_ca_rmsd=max(x['ca_rmsd'] for x in scores),min_ca_lddt=min(x['ca_lddt'] for x in scores),same_decisions=all(x[k]==y[k] for x,y in zip(left,right) for k in ('coarse_valid','raw_gate_passed')));m['controls'].append(r)
                 if r['latent_max_abs']>1e-5 or r['max_ca_rmsd']>.2 or r['min_ca_lddt']<.99 or not r['same_decisions']:raise ValueError('Historical sampling changed')
                 g=out.create_group('historical/'+ident);g.create_dataset('latent',data=z);g.create_dataset('backbone',data=bb)

@@ -18,11 +18,11 @@ def analyze(run):
     for r in m['batches']:
         if r['samples']!=4 or r['peak_reserved_GiB']>75:raise ValueError('Changed sampling resources')
     history_cohort=spec.get('historical_cohort','development')
-    new=load_conditions(c['fragments'],c['target_ids'],spec.get('condition','f30_center'),cohort=spec.get('cohort','development'));history=load_conditions(c['historical_fragments'],c['control_ids'],cohort=history_cohort)
+    new=load_conditions(c['fragments'],c['target_ids'],spec.get('condition','f30_center'),cohort=spec.get('cohort','development'));history=load_conditions(c['historical_fragments'],c['control_ids'],spec.get('historical_condition','f30_center'),cohort=history_cohort)
     with h5py.File(run/'predictions.h5') as out,h5py.File(c['historical_predictions']) as old:
         if set(out)!=({'new','historical','native'} if spec.get('native_anchor_calibration') else {'new','historical'}) or set(out['new'])!=set(new) or set(out['historical'])!=set(history):raise ValueError('Changed stored inventory')
         for ident,item in history.items():
-            g=out['historical/'+ident];reference=old[history_cohort+'/conditioned/'+ident];bb=g['backbone'][:];rb=reference['backbone'][:]
+            g=out['historical/'+ident];reference=old[spec.get('historical_prefix',history_cohort+'/conditioned')+'/'+ident];bb=g['backbone'][:];rb=reference['backbone'][:]
             if np.max(abs(g['latent'][:]-reference['latent'][:]))>1e-5:raise ValueError('Stored historical latent changed')
             for x,y in zip(bb,rb):
                 metric=ca_metrics(x[:,1],y[:,1])

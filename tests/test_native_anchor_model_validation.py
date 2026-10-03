@@ -1,0 +1,44 @@
+import copy
+import json
+from pathlib import Path
+import unittest
+from native_anchor_model_validation import check_recipe
+from compare_native_anchor_models import verify_outcome
+
+
+class ModelValidationRecipeTests(unittest.TestCase):
+    def setUp(self):
+        root=Path(__file__).resolve().parents[1]
+        self.base=json.loads((root/'configs/fragment_preference_calibration_protocol.json').read_text())
+        self.spec=json.loads((root/'configs/native_anchor_model_validation_protocol.json').read_text())
+
+    def test_preserves_full_budget_and_original_noise(self):
+        check_recipe(self.spec,self.base)
+        for key,value in [('samples',8),('seed',17),('num_sequences',4),('steps',20),('condition','f30_center'),('cohort','development')]:
+            with self.subTest(key=key):
+                bad=copy.deepcopy(self.spec);bad[key]=value
+                with self.assertRaises(ValueError):check_recipe(bad,self.base)
+
+    def test_requires_matching_final_training_controls(self):
+        for key,value in [('historical_condition','f30_center'),('historical_prefix','train/conditioned'),('historical_seed',1)]:
+            with self.subTest(key=key):
+                bad=copy.deepcopy(self.spec);bad[key]=value
+                with self.assertRaises(ValueError):check_recipe(bad,self.base)
+
+    def test_cannot_pool_constraints_across_refolds(self):
+        from latentfold.fragment_designability import same_refold_success
+        raw=dict(coarse_valid=True,motif_ca_rmsd=.2,motif_drms=.2)
+        folds=[dict(raw,sc_tm=.8,scaffold_tm=.3),dict(raw,sc_tm=.8,scaffold_tm=.8,motif_ca_rmsd=2.)]
+        r=dict(raw=raw,refolds=folds,**same_refold_success(raw,folds),scaffold_joint_success=False,scaffold_successful_refold_indices=[])
+        verify_outcome(r)
+        with self.assertRaises(ValueError):verify_outcome(dict(r,scaffold_joint_success=True,scaffold_successful_refold_indices=[0]))
+
+    def test_watcher_callback_needs_no_model_imports(self):
+        import os,subprocess,sys
+        root=Path(__file__).resolve().parents[1]
+        env=dict(os.environ,PYTHONPATH=str(root/'scripts'))
+        code='from pathlib import Path; from compare_fragment_preferences import ready_command; import tempfile; t=tempfile.TemporaryDirectory(); assert ready_command(Path(t.name)) is None'
+        subprocess.run([sys.executable,'-c',code],cwd='/tmp',env=env,check=True)
+
+
+if __name__=='__main__':unittest.main()

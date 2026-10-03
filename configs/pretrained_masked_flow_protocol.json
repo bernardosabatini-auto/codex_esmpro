@@ -1,0 +1,41 @@
+{
+  "purpose": "Test pretrained structural prior plus explicit clean-scaffold conditioning for learned masked flow, after the small fromscratch model failed native capacity.",
+  "baseline_generation": "extra_fragment_validation_50188437",
+  "diagnostic": "decoder_fragment_variance_50267175",
+  "seed": 2026100461,
+  "sampling_seed": 2026100405,
+  "sampling_stream": "motif_repair:0",
+  "conditions": [
+    "c20_left",
+    "c20_center",
+    "c20_right"
+  ],
+  "flank": 8,
+  "steps": 50,
+  "decoder_steps": 3,
+  "updates": 2000,
+  "profile_updates": 40,
+  "learning_rate": 0.0003,
+  "warmup_updates": 40,
+  "ema_decay": 0.99,
+  "batches": {
+    "128": 64,
+    "256": 32,
+    "384": 16,
+    "512": 8
+  },
+  "data": "All512 original training proteins and their three separately encoded20residue fragments. Full native latent is the supervised endpoint and clean scaffold context during training. Inference context comes ONLY from the archived generated latent; native context is an explicitly labelled oracle capacity control. No native editable latent is visible to the sampler. No scaffold sequence or reference coordinates enter model conditioning. Repeated32protein training diagnostic; locked tests untouched.",
+  "corruption": "Editable region is the supplied20residue motif plus up to8residues on each side. Only this region follows the Gaussian-to-native linear flow path. The rest of the native latent stays clean during training. Sample logit-normal times and independent Gaussian noise; average squared velocity error over editable residues perprotein. Tenpercent whole-fragment dropout removes token and intramotif-distance inputs. Use inherited50percent self-conditioning; clamp history outside the editable region to the clean context on the history pass and every sampling step. No decoder gradient. Uniform protein draws within cycled length buckets, uniform three-condition draws.",
+  "sampling": "FiftyEulersteps from fresh noise ONLY in editable region; copy remaining context and self-conditioning history exactly at eachstep and after terminal perresidue latent normalization. Repair all128 original generated latents with one fixed repairnoise each. Same four repairnoises for supplied-fragment and no-fragment arms; same original fourAE3 decoder noises. Report all outputs, with no repair acceptance filter or extra attempts. Native-context controls use the same noises; these are not generated successes.",
+  "full_evaluation": "All32 original training diagnostic proteins,4samples each,center20motif. Native-context and generated-context,each with fragment on/off. Frozen AE3 FP32 exact-length batch4. Original128parent backbones reproduced. Native directdecodes are reconstruction controls; independently audit all512 repaired outputs,context-copy invariants,savedcheckpoint GPUreplay,and geometry. Fullnativecontext capacity target>=103/128raw and>=126/128coarsevalid. Generated conditioned arm must exceed25/128parent raw and no-fragment raw,have>=126/128valid,and improve raw success on at least2families versusparent before spending on refolds. Failedgate closes this recipe without altered thresholds or extensions.",
+  "refolding": "Only after fullcapacity/geometry gates pass, refold ALL128conditioned and ALL128no-fragment repaired outputs with8fixed-motifCA-onlyProteinMPNNdesigns and qualified deterministicFP32teacher3loops50steps. Compare with unchanged original128parent/1024refolds and32native controls, without poolingattempts. Same valid refold must have propermotifCA RMSD<=1A,dRMS<=1A,globalTM>.5,scaffoldTM>.5. Advancement requires >8strong,>=7successfulfamilies,>=45designable versusparent, with family-bootstrap uncertainty. Report null-arm and parent comparisons, all-pair and jointlysuccessful diversity, and incremental repaircost separately from end-to-end generation.",
+  "pretrained_masked": true,
+  "parent": "fragment_training_50106855",
+  "failed_small_run": "masked_fragment_training_50270905",
+  "trunk_learning_rate": 1e-05,
+  "network": "Load original6000update generatorEMA and geometry/token adapter. Add a zero-initialized256hidden context MLP from eight CLEAN SCAFFOLD latentchannels plus known-mask flag into existing conditioning tokens; zero editable inputs before this MLP and gate its output to known residues. Train the generator trunk,original fragment adapter,and new context adapter. Freeze unused sequence/pairtrack parameters. The unchanged parent checkpoint remains the separate global generator. This changes initialization,architecture,self-conditioning and integration relative to the failedsmall model; no pure initialization causal claim.",
+  "optimizer": "AdamW betas(.9,.95),weight_decay.01,gradientclip1. GeneratortrunkLR1e-5;originalfragmentadapter andnewcontextadapterLR3e-4. Linear40stepwarmup and cosine to.1floor over2000updates. FP32,blockactivationcheckpointing,EMA.99. Final2000EMA only; no LR,duration,flank orwidth sweep.",
+  "profile": "One40updateRTXprofile,25minuteallocation. Same four controls:firstselectedtarget perlengthbucket. At initialization, all-edit sampling with zero context contribution must reproduce all16 archived parentlatents at<=1e-5 and originalbackbones atCA RMSD<=.2A,CA-lDDT>=.99,identical geometry/rawdecisions. Native directdecodes also reproduce priorcontrols. Require finite nonzero gradients/updates,unchangedcodec andunusednetworkparameters,exact scaffoldlatents,finiteoutputs and supplied-coordinate pose parity<=1e-4. Independently reload savedEMA into GPUmodel and regenerate all four noises for first128bucket target in bothnative/generated conditioned modes; latent maxabs<=1e-5. IndependentCPU audit streamsweights and rechecks every saved control. No large CPUmodel under the1GiBwatcher. Peak<=75GiB. Quality is not aprofilegate. Fullruntime from measuredprofile. Match initialization and allfirst40protein/condition/noise/time/drop/history/LRdraws; prefixraw/EMAweights agree to1e-4.",
+  "limitations": "Fixed latent scaffold does not imply fixed decoded scaffold; explicitly measure scaffold coordinate drift. Native-context capacity can exploit training context and cannot establish generalization or fragment reliance. On/off comparison is required. New repairnoise is local model stochasticity, not evidence of biological conformational diversity. Native-context reconstruction is easier than repairing generatedcontexts. Earlierlocalfromscratch0/128valid failure remainsclosed; using apretrainedjointprior is a newhypothesis. Incremental50steprepair cost must be included in any later end-to-end benchmark.",
+  "resources": "OneRTXprofile then oneRTXtraining, at most8ownrunning-plus-pending GPUs overall. Fullruntime derivedfromprofile. Automaticcompletionaudits andexactregisteredIDs only. Preserve allfailures; no refolds unlessprospectivecapacity/geometry gatespass."
+}

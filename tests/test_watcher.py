@@ -69,6 +69,24 @@ class WatcherTests(unittest.TestCase):
         with self.assertRaises(subprocess.CalledProcessError):
             watch.scheduler_states(['123_0'],run)
 
+    def test_purged_controller_id_requires_terminal_accounting(self):
+        import subprocess
+        error=subprocess.CalledProcessError(1,['squeue'],stderr='slurm_load_jobs error: Invalid job id specified\n')
+        for state in ('COMPLETED','RUNNING',''):
+            run=Mock(side_effect=[Mock(stdout=f'123_0|{state}|0:0|00:01:00|end\n' if state else ''),error])
+            if state=='COMPLETED':self.assertEqual(watch.scheduler_states(['123_0'],run)['123_0']['state'],'COMPLETED')
+            else:
+                with self.assertRaises(subprocess.CalledProcessError):watch.scheduler_states(['123_0'],run)
+
+    def test_mixed_purged_and_completing_ids_preserve_live_allocation(self):
+        import subprocess
+        error=subprocess.CalledProcessError(1,['squeue'],stderr='slurm_load_jobs error: Invalid job id specified\n')
+        run=Mock(side_effect=[Mock(stdout='123_0|COMPLETED|0:0|00:01:00|end\n123_1|COMPLETED|0:0|00:01:00|end\n'),
+                              error,error,Mock(stdout='123_1|COMPLETING|1:00\n')])
+        rows=watch.scheduler_states(['123_0','123_1'],run)
+        self.assertEqual(rows['123_0']['state'],'COMPLETED')
+        self.assertEqual(rows['123_1']['state'],'COMPLETING')
+
     def test_missing_or_running_tasks_never_trigger_analysis(self):
         analyze = Mock()
         for rows in [{}, {'123_0': self.rows()['123_0']}, self.rows('RUNNING')]:

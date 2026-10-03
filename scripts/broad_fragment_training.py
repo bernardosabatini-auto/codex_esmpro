@@ -11,7 +11,7 @@ PATH_OVERRIDES = ('extension_protocol', 'broad_corpus_protocol', 'warm_protocol'
                   'expanded_protocol', 'latent_weight_protocol', 'profile_report', 'factorial_profile_report')
 OVERRIDES = {'extension_arm', 'profile_only', 'seed', 'updates', 'evaluation_steps',
              'total_prior_updates', 'work_cap_seconds', 'allocation_minutes',
-             'training_protein_count', 'motif_mass', 'corpus', 'latent_weight_profile_audit'}
+             'training_protein_count', 'motif_mass', 'corpus', 'latent_weight_profile_audit', 'freeze_trunk'}
 OVERRIDES |= set(PATH_OVERRIDES) | {k + '_sha256' for k in PATH_OVERRIDES}
 
 
@@ -26,6 +26,21 @@ def audit_broad(c):
     if not spec['broad_short_corpus'] or c['extension_arm'] not in spec['arms']:
         raise ValueError('Undeclared broader training arm')
     arm = spec['arms'][c['extension_arm']]
+    if type(c.get('freeze_trunk', False)) is not bool or c.get('freeze_trunk', False) != arm.get('freeze_trunk', False):
+        raise ValueError('Changed generator freeze policy')
+    if c.get('freeze_trunk'):
+        if not spec.get('freeze_trunk_study') or not c.get('warm_start'):
+            raise ValueError('Unbound learned-generator freezing')
+        evidence = root / spec['source_calibration_report']
+        if sha(evidence) != spec['source_calibration_sha256']:
+            raise ValueError('Changed source-designability prerequisite')
+        calibration = json.loads(evidence.read_text())
+        if calibration['status'] != 'complete':
+            raise ValueError('Incomplete source-designability prerequisite')
+        for source_arm in ('original512', 'added7429'):
+            rows = [r for r in calibration['summary'] if r['arm'] == source_arm]
+            if sum(r['proteins'] for r in rows) != 64 or sum(r['designable'] for r in rows) < 48:
+                raise ValueError('Insufficient source designability for freeze study')
     for key in ('extension_protocol', 'warm_protocol', 'latent_weight_protocol'):
         if c[key] != c['broad_corpus_protocol']:
             raise ValueError('Inconsistent broader training protocol')
@@ -98,4 +113,6 @@ def audit_broad(c):
                     'extension_arm', 'seed', 'motif_mass', 'corpus'):
             if profile['config'][key] != c[key]:
                 raise ValueError('Wrong matched profile')
+        if profile['config'].get('freeze_trunk', False) != c.get('freeze_trunk', False):
+            raise ValueError('Wrong generator-freezing profile')
     return dict(spec, training_protein_count=n)

@@ -17,6 +17,7 @@ def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error','Incomplete'),updates=m.get('updates',0),profile_qualified=False)
     c=m['config'];warm=c.get('warm_start',False)
+    if c.get('freeze_trunk') and (not warm or not c.get('broad_corpus_protocol')):raise ValueError('Unbound learned-generator freeze')
     if c.get('motif_mass') is not None and not c.get('broad_corpus_protocol'):raise ValueError('Unbound region-balanced objective')
     if c.get('broad_corpus_protocol') and not c.get('extension_protocol'):raise ValueError('Unbound broader continuation')
     if bool(c.get('conditional_time_shift'))!=bool(c.get('time_protocol')):raise ValueError('Unbound conditional time shift')
@@ -82,6 +83,7 @@ def analyze(run):
         if len(rows)!=c['updates'] or [r['step'] for r in rows]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['motif_mse']) or r['aux_to_flow_ratio']>c['rollout_motif']['maximum_gradient_ratio']+1e-7 or r['flow_parameter_grad_norm']<=0 for r in rows):raise ValueError('Incomplete/unbounded rollout gradients')
         if sum(r['motif_examples'] for r in rows)<c['updates'] or not any(r['aux_parameter_grad_norm']>0 for r in rows) or any(r['motif_examples'] and r['velocity_evaluations']!=50 for r in rows):raise ValueError('Incomplete rollout objective')
     if m['updates']!=c['updates'] or len(m['training'])!=c['updates'] or m['frozen_initial']!=m['frozen_final']:raise ValueError('Incomplete/frozen-weight failure')
+    if c.get('freeze_trunk') and not m.get('frozen_generator_ema_exact'):raise ValueError('Frozen generator EMA was not preserved')
     if [r['step'] for r in m['training']]!=list(range(1,c['updates']+1)) or any(not np.isfinite(r['flow_loss']) or r['adapter_gradient_norm']<=0 for r in m['training']):raise ValueError('Invalid training trace')
     if any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in m['initial_controls']):raise ValueError('Failed initial controls')
     if len(m['initial_controls'])!=(32 if c['profile_only'] else 128) or len(m['sampling_controls'])!=4 or any(r['original_max_abs']>1e-5 or r['batched_max_abs']>(1e-5 if c.get('sampling_control_mode')=='same_batch_repeat' else 1e-4) or (c.get('sampling_control_mode')=='same_batch_repeat' and r.get('kind')!='same_batch_repeat') for r in m['sampling_controls']):raise ValueError('Incomplete sampler controls')
@@ -101,7 +103,7 @@ def analyze(run):
                     for slot in range(4):
                         old=index[(cohort,mode,ident,slot)];metrics=ca_metrics(bb[slot,:,1],ref[:,1])
                         if abs(old['motif_drms']-err[slot])>1e-6 or old['coarse_valid']!=int(geom['coarse_valid'][slot]) or any(abs(old[key]-value)>1e-6 for key,value in metrics.items()):raise ValueError('Saved-score mismatch')
-                        if (cohort=='development' or warm) and (e['step']==0 or c['arm']=='adapter_only' and mode=='null'):
+                        if (cohort=='development' or warm) and (e['step']==0 or (c['arm']=='adapter_only' or c.get('freeze_trunk')) and mode=='null'):
                             history_path=f'{cohort}/{mode}/{ident}' if warm else 'original50/unconditional/'+ident
                             original=historical[history_path+'/backbone'][slot];control=ca_metrics(bb[slot,:,1],original[:,1])
                             if control['ca_rmsd']>.2 or control['ca_lddt']<.99 or np.max(abs(z[slot]-historical[history_path+'/latent'][slot]))>1e-5:raise ValueError('Saved historical parity failed')

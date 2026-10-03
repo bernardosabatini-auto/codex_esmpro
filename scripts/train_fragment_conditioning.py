@@ -46,6 +46,7 @@ def main():
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     warm=c.get('warm_start',False)
+    if c.get('freeze_trunk') and (not warm or not c.get('broad_corpus_protocol')):raise ValueError('Unbound learned-generator freeze')
     if c.get('motif_mass') is not None and not c.get('broad_corpus_protocol'):raise ValueError('Unbound region-balanced objective')
     if c.get('broad_corpus_protocol') and not c.get('extension_protocol'):raise ValueError('Unbound broader continuation')
     if bool(c.get('conditional_time_shift'))!=bool(c.get('time_protocol')):raise ValueError('Unbound conditional time shift')
@@ -125,7 +126,7 @@ def main():
             from latentfold.teacher_endpoint_pool import TeacherEndpointPool
             endpoint_pool=TeacherEndpointPool(c['augmentation_targets'],json.loads(Path(c['augmentation_protocol']).read_text())['seed'])
         model,arch=load_legacy(Path(c['checkpoint']),trusted_pickle=True);model.cuda().train();model.checkpoint_blocks=True
-        if c['arm']=='adapter_only':model.requires_grad_(False);frozen=[n for n,_ in model.named_parameters()]
+        if c['arm']=='adapter_only' or c.get('freeze_trunk'):model.requires_grad_(False);frozen=[n for n,_ in model.named_parameters()]
         else:frozen=freeze_unused_conditioning(model)
         torch.manual_seed(c['seed']);adapter=(FragmentGeometryAdapter(model.d_model,n_layers=len(model.blocks),n_heads=model.n_heads,hidden=recipe['adapter']['hidden'],distance_precision=c.get('distance_precision','fp32'),backbone_tokens=c.get('backbone_tokens',False)) if geometry else FragmentAdapter(model.d_model,recipe['adapter']['hidden'])).cuda().train()
         if warm:
@@ -225,6 +226,7 @@ def main():
                     optimizer.step()
                     with torch.no_grad():
                         for net,bank in ((model,ema),(adapter,adapter_ema)):
+                            if c.get('freeze_trunk') and net is model:continue
                             current=net.state_dict();keys=[k for k in bank if bank[k].is_floating_point()];torch._foreach_lerp_([bank[k] for k in keys],[current[k] for k in keys],.01)
                     m['updates']=step+1;m['training'].append(dict(step=step+1,length=n,batch=b,ids=ids,conditions=names,flow_loss=float(loss.detach()),gradient_norm=float(norm),adapter_gradient_norm=float(anorm),learning_rate_factor=factor,self_conditioned=info['self_conditioned'],noise_sha256=digest(info['noise']),time_sha256=digest(info['t']),drop_sha256=digest(info['dropped']),rng_sha256=digest(rng.get_state()),global_rng_sha256=digest(torch.cuda.get_rng_state())))
                     if c.get('conditional_time_shift'):
@@ -233,6 +235,9 @@ def main():
                     del z,features,keep,mask,loss,info
                 torch.cuda.synchronize();m['batches'].append(dict(begin=begin,end=end,seconds=time.monotonic()-tick,peak_reserved_bytes=torch.cuda.max_memory_reserved()));m['frozen_final']=frozen_hash(model,frozen)
                 if m['frozen_final']!=m['frozen_initial']:raise ValueError('Frozen weights changed')
+                if c.get('freeze_trunk'):
+                    m['frozen_generator_ema_exact']=all(torch.equal(ema[k],v) for k,v in model.state_dict().items())
+                    if trunk or not m['frozen_generator_ema_exact']:raise ValueError('Learned generator or its EMA changed')
                 if not c['profile_only']:torch.save(dict(ema={k:v.cpu() for k,v in ema.items()},fragment_adapter={k:v.cpu() for k,v in adapter_ema.items()},adapter_config=dict(output_width=model.d_model,hidden=recipe['adapter']['hidden'],variant='geometry' if geometry else 'token',n_layers=len(model.blocks),n_heads=model.n_heads,distance_precision=c.get('distance_precision','fp32'),backbone_tokens=c.get('backbone_tokens',False)),arch=arch['architecture'],extra_arch=arch['extra_architecture'],model=arch['model'],experiment=c),a.output/f'ema_{end}.ckpt')
                 evaluate(end)
         m['status']='complete'

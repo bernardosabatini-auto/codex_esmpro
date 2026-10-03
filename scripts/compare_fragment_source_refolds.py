@@ -5,9 +5,6 @@ from pathlib import Path
 
 import numpy as np
 
-from prepare_overfit import sha
-
-
 def ready_command(root):
     """The completion watcher may run this one declared CPU comparison."""
     planpath=root/'runs/fragment_source_comparison.json'
@@ -57,6 +54,7 @@ def summarize(records, seed=2026100381):
 
 
 def main():
+    from prepare_overfit import sha
     parser=argparse.ArgumentParser();parser.add_argument('--runs',type=Path,nargs=4,required=True)
     parser.add_argument('--output',type=Path,required=True);args=parser.parse_args();root=Path(__file__).resolve().parents[1]
     records=[];partitions=set();inventories=set();sources=[]

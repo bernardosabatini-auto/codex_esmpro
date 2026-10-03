@@ -57,12 +57,23 @@ def scheduler_states(ids, run=subprocess.run):
                           elapsed=elapsed, ended=end)
     # Live allocation state takes precedence: accounting can already say
     # COMPLETED while squeue still reports COMPLETING and holds the GPU.
-    # Query only exact owned IDs, expanding arrays. A query failure propagates;
-    # neither completion handling nor the submission cap may assume release.
+    # Query only exact owned IDs. A purged single ID is absent from the live
+    # controller only when it explicitly says invalid ID and accounting is final.
+    # Other failures still propagate; mixed lists are checked one ID at a time.
+    def live_rows(owned):
+        try:
+            return run(['squeue','-h','-r','-j',','.join(owned),'--format=%i|%T|%M'],
+                       capture_output=True,text=True,timeout=20,check=True).stdout
+        except subprocess.CalledProcessError as error:
+            if (error.stderr or '').strip() != 'slurm_load_jobs error: Invalid job id specified' or (error.stdout or '').strip():
+                raise
+            if len(owned)>1:
+                return '\n'.join(live_rows([ident]) for ident in owned)
+            if rows.get(owned[0],{}).get('state') not in TERMINAL:
+                raise
+            return ''
     if ids:
-        live=run(['squeue','-h','-r','-j',','.join(ids),'--format=%i|%T|%M'],
-                 capture_output=True,text=True,timeout=20,check=True)
-        for line in live.stdout.splitlines():
+        for line in live_rows(ids).splitlines():
             fields=line.strip().split('|')
             if len(fields)==3 and fields[0] in ids:
                 rows[fields[0]]=dict(state=fields[1],exit_code='unknown',elapsed=fields[2],ended='',source='squeue')

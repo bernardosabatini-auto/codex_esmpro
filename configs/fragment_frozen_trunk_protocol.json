@@ -1,0 +1,45 @@
+{
+  "purpose": "Test whether adapting the shared learned generator causes the designability regression: hold the6000-update generator fixed and train only its already learned fragment conditioner.",
+  "broad_short_corpus": true,
+  "parent": "fragment_training_50106855",
+  "arms": {
+    "control_frozen": {
+      "corpus": "control512",
+      "motif_mass": null,
+      "freeze_trunk": true
+    },
+    "broad_frozen": {
+      "corpus": "broad",
+      "motif_mass": null,
+      "freeze_trunk": true
+    }
+  },
+  "seed": 2026100371,
+  "total_prior_updates": 6000,
+  "updates": 2000,
+  "evaluation_steps": [
+    500,
+    2000
+  ],
+  "weight": 3.0,
+  "sampling_control_mode": "same_batch_repeat",
+  "assembly_protocol": "configs/fragment_broad_full_protocol.json",
+  "data": "Require all four independently audited source-backed data shards and exact preservation of the original512 training and16 development inputs. Both corpora add20-residue left/center/right conditions alongside the original nine fractional conditions. Broad data retains only prospectively qualified endpoints, with every rejection retained in the ledger. No refold outcome is a training label.",
+  "objective": "Control uses established residue weight3 on condition-present motifs. Balanced uses half of each condition-present example loss on motif residues and half on scaffold residues, independent of motif size. Null examples remain uniformly residue-weighted; absent or all-residue motifs use the uniform fallback. No decoder gradient or extra noise/time/drop/self-conditioning draws. All other training settings remain inherited.",
+  "training": "Same6000-update parent, two corpora,2000updates, weight3, adapterLR3e-4 and all batch/noise/time/drop/LR schedules as the completed full-network controls. Freeze every generator parameter and hold its EMA exactly; only existing token/distance fragment adapters train. No new loss or labels. The previously failed frozen-from-original initialization is distinct: this starts from an already learned fragment conditioner and generator.",
+  "evaluation": "Primary endpoint8000totalupdates. Evaluate both candidates on the same64additional development families, four noises, centered20residue motif,50flow/AE3/CFG1. Reuse the completed full-network generation and native budgets. Refold all raw matches plus the identical predetermined32-family slot0 designability panel,8fixed-motifMPNN designs each. Same-refold motif, global and scaffold gates and full256denominators unchanged. Larger motifs only follow a demonstrated short-motif improvement, under a separate protocol.",
+  "decision": "No duration or LR sweep. Candidate must improve stronger same-refold scaffold success across families while retaining designability; report paired-family uncertainty. Raw retention or frozen null preservation alone cannot establish progress. Preserve all failures. Require all generator weights unchanged, historical null parity at every evaluated checkpoint, finite adapter gradients, and matched target/condition/noise/time/drop schedules against completed full controls.",
+  "resources": "Two40-update oneRTX profiles, then two2000-update oneRTX continuations only after both profiles and matched controls qualify. Runtime from measured profile;75GiB limit; total8own running-plus-pending GPUs. No distributed training.",
+  "freeze_trunk_study": true,
+  "legacy_full_profiles": {
+    "control_weight3": "fragment_training_50126352",
+    "broad_weight3": "fragment_training_50126512"
+  },
+  "legacy_full_runs": {
+    "control_weight3": "fragment_training_50127267",
+    "broad_weight3": "fragment_training_50127352"
+  },
+  "source_calibration_report": "reports/fragment_source_comparison_20261003.json",
+  "source_calibration_sha256": "5b90edd5da2b498234567e6f3aeeac9badcca13836200978afae05700c870954",
+  "prerequisite": "Completed128-source calibration: both original and added cohorts57/64globally designable; difference95percent interval[-.1094,.1094]. Strong same-refold source successes50/64and44/64, interval[-.25,.0625]. This motivates an intervention on learning; it does not prove source equivalence or causality."
+}

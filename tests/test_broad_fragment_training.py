@@ -51,6 +51,7 @@ class BroadTrainingLineageTests(unittest.TestCase):
             self.assertEqual(audit_broad(c)['training_protein_count'], 512)
             for key, value in [('motif_mass', .5), ('seed', 124), ('batches', {'128': 32}),
                                ('training_protein_count', 8192), ('evaluation_train_ids', ['1']),
-                               ('distance_precision', 'fp32'), ('augmentation_protocol', 'unplanned')]:
+                               ('distance_precision', 'fp32'), ('augmentation_protocol', 'unplanned'),
+                               ('freeze_trunk', True)]:
                 with self.subTest(key=key), self.assertRaises(ValueError):
                     audit_broad(dict(c, **{key: value}))

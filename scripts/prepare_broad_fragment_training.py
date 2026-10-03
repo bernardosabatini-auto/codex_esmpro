@@ -10,13 +10,14 @@ from prepare_overfit import sha
 def main():
     p = argparse.ArgumentParser()
     p.add_argument('--arm', required=True)
+    p.add_argument('--protocol', type=Path)
     p.add_argument('--data', type=Path, required=True)
     p.add_argument('--profile', type=Path)
     p.add_argument('--matched-profile', type=Path)
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     root = Path(__file__).resolve().parents[1]
-    protocol = root / 'configs/fragment_broad_training_protocol.json'
+    protocol = (a.protocol or root / 'configs/fragment_broad_training_protocol.json').resolve()
     spec = json.loads(protocol.read_text())
     arm = spec['arms'][a.arm]
     parent = root / 'runs' / spec['parent']
@@ -32,6 +33,8 @@ def main():
              total_prior_updates=spec['total_prior_updates'], work_cap_seconds=1110,
              allocation_minutes=20, corpus=arm['corpus'], motif_mass=arm['motif_mass'],
              training_protein_count=dm['training_protein_count'])
+    if 'freeze_trunk' in arm:
+        c['freeze_trunk'] = arm['freeze_trunk']
     for key, path in [('extension_protocol', protocol), ('broad_corpus_protocol', protocol),
                       ('warm_protocol', protocol), ('latent_weight_protocol', protocol),
                       ('warm_parent_manifest', parent / 'manifest.json'), ('warm_parent_report', report),

@@ -1,0 +1,53 @@
+{
+  "purpose": "Test learned whole-chain adjustment with separate motif/scaffold noise clocks after fixed-scaffold repair failed. This is a new path and objective, not an extension of the failed repair checkpoint.",
+  "parent": "fragment_training_50106855",
+  "closed_fixed_run": "pretrained_masked_training_50274847",
+  "baseline_generation": "extra_fragment_validation_50188437",
+  "diagnostic": "decoder_fragment_variance_50267175",
+  "seed": 2026100471,
+  "sampling_seed": 2026100405,
+  "sampling_stream": "motif_repair:0",
+  "conditions": [
+    "c20_left",
+    "c20_center",
+    "c20_right"
+  ],
+  "flank": 8,
+  "scaffold_start": 0.5,
+  "de_novo_probability": 0.5,
+  "window_loss_mass": 0.5,
+  "steps": 50,
+  "decoder_steps": 3,
+  "updates": 2000,
+  "profile_updates": 40,
+  "trunk_learning_rate": 1e-05,
+  "learning_rate": 0.0003,
+  "warmup_updates": 40,
+  "ema_decay": 0.99,
+  "batches": {
+    "128": 64,
+    "256": 32,
+    "384": 16,
+    "512": 8
+  },
+  "model": "Start again from the unchanged 6000-update generator and isolated geometry/token adapter. Add a zero-output 2-to-256-to-width token adapter for each residue clock offset alpha and alpha*(1-t). Gate its output by alpha. Freeze unused sequence/pair parameters and the original codec. Train the remaining trunk and fragment/clock adapters. No clean native scaffold context is supplied to the network.",
+  "path": "For each protein draw scaffold alpha=0 or 0.5 with equal probability. Motif plus eight flanking residues always have alpha=0. At global time t, local time tau=alpha+(1-alpha)*t; x=(1-tau)*epsilon+tau*z_native. Learn unscaled velocity z_native-epsilon at every real residue. Integrate dx/dt=(1-alpha)*v. Endpoint self-conditioning is x+(1-tau)*v. No residue is clamped or copied at intermediate steps or after normalization.",
+  "objective": "Logit-normal global times, 10% fragment dropout, inherited 50% self-conditioning. Conditional examples give the motif-plus-flanks window and remaining scaffold equal loss mass; dropout examples use uniform residue loss. All 512 original training proteins, uniformly sampled within cycled length buckets, with three separately encoded 20-residue motifs. No training on generated/native paired repairs; generated scaffold distribution shift remains a limitation.",
+  "sampling": "Start motif window from the original fixed repair Gaussian; start remaining scaffold at 0.5*context+0.5*noise. Run 50 Euler steps and terminal per-residue normalization on the entire chain. Context is either the archived parent generated latent or an explicitly labelled native oracle. It is never re-injected. Reuse original four AE3 decoder noises. Four repaired arms: generated/native context crossed with fragment on/off. No raw acceptance filter, extra attempts, guidance or oracle mixtures.",
+  "optimizer": "FP32 with activation checkpointing. AdamW betas(.9,.95), weight decay .01, clip 1. Trunk LR1e-5; fragment and clock adapters LR3e-4; 40-update warmup and cosine to .1 floor over 2000; EMA .99; final checkpoint only. One seed pilot, no schedule/start-time/window/learning-rate sweep.",
+  "controls": "Initialization with alpha=0 must reproduce all 16 archived parent latents from one protein per length bucket at <=1e-5. Initial alpha=.5 generated conditioned outputs on the entire evaluation panel form an untrained-path control. Parent and direct native decodes must reproduce historical motif/validity decisions, CA RMSD<=.2A and lDDT>=.99. Supplied fragment coordinate rotations/translations must change final latents <=1e-4. Saved EMA reload GPU replay <=1e-5. Independently audit all outputs, unchanged codec/unused weights, finite gradients and nonzero parameter updates. Profile/full first 40 draws and raw/EMA weights must match (weights <=1e-4).",
+  "profile": "One 40-update RTX profile with 25-minute allocation. Four proteins, four noises, all four arms. Profile gates concern numerical correctness and peak<=75GiB, not quality. Derive full allocation from measured training/evaluation time with headroom. No full submission until independent profile audit passes.",
+  "full_gate": {
+    "native_cond_min_raw": 103,
+    "native_cond_min_valid": 126,
+    "generated_cond_min_valid": 126,
+    "generated_cond_min_raw": 26,
+    "minimum_improved_families": 2,
+    "require_generated_raw_above_null": true,
+    "require_generated_raw_above_untrained_path": true
+  },
+  "evaluation": "All 32 original repeatedly used training-diagnostic proteins and four noises: 128 outputs per arm, no selection. Native-context performance is oracle capacity, not a generated success. Report whole/fixed-region coordinate displacement, not a fixed-scaffold invariant. Family-bootstrap paired differences against parent, null and initial untrained path. Any failed full gate closes this fixed pilot; retain every failure. No claim of initialization-only or scaffold-compatibility causation because path, conditioning and objective change together.",
+  "refolding": "Only after all full gates pass: all128 generated-conditioned and all128 generated-null backbones, eight fixed-motif CA-only ProteinMPNN designs each, deterministic FP32 refolding with3loops/50steps. Reuse original parent/native budgets without pooling attempts. In the SAME valid refold require motif proper CA RMSD<=1A and dRMS<=1A, global TM>.5 and scaffold TM>.5. Advancement requires >8 strong outputs, >=7 successful families and >=45 designable outputs, with protein bootstrap intervals. Report all-pair and jointly successful diversity, and incremental and end-to-end compute. Passing this training diagnostic requires a later fresh development cohort before any generalization claim; locked tests remain untouched.",
+  "resources": "One RTX at a time for profile and training; at most8 registered running-plus-pending project GPUs globally. Exact own-job monitoring and completion audits. No refolds before gates pass. No study submissions until trainer/auditor and watcher action are implemented and tested.",
+  "failed_small_run": "masked_fragment_training_50270905"
+}

@@ -1,0 +1,14 @@
+{
+  "purpose": "Freeze additional experimental fragment families before evaluating any conditional model on them; expand beyond the repeatedly reused16-family feasibility panel.",
+  "source": "/n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae/data/phase1_dataset/dataset_exp_val.h5",
+  "selection_salt": "isolated-fragment-extra-development-20261003-v1:",
+  "short_families": 32,
+  "long_families": 32,
+  "length_boundary": 256,
+  "sequence_filter": "SensitiveMMseqs2,identity>=.3andcoverage>=.5on either sequence,propagated through self-search components. Exclude conditional training sequences,all current ensemble reference candidates,and all original/reserved test and linear-probe tuning/confirmation sequences. One observed experimental construct per remaining family,ordered by saltedSHA256ofID;no model scores.",
+  "structure_filter": "Original626-chain experimental development corpus,50..512observed residues,standard amino acids,and zero cachedCA breaks. Download mmCIF into this project only. Require unique mappedN/CA/C/O,exact cached observed sequence,contiguous label_seq_id positions,and properN/CA/C RMSD<=.02Ato cached coordinates. The observed construct may omit terminal residues; no internal gap or invented atom. Require existing coarse-validity rule. Retain every rejected candidate and reason.",
+  "fragment": "Center30percent,max(8,floor(.3N));crop before canonicalization and encoding. Only isolated fragment geometry and its amino acids may enter conditioning. Full native backbone is reserved for positive-control refolding.",
+  "gate": "Exactly32short and32long distinct families;all source and exclusion hashes bound. Stop on insufficient eligible families. No geometry threshold relaxation or selection using generation/refolding outcomes.",
+  "evaluation": "Prospective development expansion,not a locked test or completely unseen pretraining benchmark. Subsequent generation/refolding recipe and compared checkpoints must be frozen before first model outputs. Preserve all old16-family results and locked tests. No evaluation output becomes a training label.",
+  "resources": "CPU-only preparation;MMseqs1thread,4GiBsplit-memory limit;bounded64MiBdownloads,45second request timeout,20minute structure-verification cap. No GPU use in selection."
+}

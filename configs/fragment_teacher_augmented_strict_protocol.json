@@ -1,0 +1,21 @@
+{
+  "purpose": "Complete the64sample teacher-augmentation screen without additional designs for overlapping samples.",
+  "sources": [
+    [
+      "teacher_augmented",
+      "fragment_training_50085613",
+      "development/conditioned"
+    ]
+  ],
+  "covered_assays": [
+    [
+      "teacher_augmented",
+      "runs/trained_fragment_designability_teacher_augmentation.json",
+      "trained_fragment_designability_50093760",
+      "fragment_fixed_positive_49906292"
+    ]
+  ],
+  "expected_backbones": 11,
+  "screening": "All seven strict raw matches: reuse1CB9slot0from its fixed assay and its existing audited fixed-motif native control. Execute eight designs for each of the remaining six generated backbones and five native controls:88newrefolds,16reused. Every raw failure remains a failure in the64sample denominator. No pooled generated sequence attempts.",
+  "evaluation": "Original same-valid-refold global agreement plus proper motifRMSD/dRMS<=1A, with prospective scaffold-onlyTM>0.5supplement and diversity only among distinct qualifying backbones. Preserve native failures. No development refolds enter training."
+}

@@ -25,7 +25,10 @@ def analyze(run):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed continuation source')
         controls=m['warm_controls']
         if len(controls)!=(32 if c['profile_only'] else 384) or any(r['latent_max_abs']>1e-5 or r['ca_rmsd']>.2 or r['ca_lddt']<.99 or not r['validity_identical'] for r in controls):raise ValueError('Warm-start parity failed')
-    if c.get('latent_motif_weight'):
+    if c.get('weight_breadth_protocol'):
+        from fragment_weight_breadth import audit
+        audit(c)
+    if c.get('latent_motif_weight') and not c.get('weight_breadth_protocol'):
         if not warm or c.get('training_protein_count')!=128 or sha(c['latent_weight_protocol'])!=c['latent_weight_protocol_sha256'] or c['latent_motif_weight']!=json.loads(Path(c['latent_weight_protocol']).read_text())['weight']:raise ValueError('Invalid latent motif weighting')
     if c.get('backbone_tokens'):
         if warm or c['arm']!='full' or c.get('fragment_representation') or sha(c['backbone_tokens_protocol'])!=c['backbone_tokens_protocol_sha256'] or not m.get('shared_adapter_initial'):raise ValueError('Invalid backbone-token contrast')

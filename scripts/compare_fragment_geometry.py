@@ -17,7 +17,11 @@ def main():
     if a.target_frame and (any(c['arm']!='full' or not c.get('warm_start') or c.get('rollout_motif') or c.get('expanded_fragment_data') for c in configs) or configs[0].get('target_frame_training') or not configs[1].get('target_frame_training')):raise ValueError('Wrong target-frame contrast')
     if a.representation and (any(c['arm']!='full' or c.get('warm_start') or c.get('auxiliary_motif') or c.get('expanded_fragment_data') for c in configs) or configs[0].get('fragment_representation') or configs[1].get('fragment_representation')!='geometry_sequence'):raise ValueError('Wrong representation contrast')
     if a.backbone_tokens and (any(c['arm']!='full' or c.get('warm_start') or c.get('fragment_representation') for c in configs) or configs[0].get('backbone_tokens') or not configs[1].get('backbone_tokens')):raise ValueError('Wrong backbone-token contrast')
-    if a.latent_weight and (any(c['arm']!='full' or not c.get('warm_start') or c.get('training_protein_count',128 if c.get('expanded_fragment_data') else 32)!=128 or c.get('rollout_motif') or c.get('backbone_tokens') or c.get('target_frame_training') for c in configs) or configs[0].get('latent_motif_weight') or configs[1].get('latent_motif_weight')!=3):raise ValueError('Wrong latent motif weight contrast')
+    if a.latent_weight and (any(c['arm']!='full' or not c.get('warm_start') or c.get('training_protein_count',128 if c.get('expanded_fragment_data') else 32) not in (128,512) or c.get('rollout_motif') or c.get('backbone_tokens') or c.get('target_frame_training') for c in configs) or configs[0].get('latent_motif_weight') or configs[1].get('latent_motif_weight')!=3):raise ValueError('Wrong latent motif weight contrast')
+    if a.latent_weight and configs[1].get('training_protein_count')==512:
+        from fragment_weight_breadth import audit
+        audit(configs[1])
+        if configs[0]['training_protein_count']!=512:raise ValueError('Mismatched weighted corpus')
     keys=('protocol_sha256','seed','updates','batches','evaluation_steps','data_report_sha256','data_manifest_sha256','fragments_sha256','checkpoint_sha256','decoder_checkpoint_sha256','initial_manifest_sha256','initial_predictions_sha256')
     if a.step==500:keys=tuple(k for k in keys if k not in ('updates','evaluation_steps'))
     if a.data_breadth:keys=tuple(k for k in keys if k not in ('data_report_sha256','data_manifest_sha256','fragments_sha256'))+('warm_protocol_sha256','warm_parent_manifest_sha256','warm_parent_report_sha256','warm_predictions_sha256')

@@ -1,0 +1,16 @@
+{
+  "purpose": "Test whether the fixed motif-weighting benefit extends to the existing broader corpus, without new labels or a weight sweep.",
+  "weight": 3.0,
+  "training_protein_count": 512,
+  "baseline": "fragment_training_49985054",
+  "baseline_profile": "fragment_training_49984278",
+  "parent": "fragment_training_49929751",
+  "seed": 2026100241,
+  "updates": 2000,
+  "total_prior_updates": 2000,
+  "rationale": "Weighted128 improved raw constraint fit and produced replicated same-refold successes, including two distinct fresh-noise scaffolds for a selected long motif. Plain512 improved raw fit versus plain128 but produced no strict refolding success. Complete the weight-by-data contrast at matched4000total updates; do not compare this endpoint as exposure-matched to6000update parents.",
+  "controls": "Clone the cached plain512 scientific recipe exactly. Only present-condition motif-residue velocity weighting changes from1to3. Retain every original numerical gate,40update profile, identical profile initialization and random traces, all384initial full-run outputs and2000primary traces. Reuse audited plain512 instead of repeating it. Preserve all earlier failures.",
+  "evaluation": "Original32training and16development families,4fixed noises,50Euler steps,AE3,CFG1 at500and2000. Recompute strict proper-rotation raw metrics. Every technically completed run receives the fixed288refold designability assay and complete64sample strict screen with8fixed-motif designs per raw match and fixed-motif native controls. Count success only when one valid refold meets both motif limits and globalTM>0.5. Report whole-panel denominators, not only raw-pass denominators.",
+  "resources": "OneRTX, measured40update profile before training; memory<=75GiB and allocation from measured runtime. No duration, weight, noise, temperature or guidance grid. At most8own running-plus-pending GPUs.",
+  "scope": "Existing development families only; lockedtests unscored, no development refolds used as training labels. A positive outcome motivates independent breadth evaluation; a negative outcome closes this specific interaction."
+}

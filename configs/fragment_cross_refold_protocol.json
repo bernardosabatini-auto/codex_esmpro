@@ -1,0 +1,29 @@
+{
+  "purpose": "Test dynamic fragment routing using unchanged same-refold criteria and fixed designability panel.",
+  "training_protocol": "configs/fragment_cross_training_protocol.json",
+  "conditions": [
+    "c20_center"
+  ],
+  "designability_panel": {
+    "families_per_length": 16,
+    "slot": 0,
+    "seed": 2026100377
+  },
+  "panel_selection": "Select four families per length stratum within each of the four frozen family partitions, ordered by SHA256(seed:familyID); use generation slot0. This fixes32families per arm and task without viewing generation or refolding outcomes. Refold the union of this panel and every strict raw match. Each backbone receives eight designs exactly once, even when selected by both rules.",
+  "native_runs": {
+    "c20_center": [
+      "extra_fragment_refold_50120060",
+      "extra_fragment_refold_50120141",
+      "extra_fragment_refold_50120178",
+      "extra_fragment_refold_50120232"
+    ]
+  },
+  "native_reuse": "Reuse exactly the existing eight-design native controls per family and condition, binding audited manifests,reports,refolded arrays and identical constraints/teacher settings. Do not pool attempts or regenerate native design budgets. In every new refold job, repeat its first generated sequence as an execution repeatability check; this is the same sequence and seed, not another design attempt.",
+  "primary": "Every generated output remains in the256 denominator. A strict success requires raw validity and both motif limits, then motif properCA RMSD and dRMS<=1A, coarse validity, globalTM>.5 and scaffold-onlyTM>.5 in the SAME refold. Never combine motif retention in one refold with global agreement in another.",
+  "secondary": "For the fixed32-family slot0 panel, report valid global designability over32 per model/task, separately by length and with paired family bootstrap differences. Include raw-invalid samples as failures. Report motif/scaffold success separately; secondary designability is not motif scaffolding. The existing native controls remain assay calibration, not an upper bound.",
+  "budget": "Eight fixed-motif CA-only ProteinMPNN designs per unique selected backbone; unchangedFP32teacher3loops50steps. No additional attempts, checkpoint selection, rankings, guidance tuning or evaluation-derived training labels. Eight own running-plus-pending GPUs maximum.",
+  "teacher_deterministic_algorithms": true,
+  "teacher_execution": "All new paired-arm refolds use deterministicFP32 kernels, identical teacher weights,3loops50steps and fixed seeds. Exact repeat controls remain at0.01A/lDDT.999. Historical native budgets are reused unchanged. Diagnostic50154738 verified six identical repeats and0.007412A parity to original output.",
+  "teacher_execution_evidence": "reports/teacher_repeatability_probe_50154738.json",
+  "teacher_execution_evidence_sha256": "56d4e08ae0fe996db5424de8639da32a91934c9ebd10c3cb6fe6e9be41db4179"
+}

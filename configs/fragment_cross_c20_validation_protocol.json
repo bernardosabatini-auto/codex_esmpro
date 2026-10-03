@@ -1,0 +1,53 @@
+{
+  "encoded_cohort": "extra_fragment_data_50117443",
+  "selection": "fragment_extra_development_20261003",
+  "seed": 2026100351,
+  "historical_seed": 2026100211,
+  "samples": 4,
+  "steps": 50,
+  "decoder_steps": 3,
+  "batch_size": 4,
+  "guidance": 1,
+  "work_cap_seconds": 1080,
+  "controls": "Eachmodel reproduces its own four historical control families: latent1e-5,CA RMSD<=.2A,lDDT>=.99,and identical raw-validity/strict decisions. Every newfamily gets same-batch repeat<=1e-5and supplied-fragment rigid-pose latent control<=1e-4. No correction, noise retry, reflow, ranking, or strength sweep.",
+  "scope": "Repeated64-family development comparison; equal new parameters, inputs and draws. Only routing differs. No evaluation labels train either model.6000parent and native budgets reused unchanged.",
+  "purpose": "Evaluate motif-only versus all-residue dynamic fragment access after2000updates, with generator and oldadapter frozen.",
+  "parents": {
+    "motif": "fragment_training_50171694",
+    "all": "fragment_training_50171768"
+  },
+  "total_updates": {
+    "motif": 8000,
+    "all": 8000
+  },
+  "training_counts": {
+    "motif": 512,
+    "all": 512
+  },
+  "condition": "c20_center",
+  "refold_protocol": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/configs/fragment_cross_refold_protocol.json",
+  "refold_protocol_sha256": "979ac8f7016e70c41c97b6688ffcff7cb5468537f3a0f79c917ad3562eebde99",
+  "designability_panel": {
+    "families_per_length": 16,
+    "slot": 0,
+    "seed": 2026100377
+  },
+  "native_runs": [
+    "extra_fragment_refold_50120060",
+    "extra_fragment_refold_50120141",
+    "extra_fragment_refold_50120178",
+    "extra_fragment_refold_50120232"
+  ],
+  "matched_training_report": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/reports/fragment_cross_training_20261003.json",
+  "comparisons": [
+    {
+      "label": 512,
+      "baseline": "motif",
+      "candidate": "all"
+    }
+  ],
+  "inventory": "Exactly256outputs/model,512total. Retain every numerical control and failure; no retry, ranker or noise selection.",
+  "refolding": "Union of all strict raw matches and the prospectively selected32-family slot0panel. Eight fixed-motif designs per unique backbone. Reuse the frozen64native budgets for this task. Same valid refold must satisfy global,scaffold and motif constraints.",
+  "resources": "Two independent oneRTX generation jobs,20minutes each; at most8own running-plus-pending GPUs.",
+  "teacher_deterministic_algorithms": true
+}

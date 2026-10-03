@@ -17,6 +17,9 @@ def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error','Incomplete'),updates=m.get('updates',0),profile_qualified=False)
     c=m['config'];warm=c.get('warm_start',False)
+    if c.get('extension_protocol'):
+        from fragment_extension import audit_extension
+        audit_extension(c)
     if warm:
         for key in ('warm_protocol','warm_parent_manifest','warm_parent_report','warm_predictions'):
             if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed continuation source')

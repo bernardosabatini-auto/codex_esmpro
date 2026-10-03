@@ -22,6 +22,9 @@ def make_entry(row, q, slot, index, arm='parent6000'):
 
 
 def audit_inputs(c, *, audited_generation=None):
+    if c.get('native_positive_coverage'):
+        from native_positive_coverage import audit_refold
+        return audit_refold(c)
     for key in ('generation_manifest','generation_report','generated_predictions','predictions',
                 'protocol','teacher_profile_manifest','teacher_profile_report','teacher_probe'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed preference input: '+key)

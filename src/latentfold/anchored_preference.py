@@ -1,4 +1,4 @@
-"""Bounded fixed-reference regression for experimentally qualified native pairs.
+"""Bounded fixed-reference regression for refold-qualified training pairs.
 
 Symmetric field construction inspired by https://arxiv.org/html/2609.09905v1 .
 This fixed-reference variant makes no exact likelihood or KL claim for our

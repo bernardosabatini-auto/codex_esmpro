@@ -17,6 +17,10 @@ def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error','Incomplete'),updates=m.get('updates',0),profile_qualified=False)
     c=m['config'];warm=c.get('warm_start',False)
+    if bool(c.get('conditional_time_shift'))!=bool(c.get('time_protocol')):raise ValueError('Unbound conditional time shift')
+    if c.get('time_protocol'):
+        from fragment_time_shift import audit_config
+        audit_config(c)
     if c.get('extension_protocol'):
         from fragment_extension import audit_extension
         audit_extension(c)
@@ -105,7 +109,12 @@ def analyze(run):
                     means=[np.mean([r['coarse_valid'] and r['motif_drms']<=1 for r in e['scores'] if (r['cohort'],r['mode'],r['family'])==(cohort,mode,family)]) for mode in ('conditioned','null')];paired.append(means[0]-means[1])
                 summaries.append(dict(step=e['step'],cohort=cohort,arms=arms,conditioned_minus_null_joint=interval(paired)))
     memory=max(b['peak_reserved_bytes']/2**30 for b in m['batches']);gate=next((r['conditioned_minus_null_joint']['ci95'][0]>0 for r in summaries if r['step']==2000 and r['cohort']=='train'),False)
-    return dict(status='complete',config=c,manifest_sha256=sha(path),updates=m['updates'],total_training_updates=m['updates']+c.get('total_prior_updates',0),audited_predictions=audited,training_seconds=sum(b['seconds'] for b in m['batches']),evaluation_seconds=sum(e['seconds'] for e in m['evaluations']),elapsed_seconds=m['elapsed_seconds'],max_reserved_GiB=memory,profile_qualified=c['profile_only'] and memory<=75,capacity_gate_passed=None if c.get("rollout_pilot") or c.get("target_frame_training") else gate,summaries=summaries,initial_controls=len(m['initial_controls']),sampling_controls=len(m['sampling_controls']))
+    result=dict(status='complete',config=c,manifest_sha256=sha(path),updates=m['updates'],total_training_updates=m['updates']+c.get('total_prior_updates',0),audited_predictions=audited,training_seconds=sum(b['seconds'] for b in m['batches']),evaluation_seconds=sum(e['seconds'] for e in m['evaluations']),elapsed_seconds=m['elapsed_seconds'],max_reserved_GiB=memory,profile_qualified=c['profile_only'] and memory<=75,capacity_gate_passed=None if c.get("rollout_pilot") or c.get("target_frame_training") else gate,summaries=summaries,initial_controls=len(m['initial_controls']),sampling_controls=len(m['sampling_controls']))
+
+    if c.get('time_protocol'):
+        from fragment_time_shift import compare
+        result['time_contrast_audit']=compare(Path(__file__).resolve().parents[1],run)
+    return result
 
 
 def main():

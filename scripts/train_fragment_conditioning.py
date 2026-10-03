@@ -46,6 +46,10 @@ def main():
     for key in ('protocol','data_report','data_manifest','fragments','checkpoint','decoder_checkpoint','initial_manifest','initial_predictions'):
         if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
     warm=c.get('warm_start',False)
+    if bool(c.get('conditional_time_shift'))!=bool(c.get('time_protocol')):raise ValueError('Unbound conditional time shift')
+    if c.get('time_protocol'):
+        from fragment_time_shift import audit_config
+        audit_config(c)
     if c.get('extension_protocol'):
         from fragment_extension import audit_extension
         audit_extension(c)
@@ -191,7 +195,7 @@ def main():
                     coordinates=coordinates.cuda() if geometry else None;null_target=null_target.cuda() if null_target is not None else None
                     z,features,keep,mask=[x.cuda() for x in (z,features,keep,mask)];factor=min((step+1)/100,1)*(.1+.9*.5*(1+math.cos(math.pi*step/1999)))
                     for group in optimizer.param_groups:group['lr']=group['base_lr']*factor
-                    optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates,return_state=bool(c.get('auxiliary_motif')),null_target=null_target,motif_weight=c.get('latent_motif_weight',1.))
+                    optimizer.zero_grad(set_to_none=True);loss,info=fragment_flow_loss(model,adapter,z,features,keep,mask,generator=rng,coordinates=coordinates,return_state=bool(c.get('auxiliary_motif')),null_target=null_target,motif_weight=c.get('latent_motif_weight',1.),conditional_time_shift=c.get('conditional_time_shift',0.))
                     if null_target is not None:m.setdefault('frame_target_updates',[]).append(dict(step=step+1,conditioned_target_sha256=digest(z),null_target_sha256=digest(null_target),selected_target_sha256=digest(info['target']),dropped_slots=info['dropped'].cpu().tolist()))
                     if c.get('auxiliary_motif'):
                         from latentfold.fragment_objective import endpoint_fragment_objective
@@ -209,6 +213,8 @@ def main():
                         for net,bank in ((model,ema),(adapter,adapter_ema)):
                             current=net.state_dict();keys=[k for k in bank if bank[k].is_floating_point()];torch._foreach_lerp_([bank[k] for k in keys],[current[k] for k in keys],.01)
                     m['updates']=step+1;m['training'].append(dict(step=step+1,length=n,batch=b,ids=ids,conditions=names,flow_loss=float(loss.detach()),gradient_norm=float(norm),adapter_gradient_norm=float(anorm),learning_rate_factor=factor,self_conditioned=info['self_conditioned'],noise_sha256=digest(info['noise']),time_sha256=digest(info['t']),drop_sha256=digest(info['dropped']),rng_sha256=digest(rng.get_state()),global_rng_sha256=digest(torch.cuda.get_rng_state())))
+                    if c.get('conditional_time_shift'):
+                        dropped=info['dropped'];m['training'][-1].update(base_time_sha256=digest(info['base_t']),conditioned_examples=int((~dropped).sum()),null_time_max_abs=float((info['t'][dropped]-info['base_t'][dropped]).abs().max()) if dropped.any() else 0.,mean_conditional_time=float(info['t'][~dropped].mean()) if (~dropped).any() else None,mean_base_conditional_time=float(info['base_t'][~dropped].mean()) if (~dropped).any() else None)
                     if (step+1)%20==0:atomic_json(a.output/'manifest.json',m);print('update',step+1,'loss',float(loss.detach()),flush=True)
                     del z,features,keep,mask,loss,info
                 torch.cuda.synchronize();m['batches'].append(dict(begin=begin,end=end,seconds=time.monotonic()-tick,peak_reserved_bytes=torch.cuda.max_memory_reserved()));m['frozen_final']=frozen_hash(model,frozen)

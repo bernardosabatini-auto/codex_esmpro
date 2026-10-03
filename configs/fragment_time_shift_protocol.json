@@ -1,0 +1,13 @@
+{
+  "purpose": "Test whether explicit fragment conditioning is undertrained near the high-noise start of generation.",
+  "baseline": "fragment_training_50019364",
+  "baseline_profile": "fragment_training_50017255",
+  "conditional_time_shift": -1.0,
+  "updates": 2000,
+  "rationale": "The current logit-normal time distribution places about8percent of draws belowt=.2. Shifting the logit mean from0to-1 puts about35percent there, where noisy coordinates carry less target information and fragment conditioning may matter more. This is one fixed time-distribution contrast, not a schedule or strength sweep.",
+  "contrast": "For present-condition examples only, replace t with sigmoid(logit(t)-1), keeping the existing1e-4endpoint bounds. Keep dropped-condition times exactly unchanged. Consume the original noise/time/drop/history draws unchanged and log both original and transformed time hashes. Do not add random draws or change inference.",
+  "training": "Clone weighted12850019364: same parent49929751,128proteins,seed2026100241,3xmotif weighting,batches,optimizer,LRS,EMA,precision,2000updates and4000totalexposure. Preserve all data and fragment inputs. Reuse the cached baseline rather than retraining it.",
+  "controls": "Analytic time/logit and dropout tests, default-zero exact parity, unchanged noise/drop/history/RNG streams. Forty-update profile compared with50017255;32initialoutputs must be bitwise equal. Before interpreting full training, verify384initialoutputs and all2000primary traces, allowing only transformed-time hashes to differ; original-time hashes must match baseline times and null-time changes must be zero.",
+  "evaluation": "Unchanged original32capacity/16development panel,4noises,50Euler/AE3/CFG1. Every technically completed run receives the fixed288refold assay plus complete64sample strict screening,8designs perrawmatch with fixed-motif nativecontrols. Include the prospective scaffold-only same-refold endpoint from fragment_scaffold_agreement_protocol.json. Do not use development refolds as labels or score locked tests.",
+  "resources": "OneRTX40update profile before one2000update run, memory<=75GiB, measured allocation. At most8ownrunning-plus-pending GPUs. No automatic further duration or time-shift grid."
+}

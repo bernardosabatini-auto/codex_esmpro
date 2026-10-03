@@ -67,18 +67,24 @@ def prepare_fragment_condition(net, adapter, features, keep, mask, dropped, *, c
     return esm, (token, pool, *prepared[2:])
 
 
-def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator, coordinates=None, return_state=False, null_target=None, motif_weight=1.):
+def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator, coordinates=None, return_state=False, null_target=None, motif_weight=1., conditional_time_shift=0.):
     """Protein-weighted flow matching; fragment dropout preserves a null branch."""
     if target.shape != (*mask.shape, 8) or target.requires_grad or not torch.isfinite(target).all():
         raise ValueError('Fixed finite full-structure latent targets required')
     if null_target is not None and (null_target.shape!=target.shape or null_target.requires_grad or not torch.isfinite(null_target).all()):raise ValueError('Fixed matching null targets required')
     if not math.isfinite(motif_weight) or motif_weight <= 0:
         raise ValueError('Finite positive motif weight required')
+    if conditional_time_shift not in (0., -1.):
+        raise ValueError('Only the declared zero or minus-one time shift is supported')
     b = len(target)
     noise = torch.randn(target.shape, device=target.device, generator=generator)
     t = torch.sigmoid(torch.randn(b, device=target.device, generator=generator)).clamp(1e-4, 1-1e-4)
     dropped = torch.rand(b, device=target.device, generator=generator) < .1
     use_history = bool(torch.rand((), device=target.device, generator=generator) < .5)
+    base_t = t
+    if conditional_time_shift:
+        shifted = (t/(math.exp(-conditional_time_shift)*(1-t)+t)).clamp(1e-4, 1-1e-4)
+        t = torch.where(~dropped & (keep & mask).any(1), shifted, t)
     if null_target is not None:target=torch.where(dropped[:,None,None],null_target,target)
     esm, prepared = prepare_fragment_condition(net, adapter, features, keep, mask, dropped, coordinates=coordinates)
     tt = t[:, None, None]
@@ -99,6 +105,7 @@ def fragment_flow_loss(net, adapter, target, features, keep, mask, *, generator,
     if not torch.isfinite(loss):
         raise FloatingPointError('Nonfinite fragment flow loss')
     info=dict(noise=noise.detach(), t=t.detach(), dropped=dropped.detach(), self_conditioned=use_history)
+    if conditional_time_shift:info['base_t']=base_t.detach()
     if null_target is not None:info['target']=target.detach()
     if return_state:info['state']=dict(x=x,velocity=velocity,t=t,dropped=dropped,mask=mask)
     return loss,info

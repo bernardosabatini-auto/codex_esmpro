@@ -7,9 +7,9 @@ from latentfold.metrics import ca_metrics
 from latentfold.fragment_preferences import motif_quality
 
 
-def score_native_decodes(run,manifest,items):
+def score_native_decodes(run,manifest,items,*,expected_count=16,minimum_both=10,minimum_long=4):
     c=manifest['config'];controls=manifest['native_controls'];rows=[]
-    if len(items)!=16 or len(controls)!=16 or {r['target_id'] for r in controls}!=set(items):
+    if len(items)!=expected_count or len(controls)!=expected_count or {r['target_id'] for r in controls}!=set(items):
         raise ValueError('Changed native decoder inventory')
     with h5py.File(run/'predictions.h5') as f,h5py.File(c['fragments']) as fr:
         if set(f['native'])!=set(items):raise ValueError('Changed native output targets')
@@ -28,8 +28,8 @@ def score_native_decodes(run,manifest,items):
             rows.extend(current)
     qualified=[ident for ident in items if all(r['raw_gate_passed'] and r['full_native_ca_rmsd']<=1 for r in rows if r['target_id']==ident)]
     long_count=sum(items[i]['length']>256 for i in qualified)
-    return dict(native_records=rows,native_controls=16,native_raw_both_qualified=len(qualified),
-                native_long_both_qualified=long_count,native_generation_gate=len(qualified)>=10 and long_count>=4)
+    return dict(native_records=rows,native_controls=expected_count,native_raw_both_qualified=len(qualified),
+                native_long_both_qualified=long_count,native_generation_gate=len(qualified)>=minimum_both and long_count>=minimum_long)
 
 
 def native_pair(native, candidates, *, minimum_quality=.5, discovery_margin=.15, confirmation_margin=.1):

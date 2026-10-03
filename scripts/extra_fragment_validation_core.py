@@ -14,6 +14,9 @@ def audit_config(c):
     from extra_fragment_design_panel import audit_refold_plan
     audit_refold_plan(spec)
     if spec!=c['spec'] or arm not in spec['parents'] or Path(c['model_manifest']).parent.name!=spec['parents'][arm] or m['status']!='complete' or d['status']!='complete' or d['manifest_sha256']!=sha(c['model_manifest']) or d['total_training_updates']!=spec['total_updates'][arm]:raise ValueError('Changed completed model')
+    if spec.get('matched_training_report'):
+        matched=json.loads(Path(c['matched_training_report']).read_text())
+        if c['matched_training_report']!=spec['matched_training_report'] or matched['status']!='complete' or matched['profile_only'] or matched['matched_training_updates']!=2000 or set(matched['initial_predictions'])!=set(spec['parents']) or any(v!=384 for v in matched['initial_predictions'].values()) or matched['protocol_sha256']!=pc.get('broad_corpus_protocol_sha256') or pc['extension_arm']!=arm or not any(r['manifest_sha256']==sha(c['model_manifest']) and r['report_sha256']==sha(c['model_report']) for r in matched['sources']):raise ValueError('Unqualified matched training endpoints')
     expected_count=spec['training_counts'][arm] if 'training_counts' in spec else int(arm[-3:])
     if pc.get('training_protein_count')!=expected_count or pc['distance_precision']!='fp64' or c['historical_fragments']!=pc['fragments'] or c['decoder_checkpoint']!=pc['decoder_checkpoint'] or c['control_ids']!=pc['control_ids']:raise ValueError('Changed conditioning architecture or historical inputs')
     run=Path(c['model_manifest']).parent

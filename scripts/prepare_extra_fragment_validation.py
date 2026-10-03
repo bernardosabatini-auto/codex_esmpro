@@ -12,6 +12,7 @@ def main():
         if row not in c['sources']:c['sources'].append(row)
         return str(path)
     for key,path in [('protocol',protocol),('model_manifest',run/'manifest.json'),('model_report',root/'reports'/(run.name+'.json')),('checkpoint',run/'ema_2000.ckpt'),('historical_predictions',run/'evaluation_2000.h5'),('historical_fragments',Path(m['config']['fragments'])),('decoder_checkpoint',Path(m['config']['decoder_checkpoint'])),('data_manifest',data/'manifest.json'),('data_report',root/'reports'/(data.name+'.json')),('fragments',data/'fragments.h5')]:c[key]=bind(path)
+    if spec.get('matched_training_report'):c['matched_training_report']=bind(spec['matched_training_report'])
     with h5py.File(c['fragments']) as f:c['target_ids']=sorted(f['development'])
     audit_config(c);a.output.write_text(json.dumps(c,indent=2)+'\n')
 

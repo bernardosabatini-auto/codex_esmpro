@@ -1,0 +1,73 @@
+{
+  "encoded_cohort": "extra_fragment_data_50117443",
+  "selection": "fragment_extra_development_20261003",
+  "seed": 2026100351,
+  "historical_seed": 2026100211,
+  "samples": 4,
+  "steps": 50,
+  "decoder_steps": 3,
+  "batch_size": 4,
+  "guidance": 1,
+  "work_cap_seconds": 1080,
+  "controls": "Eachmodel reproduces its own four historical control families: latent1e-5,CA RMSD<=.2A,lDDT>=.99,and identical raw-validity/strict decisions. Every newfamily gets same-batch repeat<=1e-5and supplied-fragment rigid-pose latent control<=1e-4. No correction, noise retry, reflow, ranking, or strength sweep.",
+  "scope": "Additional development replication on previously unused conditioning families from an already-used prediction-development corpus. Sequence exclusions are heuristic; frozen-model pretraining exposure is unknown. All locked tests remain unscored and no new evaluation outputs enter training.",
+  "purpose": "Matched breadth-by-objective final8000-update generation: frozen64families and paired4noises, with strict same-refold and independent fixed-panel designability.",
+  "parents": {
+    "control_weight3": "fragment_training_50127267",
+    "control_balanced": "fragment_training_50127289",
+    "broad_weight3": "fragment_training_50127352",
+    "broad_balanced": "fragment_training_50127387"
+  },
+  "total_updates": {
+    "control_weight3": 8000,
+    "control_balanced": 8000,
+    "broad_weight3": 8000,
+    "broad_balanced": 8000
+  },
+  "training_counts": {
+    "control_weight3": 512,
+    "control_balanced": 512,
+    "broad_weight3": 7941,
+    "broad_balanced": 7941
+  },
+  "condition": "c20_center",
+  "refold_protocol": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/configs/fragment_broad_refold_protocol.json",
+  "refold_protocol_sha256": "fb4854f03b9752a65b581988adc5d66fc25501928d5c5424a6a0ca1d8435b508",
+  "designability_panel": {
+    "families_per_length": 16,
+    "slot": 0,
+    "seed": 2026100377
+  },
+  "native_runs": [
+    "extra_fragment_refold_50120060",
+    "extra_fragment_refold_50120141",
+    "extra_fragment_refold_50120178",
+    "extra_fragment_refold_50120232"
+  ],
+  "matched_training_report": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/reports/broad_fragment_training_20261003.json",
+  "comparisons": [
+    {
+      "label": 512,
+      "baseline": "control_weight3",
+      "candidate": "control_balanced"
+    },
+    {
+      "label": 7941,
+      "baseline": "broad_weight3",
+      "candidate": "broad_balanced"
+    },
+    {
+      "label": 7941,
+      "baseline": "control_weight3",
+      "candidate": "broad_weight3"
+    },
+    {
+      "label": 7941,
+      "baseline": "control_balanced",
+      "candidate": "broad_balanced"
+    }
+  ],
+  "inventory": "Exactly256outputs per arm,1024per motif task. Every failure remains in the denominator. Preserve all132numerical controls per arm; no output filtering or noise retries.",
+  "refolding": "Union of all strict raw matches and the prospectively selected32-family slot0panel. Eight fixed-motif designs per unique backbone. Reuse the frozen64native budgets for this task. Same valid refold must satisfy global,scaffold and motif constraints.",
+  "resources": "Four independent oneRTXjobs per motif task,20minutes each. At most8own running-plus-pending GPUs across tasks. No teacher or training work in these generation jobs."
+}

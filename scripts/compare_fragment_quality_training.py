@@ -1,5 +1,6 @@
 """Matched quality-selection intervention; condition identity differs by design."""
 import argparse
+from collections import Counter
 import json
 from pathlib import Path
 from compare_broad_fragment_training import initial_parity
@@ -21,10 +22,12 @@ def main():
     for key in ('checkpoint_sha256','fragments_sha256','condition_selection_sha256','seed','batches','latent_motif_weight','motif_mass','profile_only','evaluation_steps','total_prior_updates'):
         if configs[0][key]!=configs[1][key]:raise ValueError('Changed matched setting '+key)
     updates=compare_quality_traces(manifests);reference=next(iter(paths.values()))/'evaluation_0.h5'
+    exposure={arm:dict(Counter(name for row in m['training'] for name in row['conditions'])) for arm,m in manifests.items()}
     result=dict(status='complete',profile_only=configs[0]['profile_only'],protocol_sha256=sha(protocol),sources=sources,
                 matched_training_updates=updates,initial_predictions={arm:initial_parity(reference,run/'evaluation_0.h5') for arm,run in paths.items()},
+                sampled_training_placement_counts=exposure,
                 arms={arm:{k:d[k] for k in ('training_seconds','evaluation_seconds','elapsed_seconds','max_reserved_GiB','total_training_updates','summaries')} for arm,d in reports.items()},
-                scope='Same proteins, initial predictions, frozen generator, RNG and LR draws. Condition identity differs exactly as preregistered; counts/lengths/placement margins match. Quality is not inferred from evaluation outcomes.')
+                scope='Same proteins, initial predictions, frozen generator, RNG and LR draws. Condition identity differs exactly as preregistered; corpus condition counts/lengths/placement margins match. Repeated sampled placement counts are reported separately and need not match exactly. Quality is not inferred from evaluation outcomes.')
     a.output.with_suffix('.json').write_text(json.dumps(result,indent=2)+'\n')
     view={k:v for k,v in result.items() if k!='arms'};a.output.with_suffix('.md').write_text('# Matched fragment-quality training\n\n```json\n'+json.dumps(view,indent=2)+'\n```\n');print(json.dumps(view))
 

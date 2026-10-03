@@ -1,0 +1,17 @@
+{
+  "purpose": "Complete the64sample screens for both8000update arms. Refold every strict raw match; all four weighted matches lie outside the fixed first-two-slot assay, so no overlap or extra sequence attempts.",
+  "sources": [
+    [
+      "plain8000",
+      "fragment_training_50081634",
+      "development/conditioned"
+    ],
+    [
+      "weighted8000",
+      "fragment_training_50081718",
+      "development/conditioned"
+    ]
+  ],
+  "expected_backbones": 7,
+  "decision": "Four generated backbones plus three fixed-motif native controls,56refolds,eight designs each. Preserve all64raw outputs perarm in denominators; require SAME valid refold with globalTM>.5 and both original1Amotiflimits,plus prospectively specified scaffold-onlyTM>.5supplement. No raw matches in plain arm. No resampling or threshold changes."
+}

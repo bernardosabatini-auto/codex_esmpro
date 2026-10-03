@@ -21,8 +21,8 @@ def analyze(run):
     with h5py.File(run/'predictions.h5') as out,h5py.File(c['parent_predictions']) as parent,h5py.File(c['fragments']) as fragments:
         if set(out)!=set(c['target_ids']):raise ValueError('Changed case coverage')
         for ident in c['target_ids']:
-            g=out[ident];q=fragments['development/'+ident+'/conditions/f30_center'];fragment=q['fragment'][:];st=int(q.attrs['start']);source=parent['development/conditioned/'+ident];reference=g['initial_latent'][:];current=reference.copy();bb=g['initial_backbone'][:];loss=g['initial_loss'][:];scale=np.sqrt(np.mean(reference**2,axis=(1,2)));initial=score(bb,fragment,st);archived=score(source['backbone'][:],fragment,st)
-            if not np.array_equal(reference,source['latent'][:]) or not np.array_equal(g['fragment'][:],fragment) or int(g.attrs['start'])!=st or str(g.attrs['sequence'])!=str(q.attrs['sequence']):raise ValueError('Changed cached condition or latent')
+            g=out[ident];q=fragments['development/'+ident+'/conditions/f30_center'];fragment=q['fragment'][:];st=int(q.attrs['start']);source=parent[spec.get('prediction_prefix','development/conditioned')+'/'+ident];reference=g['initial_latent'][:];current=reference.copy();bb=g['initial_backbone'][:];loss=g['initial_loss'][:];scale=np.sqrt(np.mean(reference**2,axis=(1,2)));initial=score(bb,fragment,st);archived=score(source['backbone'][:4],fragment,st)
+            if not np.array_equal(reference,source['latent'][:4]) or not np.array_equal(g['fragment'][:],fragment) or int(g.attrs['start'])!=st or str(g.attrs['sequence'])!=str(q.attrs['sequence']):raise ValueError('Changed cached condition or latent')
             for k in range(4):
                 metric=ca_metrics(bb[k,:,1],source['backbone'][k,:,1])
                 if metric['ca_rmsd']>.2 or metric['ca_lddt']<.99 or any(initial[k][key]!=archived[k][key] for key in ('coarse_valid','raw_gate_passed')):raise ValueError('Initial cached parity failed')
@@ -42,6 +42,7 @@ def analyze(run):
                     if pg.attrs['step']!=step or np.max(abs(z-expected))>1e-5 or np.max(abs(distance-computed))>1e-6 or np.max(abs(pl-objectives))>1e-6:raise ValueError('Proposal or objective changed')
                     if np.max(abs(z.mean(-1)-reference.mean(-1)))>1e-5 or np.max(abs(z.std(-1)-reference.std(-1)))>1e-5:raise ValueError('Latent row statistics changed')
                     decision=remaining&(distance<=spec['relative_radius'])&(pl<loss)
+                    if spec.get('validity_guarded'):decision &= np.array([r['coarse_valid'] for r in scored])
                     if not np.array_equal(accepted,decision):raise ValueError('Not the first improving bounded proposal')
                     current=np.where(accepted[:,None,None],z,current);bb=np.where(accepted[:,None,None,None],pb,bb);loss=np.where(accepted,pl,loss);remaining &= ~accepted;any_accepted |= bool(accepted.any())
                 if remaining.any() and len(lines)!=4:raise ValueError('Incomplete backtracking')
@@ -55,7 +56,7 @@ def analyze(run):
             for k in range(4):records.append(dict(target_id=ident,family=str(g.attrs['family']),generation_slot=k,initial=initial[k],guided=final[k],relative_displacement=float(displacement[k])))
     if sum(r['proposal_calls'] for r in m['cases'])!=proposal_count or max(r['peak_reserved_bytes']/2**30 for r in m['cases'])>75:raise ValueError('Changed cost or memory accounting')
     newly_invalid=sum(r['initial']['coarse_valid'] and not r['guided']['coarse_valid'] for r in records);improved=sum(r['guided']['raw_gate_passed'] and r['initial']['motif_ca_rmsd']-r['guided']['motif_ca_rmsd']>=.2 for r in records);summaries={mode:dict(samples=16,valid=sum(r[mode]['coarse_valid'] for r in records),strict_raw=sum(r[mode]['raw_gate_passed'] for r in records),mean_proper_rmsd=float(np.mean([r[mode]['motif_ca_rmsd'] for r in records]))) for mode in ('initial','guided')}
-    return dict(status='complete',manifest_sha256=sha(path),predictions_sha256=m['predictions_sha256'],controls=24,summaries=summaries,newly_invalid_samples=newly_invalid,qualified_improved_samples=improved,refold_gate_passed=bool(improved and newly_invalid<=1),max_relative_displacement=max_displacement,proposal_batches=proposal_count,incremental_correction_seconds=sum(r['seconds'] for r in m['cases']),max_reserved_GiB=max(r['peak_reserved_bytes']/2**30 for r in m['cases']),records=records,scope='Four reused development families,16paired cached starts. Raw fit and latent-statistic preservation do not establish designability. Incremental correction time excludes cached parent generation; no end-to-end speed claim.')
+    return dict(status='complete',manifest_sha256=sha(path),predictions_sha256=m['predictions_sha256'],controls=24,summaries=summaries,newly_invalid_samples=newly_invalid,qualified_improved_samples=improved,refold_gate_passed=bool(improved and newly_invalid<=(0 if spec.get('validity_guarded') else 1)),max_relative_displacement=max_displacement,proposal_batches=proposal_count,incremental_correction_seconds=sum(r['seconds'] for r in m['cases']),max_reserved_GiB=max(r['peak_reserved_bytes']/2**30 for r in m['cases']),records=records,scope='Four reused development families,16paired cached starts. Raw fit and latent-statistic preservation do not establish designability. Incremental correction time excludes cached parent generation; no end-to-end speed claim.')
 
 
 def main():

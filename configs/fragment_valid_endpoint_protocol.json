@@ -1,0 +1,32 @@
+{
+  "purpose": "Test whether rejecting invalid intermediate decoder proposals prevents the chain breaks that defeated unconstrained endpoint correction. This is a new acceptance rule on a new paired noise cohort; the original failed recipe stays closed.",
+  "parent": "fragment_training_50043086",
+  "samples": 4,
+  "max_updates": 12,
+  "line_search_steps": [
+    0.01,
+    0.005,
+    0.0025,
+    0.00125
+  ],
+  "relative_radius": 0.05,
+  "desired_rmsd": 0.5,
+  "generation_seed": 2026100291,
+  "finite_difference_eps": [
+    0.01,
+    0.001,
+    0.0001
+  ],
+  "work_cap_seconds": 780,
+  "panel": "All four historical control families, slots0..3 from the paired fresh-noise reference6000 arm of validation50099599.16unselected starts; full target coordinates never enter guidance. P62593 slots4..15 are excluded prospectively.",
+  "optimizer": "Differentiate proper-rotation motifCA squared RMSD through the frozen AE3decoder. Use the envelope-theorem gradient with the optimal proper rotation detached. Project gradients onto each residue latent's fixed-mean/fixed-radius tangent plane, normalize gradient RMS perprotein, and backtrack the four fixed step sizes scaled by starting latent RMS. Retract to the original per-residue mean/radius and reject proposals outside5percent total latent-RMS displacement. Accept the first objective improvement only if its decoded backbone is coarse-valid, independently percase; stop at0.5AproperRMSD, after an update accepts no proposal, or after12updates. Preserve every proposal and failure. Geometry is an explicit rejection constraint; no full-reference selection. Never stitch or repair coordinates after decoding. Invalid starting cases remain in the denominator and can change only to a valid improving proposal.",
+  "controls": "Initial redecoding must match archived backbone atCA RMSD<=.2A,lDDT>=.99,identical coarsevalidity and strict-raw decisions. Autograd/no-grad decoding must agree atCA RMSD<=.01A,lDDT>=.999. Firstslot of everyfamily needs a nonzero finite tangent gradient and a central directional derivative agreeing at one of the three fixed epsilons within max(.01,.05*abs(analytic)). Audit per-residue statistics,5percent displacement bound, monotone objective, and all first-improving decisions. Preserve a failed numerical check without changing tolerance or step sizes.",
+  "refold_gate": "All original numerical controls pass; zero newly invalid outputs, and at least one coarse-valid guided sample passes both1Araw motif limits while improving properRMSD by>=.2A. Otherwise close this acceptance-rule test. Geometry qualification is not designability.",
+  "refolding": "If qualified, refold all16baseline and all16guided backbones plus4fixed-motif native controls:288refolds,8CA-onlyProteinMPNNdesigns perbackbone,T.1,seed1,same FP32teacher3loops50steps. This is a fresh matched assay: use only its eight designs perbackbone, never pool previous attempts. Evaluate original same-valid-refold criterion and the prospective scaffold-onlyTM>0.5supplement. Report diversity only among distinct generated backbones passing the same definition.",
+  "cost_scope": "Report incremental decoder correction cost separately. Cached starts do not establish end-to-end inference speed; a later end-to-end benchmark must include parent generation. This is post-processing of a trained model, not new training, experimental validation or a claim that sphere projection preserves the learned protein manifold.",
+  "resources": "OneRTX15minute bounded profile/pilot, memory<=75GiB; no expansion before measured controls and quality. At most8ownrunning-plus-pending GPUs.",
+  "validity_guarded": true,
+  "prediction_prefix": "reference6000",
+  "fresh_validation": "fragment_validation_50099599",
+  "scope": "The original invalidating50079395recipe remains a failure. This changes proposal acceptance, not strength, radius, update budget, or thresholds. Fresh noise uses development families, not independent test proteins. If qualified, compare complete16paired endpoints with equal8design budgets and same-refold scaffold success; retain all failures."
+}

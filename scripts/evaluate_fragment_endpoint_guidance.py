@@ -24,14 +24,14 @@ def main():
         with inference_precision('fp32'),h5py.File(c['parent_predictions']) as parent,h5py.File(c['fragments']) as fragments,h5py.File(a.output/'predictions.h5','x') as out:
             for ident in c['target_ids']:
                 if time.monotonic()-start_time>spec['work_cap_seconds']:raise TimeoutError('Correction work cap')
-                q=fragments['development/'+ident+'/conditions/f30_center'];fragment=q['fragment'][:];st=int(q.attrs['start']);source=parent['development/conditioned/'+ident];z0=torch.from_numpy(source['latent'][:]).cuda();n=z0.shape[1];mask=torch.ones(4,n,dtype=torch.bool,device='cuda');ref=torch.from_numpy(fragment).cuda();noise=torch.cat([target_noise([ident],[4*n],3,seed=spec['generation_seed'],sample_index=k,stream='decoder:0',device='cuda') for k in range(4)])*decoder.fm.scale_ref
+                q=fragments['development/'+ident+'/conditions/f30_center'];fragment=q['fragment'][:];st=int(q.attrs['start']);source=parent[spec.get('prediction_prefix','development/conditioned')+'/'+ident];z0=torch.from_numpy(source['latent'][:4]).cuda();n=z0.shape[1];mask=torch.ones(4,n,dtype=torch.bool,device='cuda');ref=torch.from_numpy(fragment).cuda();noise=torch.cat([target_noise([ident],[4*n],3,seed=spec['generation_seed'],sample_index=k,stream='decoder:0',device='cuda') for k in range(4)])*decoder.fm.scale_ref
                 if z0.shape!=(4,n,8):raise ValueError('Changed cached batch')
                 group=out.create_group(ident);group.attrs.update(start=st,sequence=str(q.attrs['sequence']),family=str(fragments['development/'+ident].attrs['family']));group.create_dataset('fragment',data=fragment);group.create_dataset('initial_latent',data=z0.cpu().numpy())
                 def decode(z):
                     _,bb=decoder(z,mask,noise=noise,return_backbone=True)
                     return proper_loss(bb,ref,st),bb
                 with torch.no_grad():initial_loss,initial_bb=decode(z0)
-                initial=initial_bb.cpu().numpy();expected=source['backbone'][:];old=score(expected,fragment,st);current_scores=score(initial,fragment,st)
+                initial=initial_bb.cpu().numpy();expected=source['backbone'][:4];old=score(expected,fragment,st);current_scores=score(initial,fragment,st)
                 for k in range(4):
                     metrics=ca_metrics(initial[k,:,1],expected[k,:,1]);passed=metrics['ca_rmsd']<=.2 and metrics['ca_lddt']>=.99 and old[k]['coarse_valid']==current_scores[k]['coarse_valid'] and old[k]['raw_gate_passed']==current_scores[k]['raw_gate_passed'];m['controls'].append(dict(kind='historical',target_id=ident,slot=k,passed=passed,**metrics))
                     if not passed:raise ValueError('Historical redecoding changed')
@@ -57,6 +57,8 @@ def main():
                         if not remaining.any():break
                         with torch.no_grad():
                             proposal=retract(base-step*scale[:,None,None]*direction,z0);displacement=(proposal-z0).square().mean((1,2)).sqrt()/scale;ploss,pbb=decode(proposal);accepted=remaining&(displacement<=spec['relative_radius'])&(ploss<current_loss);proposal_calls+=1
+                            if spec.get('validity_guarded'):
+                                valid=torch.tensor([r['coarse_valid'] for r in score(pbb.cpu().numpy(),fragment,st)],device=accepted.device);accepted &= valid
                         pg=ug.create_group(str(line));pg.attrs['step']=step
                         for name,value in [('latent',proposal),('backbone',pbb),('loss',ploss),('relative_displacement',displacement),('accepted',accepted)]:pg.create_dataset(name,data=value.detach().cpu().numpy())
                         current=torch.where(accepted[:,None,None],proposal,current).detach();current_bb=torch.where(accepted[:,None,None,None],pbb,current_bb).detach();current_loss=torch.where(accepted,ploss,current_loss).detach();remaining=remaining&~accepted;accepted_this_update |= accepted

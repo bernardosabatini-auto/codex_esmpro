@@ -7,23 +7,26 @@ from pathlib import Path
 
 def ready_command(root):
     """Fixed CPU completion comparison; never submits GPU work."""
-    path=root/'runs/fragment_preference_comparison.json'
-    if not path.exists():return None
-    plan=json.loads(path.read_text());ids=plan['jobs']
-    if len(ids)!=4 or len(set(ids))!=4:raise ValueError('Expected four declared partitions')
-    registry={r['id']:r for r in json.loads((root/'runs/jobs.json').read_text())['jobs']}
-    if any(i not in registry or registry[i].get('completion_action')!='summarize_fragment_preference_refold' for i in ids):
-        raise ValueError('Unregistered preference comparison job')
-    reports=[root/f'reports/fragment_preference_refold_{i}.json' for i in ids]
-    if not all(p.exists() for p in reports):return None
-    data=[json.loads(p.read_text()) for p in reports]
-    if any(d['status']!='complete' for d in data):return None
-    if any(d['generation_manifest_sha256']!=plan['generation_manifest_sha256'] for d in data):
-        raise ValueError('Changed comparison generation')
-    output=root/'reports/fragment_preference_comparison_20261003'
-    if output.with_suffix('.json').exists():return None
-    return [str(root/'scripts/compare_fragment_preferences.py'),'--runs',
-            *[str(root/f'runs/fragment_preference_refold_{i}') for i in ids],'--output',str(output)]
+    for plan_name, output_name in [('fragment_preference_comparison','fragment_preference_comparison_20261003'),
+                                   ('native_anchor_comparison','native_anchor_comparison_20261003')]:
+        path=root/'runs'/(plan_name+'.json')
+        if not path.exists():continue
+        plan=json.loads(path.read_text());ids=plan['jobs']
+        if len(ids)!=4 or len(set(ids))!=4:raise ValueError('Expected four declared partitions')
+        registry={r['id']:r for r in json.loads((root/'runs/jobs.json').read_text())['jobs']}
+        if any(i not in registry or registry[i].get('completion_action')!='summarize_fragment_preference_refold' for i in ids):
+            raise ValueError('Unregistered preference comparison job')
+        reports=[root/f'reports/fragment_preference_refold_{i}.json' for i in ids]
+        if not all(p.exists() for p in reports):continue
+        data=[json.loads(p.read_text()) for p in reports]
+        if any(d['status']!='complete' for d in data):continue
+        if any(d['generation_manifest_sha256']!=plan['generation_manifest_sha256'] for d in data):
+            raise ValueError('Changed comparison generation')
+        output=root/'reports'/output_name
+        if output.with_suffix('.json').exists():continue
+        return [str(root/'scripts/compare_fragment_preferences.py'),'--runs',
+                *[str(root/f'runs/fragment_preference_refold_{i}') for i in ids],'--output',str(output)]
+    return None
 
 
 def feasibility_gate(preferences, selected, native_passes, limits):
@@ -41,6 +44,11 @@ def feasibility_gate(preferences, selected, native_passes, limits):
 
 
 def compare(runs,root):
+    first=json.loads((runs[0]/'manifest.json').read_text())
+    generation=json.loads(Path(first['config']['generation_manifest']).read_text())
+    if generation['config']['spec'].get('native_anchor_calibration'):
+        from compare_native_anchors import compare_native
+        return compare_native(runs,root)
     from latentfold.fragment_preferences import split_preference
     from prepare_fragment_preference_refold import audit_inputs
     from prepare_overfit import sha

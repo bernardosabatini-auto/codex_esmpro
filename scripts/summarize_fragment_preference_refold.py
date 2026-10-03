@@ -27,14 +27,28 @@ def analyze(run):
             passing=[k for k in r['successful_refold_indices'] if r['refolds'][k]['scaffold_tm']>.5] if r['raw_gate_passed'] else []
             r.update(scaffold_successful_refold_indices=passing,scaffold_joint_success=bool(passing))
     params={k:spec['preference'][k] for k in ('minimum_quality','discovery_margin','confirmation_margin')}
-    prefs=[split_preference([dict(r,slot=r['generation_slot']) for r in records if r['target_id']==ident],**params)
-           for ident in sorted({r['target_id'] for r in records})]
-    return dict(status='complete',manifest_sha256=sha(path),refolded_sha256=sha(run/'refolded.h5'),
+    if spec.get('native_anchor_calibration'):
+        from native_anchor_calibration import native_pair
+        generation=json.loads(Path(c['generation_report']).read_text())
+        for r in records:
+            if r['arm']=='native_latent':
+                original=next(x for x in generation['native_records'] if (x['target_id'],x['generation_slot'])==(r['target_id'],r['generation_slot']))
+                r['full_native_ca_rmsd']=original['full_native_ca_rmsd']
+        prefs=[native_pair(sorted([r for r in records if r['target_id']==ident and r['arm']=='native_latent'],key=lambda r:r['generation_slot']),
+                           [r for r in records if r['target_id']==ident and r['arm']=='parent6000'],**params)
+               for ident in sorted({r['target_id'] for r in records})]
+    else:
+        prefs=[split_preference([dict(r,slot=r['generation_slot']) for r in records if r['target_id']==ident],**params)
+               for ident in sorted({r['target_id'] for r in records})]
+    result=dict(status='complete',manifest_sha256=sha(path),refolded_sha256=sha(run/'refolded.h5'),
                 generation_manifest_sha256=c['generation_manifest_sha256'],protocol_sha256=c['protocol_sha256'],
                 partition=c['partition'],completed_refolds=len(m['records']),records=records,preferences=prefs,
                 raw_matches=sum(r['raw_gate_passed'] for r in records),strong=sum(r['scaffold_joint_success'] for r in records),
                 designable=sum(r['valid_designable'] for r in records),eligible=sum(r['eligible'] for r in prefs),
                 confirmed=sum(r['confirmed'] for r in prefs),elapsed_seconds=m['elapsed_seconds'])
+    if spec.get('native_anchor_calibration'):
+        result.update(native_anchor_calibration=True,summary=[dict(arm=arm,samples=sum(r['arm']==arm for r in records),strong=sum(r['arm']==arm and r['scaffold_joint_success'] for r in records),designable=sum(r['arm']==arm and r['valid_designable'] for r in records)) for arm in ('parent6000','native_latent')])
+    return result
 
 
 def main():

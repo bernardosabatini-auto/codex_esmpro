@@ -4,6 +4,7 @@ import unittest
 import torch
 from latentfold.native_anchors import decode_native_anchors
 from native_anchor_calibration import native_pair
+from compare_native_anchors import native_gate
 
 
 def row(slot,error=1.):
@@ -35,6 +36,15 @@ class NativeAnchorTests(unittest.TestCase):
         p=native_pair(native,candidates);self.assertEqual(p['negative_slot'],3);self.assertFalse(p['confirmed'])
         p=native_pair([row(0),row(1,1.5)],[row(k,3+k) for k in range(4)])
         self.assertTrue(p['eligible']);self.assertFalse(p['native_both_strict']);self.assertFalse(p['confirmed'])
+
+    def test_cohort_requires_enough_strict_positive_anchors(self):
+        selected=[dict(id=str(k),length=(k%4+1)*128,bucket=(k%4+1)*128) for k in range(16)]
+        pairs=[dict(target_id=str(k),eligible=k<8,confirmed=k<8,native_both_strict=k<10) for k in range(16)]
+        limits=dict(minimum_confirmed=8,minimum_confirmation_rate=.75,minimum_buckets=3,
+                    minimum_long_confirmed=4,minimum_native_global_scaffold=12,minimum_native_both_strict=10)
+        self.assertTrue(native_gate(pairs,selected,12,limits)['qualified'])
+        pairs[9]['native_both_strict']=False
+        self.assertFalse(native_gate(pairs,selected,12,limits)['qualified'])
 
     def test_both_decodes_must_preserve_full_native(self):
         native=[row(0),row(1)];native[1]['full_native_ca_rmsd']=1.01

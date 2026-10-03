@@ -1,0 +1,42 @@
+{
+  "purpose": "Test whether increasing strictly validated reference-positive conditioning coverage improves same-refold success beyond the ten-anchor positive-only control.",
+  "motivation": "Contrastive400 improved designability45to56/128 (family-bootstrap95percentCI+0.03125to+0.1484375) but strict success8to9/128 remained unresolved and families fell7to6. Both pilot development gates failed. Contrastive versus positive-only designability is unresolved. The disjoint16-source calibration contains only one split-stable hard-negative candidate; do not train a hard-negative objective on that single case.",
+  "preceding_comparison": "/n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot/reports/native_anchor_model_comparison_20261003.json",
+  "preceding_comparison_sha256": "8992b9a26f2d14d1b802735465c342679a89d26aed2d2cab9475e4f67a4df77b",
+  "parent": "fragment_training_50106855",
+  "matched_positive_control": "native_anchor_training_50209404",
+  "corpus": "runs/broad_fragment_corpora_20261003/control512",
+  "cohort": "train",
+  "condition": "c20_center",
+  "candidate_proteins": 64,
+  "per_length_bucket": {
+    "128": 8,
+    "256": 16,
+    "384": 20,
+    "512": 20
+  },
+  "selection_seed": 2026100431,
+  "native_seed": 2026100433,
+  "selection": "SHA256(seed:id),8/16/20/20 sources in128/256/384/512-residue buckets,from512training proteins. Exclude ALL64original-source reference-calibration proteins, which include the32diagnostic and16anchor-source cohorts; additionally exclude every prior feedback source. No outcome filtering or diagnostic-label selection. Inventory inspection found only8unused short sources; this correction precedes any new decoded/refolded outcomes. Training still cycles buckets equally, as in the matched control.",
+  "native_samples": 2,
+  "decoder_steps": 3,
+  "native_batch_size": 2,
+  "generation_controls": "Decode two independently seeded realizations of each full reference_z. Repeat each fixed batch; CA maxabs<=1e-4. For each realization check finite complete coordinates, raw validity, supplied20AA properCA RMSD<=1A and dRMS<=1A, and full-reference properCA RMSD<=1A. Supplied inputs for later generation remain isolated-fragment-only.",
+  "generation_gate": {
+    "minimum_both_raw_and_roundtrip": 48,
+    "minimum_long_both_raw_and_roundtrip": 30
+  },
+  "refold": "If generation gate passes, refold ALL128decoded backbones,8ProteinMPNN designs each, motif sequence fixed; deterministicFP32 teacher3loops50steps. Do not filter failed raw samples, pool native realizations, or add attempts.",
+  "refold_profile": "fragment_preference_refold_50189270",
+  "label_rule": "A source qualifies only if BOTH native decoder realizations separately retain the motif in a valid refold with globalTM>.5 AND scaffoldTM>.5 in that same refold, and both raw/full-reference generation checks pass. Positive endpoint is original reference_z. This is a training-source reference, not an experimental structure claim.",
+  "label_gate": {
+    "minimum_new_qualified": 24,
+    "minimum_buckets": 4,
+    "minimum_new_long_qualified": 8
+  },
+  "conditional_training": "Only after every qualification gate passes: use ALLnew qualified positives plus original10anchors, with no ranking. Positive-only fixed-reference regression, identical parent/adapter/seed2026100421/beta0.5/LR3e-5/warmup20/bucket batches/EMA0.99 and400updates fromconfigs/native_anchor_training_protocol.json. No generated-negative labels or negative loss. Freeze generator; update existing geometry/token adapter only. Profile40updates before400; require historical/null/pose/frozen checks and matched noise/time/schedule versus old positive control. Final400EMA only.",
+  "evaluation": "Same32training-only diagnostic proteins, four original noises each,50Euler/AE3/CFG1. Refold ALL128outputs with8fixed-motif sequences. Reuse parent and old positive/contrastive budgets without pooling. Report length/family uncertainty, designability, strict same-refold success, and all/sample-success diversity. Locked tests remain untouched.",
+  "development_gate": "Require strictly more strong successes than BOTHparent8 and matchedpositive9; at least parent7successful families and at least matchedpositive51designable outputs. No training-seed/generalization claim from this repeated diagnostic.",
+  "stopping": "Any calibration/profile gate failure closes this fixed recipe. No threshold,LR,beta,loss-weight,duration,checkpoint or extra-attempt sweep.",
+  "resources": "At most8own running-plus-pending GPUs. Native decoding and positive training each oneRTX, allocation from inherited native decoder/training profiles. Four disjoint256-refold RTX partitions for calibration, then four for model evaluation only if labels/profile pass; inherit qualified teacher execution and35minute ceilings. Code and hashes must be bound before submission."
+}

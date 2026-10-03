@@ -44,6 +44,20 @@ class WatcherTests(unittest.TestCase):
         self.assertEqual(analyze.call_count, 1)
         self.assertEqual(query.call_args.args[0], ['123_0', '123_1'])
 
+    def test_one_expensive_audit_per_tick_still_observes_all_jobs(self):
+        other=dict(id='456',state='RUNNING',completion_action='summarize_comparison')
+        (self.root/'runs/jobs.json').write_text(json.dumps({'jobs':[self.job,other]}))
+        rows=dict(self.rows(),**{'456':self.rows()['123_0']})
+        query=Mock(return_value=rows);analyze=Mock(return_value='report.md')
+        first=watch.tick(self.root,{},query,analyze)
+        self.assertEqual(analyze.call_count,1)
+        self.assertTrue(first['jobs']['123']['handled'])
+        self.assertFalse(first['jobs']['456'].get('handled',False))
+        self.assertEqual(first['jobs']['456']['tasks']['456']['state'],'COMPLETED')
+        second=watch.tick(self.root,{},query,analyze)
+        self.assertTrue(second['jobs']['456']['handled'])
+        self.assertEqual(analyze.call_count,2)
+
     def test_pending_accounting_fallback_is_scoped(self):
         run=Mock(side_effect=[Mock(stdout=''),Mock(stdout='123_0|PENDING|0:00\n999|RUNNING|0:20\n')])
         rows=watch.scheduler_states(['123_0'],run)

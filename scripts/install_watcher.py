@@ -41,7 +41,7 @@ Environment=OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
 Nice=10
 CPUQuota=100%
 MemoryMax=1G
-TimeoutStartSec=300
+TimeoutStartSec=1200
 '''
     timer = '''[Unit]
 Description=Check only ESM ProteinAE registered jobs every minute

@@ -40,5 +40,18 @@ class ModelValidationRecipeTests(unittest.TestCase):
         code='from pathlib import Path; from compare_fragment_preferences import ready_command; import tempfile; t=tempfile.TemporaryDirectory(); assert ready_command(Path(t.name)) is None'
         subprocess.run([sys.executable,'-c',code],cwd='/tmp',env=env,check=True)
 
+    def test_completed_audit_reuse_requires_unchanged_artifacts(self):
+        import tempfile
+        from unittest.mock import patch
+        import summarize_fragment_preference_refold as summary
+        from prepare_overfit import sha
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);run=root/'run';run.mkdir()
+            (run/'manifest.json').write_text('{}');(run/'refolded.h5').write_bytes(b'original')
+            def result(_):return dict(status='complete',manifest_sha256=sha(run/'manifest.json'),refolded_sha256=sha(run/'refolded.h5'))
+            with patch('sys.argv',['audit','--runs',str(run),'--output',str(root/'report')]),patch.object(summary,'analyze',side_effect=result) as analyze:
+                summary.main();summary.main();self.assertEqual(analyze.call_count,1)
+                (run/'refolded.h5').write_bytes(b'changed');summary.main();self.assertEqual(analyze.call_count,2)
+
 
 if __name__=='__main__':unittest.main()

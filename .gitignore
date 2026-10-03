@@ -50,6 +50,8 @@ runs/
 *.bz2
 *.xz
 reports/*.json
+reports/*.json.tmp
+reports/*.lock
 configs/development*_ids.txt
 configs/comparison626.json
 configs/hybrid_*.json

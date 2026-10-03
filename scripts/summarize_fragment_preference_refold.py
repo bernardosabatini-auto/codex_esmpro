@@ -1,5 +1,6 @@
 """Same-refold scoring of every training-only preference candidate."""
 import argparse
+import fcntl
 import json
 from pathlib import Path
 import h5py
@@ -55,8 +56,17 @@ def analyze(run):
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs=1,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-    d=analyze(a.runs[0]);a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n')
-    a.output.with_suffix('.md').write_text('# Training-only preference calibration partition\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','preferences')},indent=2)+'\n```\n')
+    # Allow independent CPU audits of disjoint completed GPU partitions. The
+    # watcher may join the same audit; a lock prevents duplicate scoring.
+    with a.output.with_suffix('.lock').open('w') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        target=a.output.with_suffix('.json')
+        if target.exists() and a.output.with_suffix('.md').exists():
+            old=json.loads(target.read_text());run=a.runs[0]
+            if (old['status']=='complete' and old['manifest_sha256']==sha(run/'manifest.json')
+                    and old['refolded_sha256']==sha(run/'refolded.h5')):return
+        d=analyze(a.runs[0]);temporary=target.with_suffix('.json.tmp');temporary.write_text(json.dumps(d,indent=2)+'\n');temporary.replace(target)
+        a.output.with_suffix('.md').write_text('# Training-only preference calibration partition\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','preferences')},indent=2)+'\n```\n')
 
 
 if __name__=='__main__':main()

@@ -168,7 +168,7 @@ def followup(root, job, config):
     env = dict(os.environ, CUDA_VISIBLE_DEVICES='', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1',
                OPENBLAS_NUM_THREADS='1', PYTHONPATH=str(root/'src'))
     with (root/'runs/watch'/f"analysis_{job['id']}.log").open('a') as log:
-        run_monitored_analysis(command, root=root, env=env, log=log, timeout=240)
+        run_monitored_analysis(command, root=root, env=env, log=log, timeout=900 if action=='summarize_fragment_preference_refold' else 240)
         if action == 'summarize_native_anchor_training':
             from compare_native_anchor_training import ready_command
             comparison = ready_command(root)
@@ -244,6 +244,7 @@ def tick(root, config, query=scheduler_states, analyze=followup):
         pending.append(job)
     requested = [i for job in pending for i in job_ids(job)]
     rows = query(requested) if requested else {}
+    analyses_started = 0
     for job in pending:
         jid = job['id']
         entry = state['jobs'].setdefault(jid, {})
@@ -268,7 +269,8 @@ def tick(root, config, query=scheduler_states, analyze=followup):
             entry.update(handled=True, outcome='job_failed', handled_at=stamp())
         elif not job.get('completion_action'):
             entry.update(handled=True, outcome='completed', handled_at=stamp())
-        elif time.time() >= entry.get('retry_after', 0):
+        elif time.time() >= entry.get('retry_after', 0) and analyses_started < 1:
+            analyses_started += 1
             # Save completion detection before a potentially expensive follow-up.
             write_json(state_path, state)
             try:

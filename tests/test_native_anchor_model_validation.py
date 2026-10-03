@@ -53,5 +53,21 @@ class ModelValidationRecipeTests(unittest.TestCase):
                 summary.main();summary.main();self.assertEqual(analyze.call_count,1)
                 (run/'refolded.h5').write_bytes(b'changed');summary.main();self.assertEqual(analyze.call_count,2)
 
+    def test_comparison_waits_for_late_cpu_diversity(self):
+        import tempfile
+        from compare_native_anchor_models import ready_command
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);(root/'runs').mkdir();(root/'reports').mkdir()
+            jobs={'positive':['1','2','3','4'],'contrastive':['5','6','7','8']}
+            pending={arm:str(root/'reports'/f'{arm}_diversity.json') for arm in ['parent6000','positive','contrastive']}
+            path=root/'runs/native_anchor_model_comparison.json';path.write_text(json.dumps(dict(jobs=jobs,diversity_pending=pending)))
+            (root/'runs/jobs.json').write_text(json.dumps(dict(jobs=[dict(id=i,completion_action='summarize_fragment_preference_refold') for v in jobs.values() for i in v])))
+            for ids in jobs.values():
+                for i in ids:(root/f'reports/fragment_preference_refold_{i}.json').write_text('{"status":"complete"}')
+            self.assertIsNone(ready_command(root))
+            for p in pending.values():Path(p).write_text('{"status":"complete"}')
+            self.assertIsNotNone(ready_command(root))
+            plan=json.loads(path.read_text());self.assertNotIn('diversity_pending',plan);self.assertEqual(set(plan['diversity']),set(pending))
+
 
 if __name__=='__main__':unittest.main()

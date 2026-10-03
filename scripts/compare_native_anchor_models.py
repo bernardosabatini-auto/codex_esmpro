@@ -9,6 +9,16 @@ def ready_command(root):
     output=root/'reports/native_anchor_model_comparison_20261003'
     if not path.exists() or output.with_suffix('.json').exists():return None
     plan=json.loads(path.read_text());jobs=plan['jobs']
+    if plan.get('diversity_pending'):
+        import hashlib
+        paths=plan['diversity_pending']
+        if not all(Path(p).exists() and json.loads(Path(p).read_text())['status']=='complete' for p in paths.values()):return None
+        plan['diversity']={}
+        for arm,p in paths.items():
+            with Path(p).open('rb') as f:checksum=hashlib.file_digest(f,'sha256').hexdigest()
+            plan['diversity'][arm]=dict(path=p,sha256=checksum)
+        del plan['diversity_pending']
+        temporary=path.with_suffix('.tmp');temporary.write_text(json.dumps(plan,indent=2)+'\n');temporary.replace(path)
     if set(jobs)!={'positive','contrastive'} or any(len(v)!=4 for v in jobs.values()):raise ValueError('Incomplete declared model comparison')
     ids=[i for v in jobs.values() for i in v]
     if len(set(ids))!=8:raise ValueError('Duplicate refold partitions')
@@ -32,21 +42,35 @@ def verify_outcome(r):
         raise ValueError('Scaffold and motif/global criteria do not share a refold')
 
 
-def diversity(gc,records,usalign):
+def diversity(gc,records,usalign,precomputed=None):
     import itertools
     import h5py
     import numpy as np
     from latentfold.metrics import usalign_coordinates
+    from prepare_overfit import sha
     successful={(r['target_id'],r['generation_slot']) for r in records if r['scaffold_joint_success']}
     path=Path(gc['generation_manifest']).parent/'predictions.h5';config=gc['config'];rows=[]
-    with h5py.File(path) as f,h5py.File(config['fragments']) as fragments:
-        for r in config['selected']:
-            ident=r['id'];bb=f['new/'+ident+'/backbone'][:];q=fragments['train/'+ident+'/conditions/c20_center']
-            mask=np.ones(r['length'],bool);start=int(q.attrs['start']);mask[start:start+20]=False
-            for i,j in itertools.combinations(range(4),2):
-                rows.append(dict(target_id=ident,bucket=r['bucket'],slots=[i,j],both_strong=(ident,i) in successful and (ident,j) in successful,
-                                 global_tm=usalign_coordinates(usalign,bb[i,:,1],bb[j,:,1]),
-                                 scaffold_tm=usalign_coordinates(usalign,bb[i,mask,1],bb[j,mask,1])))
+    if precomputed:
+        if sha(precomputed['path'])!=precomputed['sha256']:raise ValueError('Changed cached diversity report')
+        d=json.loads(Path(precomputed['path']).read_text())
+        if (d['status']!='complete' or d['manifest_sha256']!=sha(gc['generation_manifest'])
+                or d['predictions_sha256']!=sha(path) or d['scorer_sha256']!=sha(usalign)):
+            raise ValueError('Cached diversity belongs to different predictions or scorer')
+        wanted={(r['id'],r['bucket'],i,j) for r in config['selected'] for i,j in itertools.combinations(range(4),2)}
+        if {(r['target_id'],r['bucket'],*r['slots']) for r in d['records']}!=wanted or len(d['records'])!=192:
+            raise ValueError('Changed cached diversity inventory')
+        for r in d['records']:
+            if any(not np.isfinite(r[k]) or not 0<=r[k]<=1 for k in ('global_tm','scaffold_tm')):raise ValueError('Invalid cached diversity score')
+            ident=r['target_id'];i,j=r['slots'];rows.append(dict(r,both_strong=(ident,i) in successful and (ident,j) in successful))
+    else:
+        with h5py.File(path) as f,h5py.File(config['fragments']) as fragments:
+            for r in config['selected']:
+                ident=r['id'];bb=f['new/'+ident+'/backbone'][:];q=fragments['train/'+ident+'/conditions/c20_center']
+                mask=np.ones(r['length'],bool);start=int(q.attrs['start']);mask[start:start+20]=False
+                for i,j in itertools.combinations(range(4),2):
+                    rows.append(dict(target_id=ident,bucket=r['bucket'],slots=[i,j],both_strong=(ident,i) in successful and (ident,j) in successful,
+                                     global_tm=usalign_coordinates(usalign,bb[i,:,1],bb[j,:,1]),
+                                     scaffold_tm=usalign_coordinates(usalign,bb[i,mask,1],bb[j,mask,1])))
     if len(rows)!=192:raise ValueError('Changed four-noise diversity inventory')
     summaries=[]
     for bucket in [None,128,256,384,512]:
@@ -118,15 +142,25 @@ def compare(plan,root):
             contrasts.append(dict(candidate=candidate,reference=reference,bucket=bucket,metrics=metrics))
     totals={r['arm']:r for r in summary if r['bucket'] is None};reference=totals['parent6000']
     qualified={arm:(totals[arm]['strong']>reference['strong'] and totals[arm]['designable']>=reference['designable'] and totals[arm]['strong_families']>=reference['strong_families']) for arm in ('positive','contrastive')}
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        tasks={arm:pool.submit(diversity,generations[arm],rows,configs[arm,0]['usalign'],plan.get('diversity',{}).get(arm)) for arm,rows in arms.items()}
+        diversity_results={arm:task.result() for arm,task in tasks.items()}
     return dict(status='complete',training_only=True,source_reports=sources,summary=summary,contrasts=contrasts,
                 development_screen_qualified=qualified,new_refolds=2048,reused_refolds=1024,native=prior['native'],
-                diversity={arm:diversity(generations[arm],rows,configs[arm,0]['usalign']) for arm,rows in arms.items()},
+                diversity=diversity_results,reused_diversity=plan.get('diversity',{}),
                 scope='Repeated32training-protein diagnostic; disjoint from16anchor-source proteins, not independent generalization. All128samples/arm and8designs/sample retained. Same valid refold must satisfy motif/global/scaffold gates. Native budgets reused unchanged; teacher RNG not claimed paired. Bootstrap describes family variation, not training-seed replication. Qualification permits a separate development assay only.')
 
 
-def main():
-    p=argparse.ArgumentParser();p.add_argument('--plan',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-    d=compare(json.loads(a.plan.read_text()),Path(__file__).resolve().parents[1]);a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n')
+def write_comparison(a):
+    from prepare_overfit import sha
+    plan_sha=sha(a.plan)
+    target=a.output.with_suffix('.json')
+    if target.exists() and a.output.with_suffix('.md').exists():
+        old=json.loads(target.read_text())
+        if old.get('plan_sha256')==plan_sha and old['status']=='complete':return
+    d=compare(json.loads(a.plan.read_text()),Path(__file__).resolve().parents[1]);d['plan_sha256']=plan_sha
+    temporary=target.with_suffix('.json.tmp');temporary.write_text(json.dumps(d,indent=2)+'\n');temporary.replace(target)
     lines=['# Native-anchor model diagnostic','',d['scope'],'','|Arm|Raw /128|Strong /128|Designable /128|Successful families|','|---|---:|---:|---:|---:|']
     for r in d['summary']:
         if r['bucket'] is None:lines.append(f"|{r['arm']}|{r['raw']}|{r['strong']}|{r['designable']}|{r['strong_families']}|")
@@ -134,6 +168,13 @@ def main():
     for r in d['contrasts']:
         if r['bucket'] is None:lines.extend(['',f"{r['candidate']} minus {r['reference']}, strict success: {r['metrics']['scaffold_joint_success']}"])
     a.output.with_suffix('.md').write_text('\n'.join(lines)+'\n');print(json.dumps(d['development_screen_qualified']))
+
+
+def main():
+    import fcntl
+    p=argparse.ArgumentParser();p.add_argument('--plan',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+    with a.output.with_suffix('.lock').open('w') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX);write_comparison(a)
 
 
 if __name__=='__main__':main()

@@ -178,7 +178,7 @@ def followup(root, job, config):
             from compare_fragment_preferences import ready_command
             comparison = ready_command(root)
             if comparison:
-                run_monitored_analysis([config['python'], *comparison], root=root, env=env, log=log, timeout=240)
+                run_monitored_analysis([config['python'], *comparison], root=root, env=env, log=log, timeout=900)
         if action == 'summarize_fragment_source_refold':
             from compare_fragment_source_refolds import ready_command
             comparison = ready_command(root)
@@ -281,6 +281,15 @@ def tick(root, config, query=scheduler_states, analyze=followup):
                 attempts = entry.get('attempts', 0)+1
                 entry.update(attempts=attempts, analysis_error=str(error), retry_after=time.time()+min(900, 60*2**min(attempts, 4)))
                 notify(root, state, f'{jid}:analysis_failed', f'ESM project {jid}: analysis failed; see runs/watch/analysis_{jid}.log; automatic retries enabled.', config)
+    # This fixed comparison also depends on independent CPU diversity audits;
+    # they can finish after the final GPU completion callback has returned.
+    if analyses_started == 0:
+        from compare_native_anchor_models import ready_command as ready_native_models
+        command = ready_native_models(root)
+        if command:
+            env = dict(os.environ, CUDA_VISIBLE_DEVICES='', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1', PYTHONPATH=str(root/'src'))
+            with (root/'runs/watch/native_anchor_model_comparison.log').open('a') as log:
+                run_monitored_analysis([config['python'], *command], root=root, env=env, log=log, timeout=900)
     state['outstanding_local_units']=tick_local(root,state,config)
     from overfit_checkpoint_analysis import tick as checkpoint_tick
     for key,message in checkpoint_tick(root,state,registry,config):

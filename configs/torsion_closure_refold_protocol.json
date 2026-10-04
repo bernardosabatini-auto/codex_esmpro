@@ -1,0 +1,22 @@
+{
+  "purpose": "Establish whether constructive internal-coordinate bridge closure is designable before using its outputs to train an isolated-fragment model",
+  "source_run": "torsion_closure_full_20261004",
+  "source_report": "reports/torsion_closure_full_20261004.json",
+  "source_audit": "reports/torsion_closure_full_audit_20261004.json",
+  "required_complete_geometry": 45,
+  "samples": 128,
+  "proteins": 32,
+  "slots": 4,
+  "partitions": 4,
+  "sequences_per_backbone": 8,
+  "temperature": 0.1,
+  "mpnn_mode": "ca",
+  "teacher": "Same deterministic FP32 ESMFold2-Fast execution, three loops,50steps, one diffusion sample, fixed sequence and seed recipe as historical parent controls",
+  "denominator": "Export all128generated outputs, including every geometry failure and all15known obstructed parent/fragment pairs. No profile or native-oracle outputs are candidates. Preserve every attempted sequence/refold; no replacement draws.",
+  "constraints": "ProteinMPNN fixes the supplied20residue motif sequence. Score the ORIGINAL isolated motif structure, not the constructed or refolded motif as a substitute target.",
+  "same_refold": "One and the SAME refold must pass coarse whole-backbone validity, globalTM>0.5, scaffold-onlyTM>0.5, motifCA-RMSD<=1A, motifdRMS<=1A, and peptideC-N1.1to1.6A/CA<=4.5A throughout both eight-residue flanks and boundaries. Strict candidate success additionally requires the original constructed backbone's complete physical gate. Report ordinary valid designability and connected designability separately.",
+  "comparison": "Reuse original128parent backbones and their existing eight sequences/refolds, and original experimental positive controls, with their budgets unchanged. Recompute the same connectivity/scaffold/motif criteria on those existing refolds. Report family-clustered paired intervals. Distinguish baseline unconditional parent, constructive closure, and any later trained model.",
+  "advancement": "More than8strict successes across at least7families, with at least45connected designable samples. Otherwise close this fixed construction as a designability route; do not train on geometry alone. Passing permits a separately specified isolated-fragment training experiment, not a generalization claim.",
+  "resources": "Four one-RTX partitions, each32backbones x8sequences with35minute caps, inheriting the already qualified matched teacher profile. Verify teacher content and inputs on CPU before submission; verify immutable file metadata at GPU startup/end and rehash in independent CPU completion audits. Overlap CPU scoring with GPU refolding. No concurrent teacher workers on the same GPU; previous profile was slower. At most8own running+pending GPUs total.",
+  "scope": "Training-diagnostic corpus only; locked tests remain untouched. Constructive bridge closure is neither a learned generative model nor demonstrated designability before this assay. Include parent generation, CPU closure and refolding costs."
+}

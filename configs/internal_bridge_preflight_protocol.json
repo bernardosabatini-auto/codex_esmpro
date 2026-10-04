@@ -1,0 +1,22 @@
+{
+  "purpose": "Numerical and molecular-geometry validation of an internal-coordinate bridge representation before any new model training",
+  "source_job": "50385481",
+  "source_report": "reports/fragment_inpainting_training_50385481.json",
+  "source_report_sha256": "d6b769b04f62c606e7c90c0c232167ae15cbfb573db5ee766d45e6fa2ff9403d",
+  "arms": ["parent", "native_direct"],
+  "proteins": 32,
+  "slots": 4,
+  "motif_length": 20,
+  "flank_width": 8,
+  "bridges": 512,
+  "seed": 2026100491,
+  "torsion_perturbation_sd_radians": 0.3,
+  "float64_coordinate_tolerance_angstrom": 1e-8,
+  "float64_angle_tolerance_degrees": 1e-7,
+  "float32_coordinate_tolerance_angstrom": 0.001,
+  "float32_angle_tolerance_degrees": 0.01,
+  "cpu_seconds_cap": 600,
+  "checks": "Native and generated-parent roundtrip; exact fixed atoms; arbitrary proper rigid transform; finite nonzero gradients; independent NumPy evaluation of every touched bond, angle and peptide torsion after nonzero phi/psi changes, using an explicitly reconstructed right endpoint ghost. Report actual endpoint mismatch separately, never claim the assembled chain is closed from ghost geometry.",
+  "scope": "Original32 training-diagnostic families, no locked-test access. A representation test, not learned capacity, conformational validity or designability. Source parents retain their imperfections. Endpoint, steric and same-refold gates remain necessary.",
+  "decision": "All numerical tests must pass before specifying a small native-context capacity test. No GPU work or model fitting is performed by this preflight. Do not reopen or re-score the failed Cartesian bridge as a new candidate."
+}

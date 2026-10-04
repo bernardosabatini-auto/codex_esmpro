@@ -1,0 +1,40 @@
+{
+  "purpose": "Test whether internal-coordinate endpoint closure can construct physically valid isolated-fragment scaffolds before training a torsion-output model",
+  "representation_protocol": "configs/internal_bridge_preflight_protocol.json",
+  "representation_report": "reports/internal_bridge_preflight_20261004.json",
+  "source_job": "50385481",
+  "source_report": "reports/fragment_inpainting_training_50385481.json",
+  "source_report_sha256": "d6b769b04f62c606e7c90c0c232167ae15cbfb573db5ee766d45e6fa2ff9403d",
+  "arms": ["generated_cond", "native_cond"],
+  "profile_panel": "First original selected target per bucket128/256/384/512, all four original generation slots",
+  "full_panel": "All original32training-diagnostic proteins and four slots; all failures retained, including15known generated geometric obstructions",
+  "flank_width": 8,
+  "motif_length": 20,
+  "solver": {
+    "optimizer": "LBFGS",
+    "lr": 1.0,
+    "max_iter": 200,
+    "max_eval": 250,
+    "history_size": 50,
+    "tolerance_grad": 1e-8,
+    "tolerance_change": 1e-12,
+    "line_search_fn": "strong_wolfe",
+    "canonical_frame": "parent_start_N_CA_C",
+    "input_grid_angstrom": 1e-6
+  },
+  "objective": {
+    "endpoint_scale_angstrom": 0.02,
+    "ca_clash_scale_angstrom": 0.25,
+    "torsion_displacement_weight": 0.01
+  },
+  "initialization": "Exactly one zero-offset start from original parent phi/psi; no restarts or solver/window sweeps",
+  "state": "Replace the original centered generated parent motif with the same placed isolated fragment. Keep all20motif and far-scaffold atoms fixed; only the16flanking residues vary. Preserve original parent local bond lengths/angles and peptide omega. Optimize the two bridges jointly, returning explicit right-endpoint ghost residuals; never treat ghost closure as real geometry. Native arm is a separate oracle using native_direct parent coordinates.",
+  "loss": "Mean squared residual of both reconstructed endpoint N/CA/C triplets to the actual fixed endpoints, scaled by0.02A; unchanged local CA clash hinge with cutoffmin(2.5A,parentdistance), sequence separation>2, scaled by0.25A;0.01mean squared torsion displacement. No generated outputs or native target structures used as teacher labels.",
+  "geometry_gate": "Actual assembled coordinates must satisfy unchanged coarse validity, supplied motif CA fit/dRMS<=1A, every touched bond within0.05A of original parent, every touched angle and peptide torsion within10degrees, every peptide/CAedge throughout both eight-residue flanks and boundaries valid. Motif and all far atoms must remain bitwise fixed. Report endpoint residuals separately. No relaxation for known obstructions.",
+  "profile_controls": "All32outputs, plus exact no-op original parent controls, independent repeated solver and proper-pose controls for the first slot of each bucket/arm. Fixed atoms exact; repeated outputs exact; proper-pose output difference<=0.005A. All7kinematic unit tests must pass. Numerical preflight512bridges must pass in both precisions.",
+  "full_gate": "Complete technical profile, at least12/16native-oracle physical successes, and at least1/16generated physical success; then one unfiltered128generated+128native CPU assay. No GPU refolding on profile outputs.",
+  "refold_gate": "Atleast45/128generated complete physical successes in full assay before specifying matched128x8ProteinMPNN/refolding, keeping all generated outputs. The same valid refold must retain ORIGINAL motif and meet global/scaffold agreement and connectivity. Geometric feasibility does not imply designability. This is a constructive baseline/possible future training teacher, not a trained model.",
+  "cpu_profile_seconds_cap": 1200,
+  "cpu_full_seconds_cap": 3600,
+  "scope": "New internal-coordinate construction, not a rescue of failed Cartesian candidates. Source geometry/anchors/budgets remain bound; original results unchanged. CPU-only. Even positive closure must later support explicit isolated-fragment training and independent evaluation before the project goal is achieved."
+}

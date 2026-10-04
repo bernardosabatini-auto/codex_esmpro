@@ -10,6 +10,7 @@ def main():
     p.add_argument('--profile', action='store_true')
     p.add_argument('--profile-report', type=Path)
     p.add_argument('--junction-weighted', action='store_true')
+    p.add_argument('--flank-context', action='store_true')
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -31,7 +32,7 @@ def main():
                       ('fragments', bc['fragments']), ('decoder_checkpoint', bc['decoder_checkpoint']),
                       ('diagnostic_manifest', cc['diagnostic_manifest']), ('diagnostic_predictions', cc['diagnostic_predictions'])]:
         c[key] = bind(path)
-    if a.junction_weighted:
+    if a.junction_weighted or a.flank_context:
         c['junction_protocol'] = bind(root/'configs/fragment_junction_weighted_protocol.json')
         c['junction_spec'] = js = json.loads(Path(c['junction_protocol']).read_text())
         c['junction_loss'] = {k: js[k] for k in ('junction_width', 'junction_mass')}
@@ -51,7 +52,34 @@ def main():
         c['work_cap_seconds'] = 60*c['allocation_minutes'] - 120
         c['profile_manifest'] = bind(pr['manifest_path'])
         c['profile_checkpoint'] = bind(Path(pr['manifest_path']).parent/'checkpoint.pt')
-    audit(c)
+    if a.flank_context:
+        from fragment_flank_core import file_stats
+        from fragment_inpainting_core import load_training
+        import torch
+        c['flank_protocol'] = bind(root/'configs/fragment_flank_context_protocol.json')
+        c['flank_spec'] = fs = json.loads(Path(c['flank_protocol']).read_text())
+        c['context_flank'] = fs['context_flank']
+        prior = root/'runs'/fs['baseline']
+        for key, path in [('flank_baseline_manifest', prior/'manifest.json'),
+                          ('flank_baseline_predictions', prior/'predictions.h5'),
+                          ('flank_baseline_report', root/'reports'/(prior.name+'.json')),
+                          ('flank_compatible_report', root/'reports/compatible_fragment_50364419.json'),
+                          ('flank_refresh_report', root/'reports/context_refresh_50371008.json'),
+                          ('flank_closure_protocol', root/'configs/fragment_local_closure_canonical_protocol.json'),
+                          ('flank_closure_code', root/'src/latentfold/local_closure.py')]:
+            c[key] = bind(path)
+        before = file_stats(c)
+        cache = a.output.with_suffix('.training.pt')
+        if cache.exists(): raise FileExistsError(cache)
+        torch.save(load_training(c), cache)
+        if file_stats(c) != before: raise ValueError('Sources changed during CPU data preparation')
+        c['flank_training_cache'] = bind(cache)
+        before = file_stats(c)
+        audit(c)
+        if file_stats(c) != before: raise ValueError('Sources changed during CPU content verification')
+        c['cpu_verified_file_stats'] = before
+    else:
+        audit(c)
     with a.output.open('x') as f:
         json.dump(c, f, indent=2)
     print('profile' if a.profile else 'full', c['updates'], len(c['training_ids']), c['allocation_minutes'])

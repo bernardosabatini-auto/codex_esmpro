@@ -11,7 +11,7 @@ import torch
 
 from latentfold.decoder import load_proteinae
 from latentfold.fragment_decoder_fm import sample_times
-from latentfold.fragment_inpainting import FragmentInpaintingDecoder, inpainting_loss, place_fragment
+from latentfold.fragment_inpainting import FragmentInpaintingDecoder, inpainting_loss, place_fragment, context_mask
 from latentfold.fragment_decoder import FragmentDecoder
 from latentfold.flow import target_noise
 from latentfold.precision import inference_precision
@@ -30,9 +30,15 @@ def main():
         p.add_argument('--'+name, type=Path, required=True)
     a = p.parse_args()
     c = json.loads(a.config.read_text())
-    spec = audit(c)
+    if 'flank_protocol' in c:
+        from fragment_flank_core import audit_worker
+        spec = audit_worker(c)
+        data = torch.load(c['flank_training_cache'], map_location='cpu', weights_only=True)
+    else:
+        spec = audit(c)
+        data = load_training(c)
     loss_options = c.get('junction_loss', {})
-    data, selected = load_training(c), panel(c)
+    selected = panel(c)
     items = load_conditions(c['fragments'], [r['id'] for r in selected], 'c20_center', cohort='train')
     initial_ids = [next(r['id'] for r in c['selected'] if r['bucket'] == b) for b in (128, 256, 384, 512)]
     a.output.mkdir(exist_ok=False)
@@ -46,7 +52,7 @@ def main():
         torch.cuda.set_per_process_memory_fraction(.85)
         torch.manual_seed(spec['seed'])
         codec = load_proteinae(a.source/'ProteinAE_v1', Path(c['decoder_checkpoint']), steps=3).cuda().eval()
-        model = FragmentInpaintingDecoder(codec, seed=spec['seed']).cuda().eval()
+        model = FragmentInpaintingDecoder(codec, seed=spec['seed'], context_flank=c.get('context_flank', 0)).cuda().eval()
         m['frozen_original'] = state_hash(expected_frozen_state(c))
         m['frozen_initial'] = state_hash(canonical_frozen_state(model))
         m['initial_model_sha256'] = state_hash(model.state_dict())
@@ -78,9 +84,10 @@ def main():
                 contexts = dict(generated=torch.from_numpy(old['new/'+ident+'/latent'][:]).cuda(),
                                 native=data[ident]['target'][None].expand(4, -1, -1).cuda())
                 for kind, context in contexts.items():
-                    z = torch.where(keep[..., None], torch.zeros_like(context), context)
+                    hidden = context_mask(keep, model.context_flank)
+                    z = torch.where(hidden[..., None], torch.zeros_like(context), context)
                     expected = codec(z, mask, noise=noise, return_backbone=True)[1]
-                    bb = FragmentDecoder.forward(model, context, features, keep, mask, coords, noise=noise)
+                    bb = FragmentDecoder.forward(model, z, features, keep, mask, coords, noise=noise)
                     error = float((bb-expected).abs().max())
                     if error > 1e-5:
                         raise ValueError('Zero decoder adapter changed masked decoding')
@@ -90,6 +97,18 @@ def main():
                     anchors = place_fragment(torch.from_numpy(item['fragment']).cuda(),torch.from_numpy(reference).cuda(),item['start'])
                     clamped = model(context,features,keep,mask,coords,anchors=anchors,noise=noise)
                     g['anchors'],g['clamped_backbone']=anchors.cpu().numpy(),clamped.cpu().numpy()
+                    if 'flank_protocol' in c:
+                        g['source_latent'] = context.cpu().numpy()
+                        if ident in initial_ids:
+                            model.context_flank = 0
+                            zero = model(context,features,keep,mask,coords,anchors=anchors,noise=noise)
+                            model.context_flank = c['context_flank']
+                            with h5py.File(c['flank_baseline_predictions']) as baseline:
+                                expected_zero = torch.from_numpy(baseline[kind+'_untrained/'+ident+'/backbone'][:]).cuda()
+                            error_zero = float((zero-expected_zero).abs().max())
+                            g['zero_width_backbone'] = zero.cpu().numpy()
+                            m.setdefault('flank_controls', []).append(dict(kind='zero_width', arm=kind, target_id=ident, max_abs=error_zero))
+                            if error_zero > 1e-5: raise ValueError('Zero-width historical untrained replay changed')
                     m['initial_controls'].append(dict(kind=kind+'_masked', target_id=ident, backbone_max_abs=error))
                     if ident in initial_ids:
                         expected = codec(context, mask, noise=noise, return_backbone=True)[1]
@@ -236,11 +255,12 @@ def main():
                         bb = model(context, features, keep, mask, coords, anchors=anchors, noise=noise, drop_fragment=dropped)
                         torch.cuda.synchronize()
                         g = out.create_group(arm+'/'+ident)
-                        g['latent'] = torch.where(keep[..., None], torch.zeros_like(context), context).cpu().numpy()
+                        g['latent'] = torch.where(context_mask(keep, model.context_flank)[..., None], torch.zeros_like(context), context).cpu().numpy()
+                        if 'flank_protocol' in c: g['source_latent'] = context.cpu().numpy()
                         g['backbone'] = bb.cpu().numpy()
                         m['evaluations'].append(dict(arm=arm, target_id=ident, seconds=time.monotonic()-sample_start))
                         if dropped:
-                            hidden=context.clone();hidden[keep]+=97
+                            hidden=context.clone();hidden[context_mask(keep, model.context_flank)]+=97
                             altered=features.clone();altered[...,:28]+=keep[...,None]*13
                             repeat = model(hidden,altered,keep,mask,coords+keep[...,None]*17,anchors=anchors+keep[...,None,None]*19,noise=noise,drop_fragment=True)
                             error = float((bb-repeat).abs().max())
@@ -257,6 +277,14 @@ def main():
                             if error > 1e-4:
                                 raise ValueError('Decoder supplied-coordinate pose control failed')
                             g['pose_backbone'] = posed_bb.cpu().numpy()
+                            if 'flank_protocol' in c and ident in initial_ids:
+                                hidden = context.clone(); hidden[context_mask(keep, model.context_flank)] += 97
+                                eps = noise.clone(); eps[keep.repeat_interleave(4, 1)] += 111
+                                repeat = model(hidden,features,keep,mask,coords,anchors=anchors,noise=eps)
+                                error_hidden = float((repeat-bb).abs().max())
+                                g['nonleak_backbone'] = repeat.cpu().numpy()
+                                m['flank_controls'].append(dict(kind='nonleak',arm=kind,target_id=ident,max_abs=error_hidden))
+                                if error_hidden > 1e-5: raise ValueError('Hidden flank codes or fixed-atom noise leaked')
                             m['controls'].append(dict(kind=arm+'_pose', target_id=ident, backbone_max_abs=error))
                             if ident == selected[0]['id']:
                                 model.load_state_dict(initial_model_state(c))
@@ -277,6 +305,7 @@ def main():
         m['peak_reserved_GiB'] = max(m['control_peak_reserved_GiB'], torch.cuda.max_memory_reserved()/2**30)
         if m['frozen_final'] != m['frozen_initial'] or m['adapted_decoder_final'] == m['frozen_initial'] or m['peak_reserved_GiB'] > 75:
             raise ValueError('Changed frozen decoder or failed memory profile')
+        if 'flank_protocol' in c: audit_worker(c)
         m.update(status='complete', predictions_sha256=sha(a.output/'predictions.h5'))
     except BaseException as error:
         m.update(status='failed', error=f'{type(error).__name__}: {error}')

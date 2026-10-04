@@ -45,6 +45,11 @@ def audit(c):
         audit_sources(c)
     elif any(k.startswith('junction_') for k in c):
         raise ValueError('Junction settings require a bound prospective protocol')
+    if 'flank_protocol' in c:
+        from fragment_flank_core import audit_sources
+        audit_sources(c)
+    elif any(k.startswith('flank_') or k == 'context_flank' for k in c):
+        raise ValueError('Context flank requires a bound prospective protocol')
     return spec
 
 

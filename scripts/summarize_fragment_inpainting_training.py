@@ -1,5 +1,6 @@
 """Independently audit adapter checkpoints and every direct-decoder output."""
 import argparse
+import fcntl
 import json
 import math
 from pathlib import Path
@@ -15,7 +16,7 @@ from extra_fragment_validation_core import load_conditions
 from evaluate_decoder_fragment_variance import check_backbones
 from fragment_validation_core import raw_rows
 from latentfold.metrics import ca_metrics
-from latentfold.fragment_inpainting import place_fragment
+from latentfold.fragment_inpainting import place_fragment, context_mask
 from compare_extra_fragment_refolds import clustered
 from prepare_overfit import sha
 
@@ -112,12 +113,13 @@ def analyze(run):
         for source in selected:
             ident, item = source['id'], items[source['id']]
             n, keep = item['length'], item['keep'].numpy()
+            hidden = context_mask(item['keep'][None], c.get('context_flank', 0))[0].numpy()
             source_z = dict(generated=old['new/'+ident+'/latent'][:], native=np.repeat(data[ident]['target'].numpy()[None], 4, axis=0))
             references = dict(generated=old['new/'+ident+'/backbone'][:], native=native['native/'+ident+'/backbone'][:4])
             for kind in ('generated', 'native'):
                 g = initial[kind+'/'+ident]
                 z = source_z[kind].copy()
-                z[:, keep] = 0
+                z[:, hidden] = 0
                 error = float(np.max(abs(g['backbone'][:]-g['original_backbone'][:])))
                 logged = next(r for r in m['initial_controls'] if (r['target_id'], r['kind']) == (ident, kind+'_masked'))
                 if (not np.array_equal(z, g['latent'][:]) or g['backbone'].shape != (4, n, 4, 3)
@@ -147,7 +149,7 @@ def analyze(run):
                 z, bb = g['latent'][:], g['backbone'][:]
                 expected_z = source_z[kind].copy()
                 if arm not in ('parent', 'native_direct'):
-                    expected_z[:, keep] = 0
+                    expected_z[:, hidden] = 0
                 if (z.shape != (4, n, 8) or bb.shape != (4, n, 4, 3) or not np.array_equal(z, expected_z)
                         or not np.isfinite(bb).all()):
                     raise ValueError('Changed hidden-motif decoder inputs or invalid outputs')
@@ -209,7 +211,10 @@ def analyze(run):
         recommended_full_minutes=recommended, summary=summary, refold_eligibility=eligibility, contrasts=contrasts, records=records,
         scope='Repeated training-only diagnostic. Private decoder adapted with fixed-fragment coordinate flow matching. Exact raw motif retention is imposed, not evidence of designability. Native contexts are oracle controls. Latent arrays are masked decoder inputs, not predicted codes. '
               'Eligibility only excludes mathematically impossible improvement under unchanged joint/designability counts; actual same-refold results decide advancement.')
-    if 'junction_protocol' in c:
+    if 'flank_protocol' in c:
+        from fragment_flank_core import augment_report
+        result = augment_report(result, run, m)
+    elif 'junction_protocol' in c:
         from fragment_junction_core import augment_report
         result = augment_report(result, run, m)
     return result
@@ -221,11 +226,13 @@ def main():
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     torch.set_num_threads(1)
-    d = analyze(a.runs[0])
-    a.output.with_suffix('.json').write_text(json.dumps(d, indent=2)+'\n')
-    visible = {k: v for k, v in d.items() if k != 'records'}
-    a.output.with_suffix('.md').write_text('# Fixed-fragment coordinate inpainting\n\n```json\n'+json.dumps(visible, indent=2)+'\n```\n')
-    print(json.dumps(visible))
+    with (a.runs[0]/'inpainting_audit.lock').open('w') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX)
+        d = analyze(a.runs[0])
+        a.output.with_suffix('.json').write_text(json.dumps(d, indent=2)+'\n')
+        visible = {k: v for k, v in d.items() if k not in ('records','closure_records')}
+        a.output.with_suffix('.md').write_text('# Fixed-fragment coordinate inpainting\n\n```json\n'+json.dumps(visible, indent=2)+'\n```\n')
+        print(json.dumps(visible))
 
 
 if __name__ == '__main__':

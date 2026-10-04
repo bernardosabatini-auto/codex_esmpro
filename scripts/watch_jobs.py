@@ -169,7 +169,7 @@ def followup(root, job, config):
                OPENBLAS_NUM_THREADS='1', PYTHONPATH=str(root/'src'))
     with (root/'runs/watch'/f"analysis_{job['id']}.log").open('a') as log:
         run_monitored_analysis(command, root=root, env=env, log=log,
-            timeout=1260 if action in ('summarize_compatible_fragment','summarize_context_refresh') else 900 if action=='summarize_fragment_preference_refold' else 240)
+            timeout=1260 if action in ('summarize_compatible_fragment','summarize_context_refresh','summarize_fragment_inpainting_training') else 900 if action=='summarize_fragment_preference_refold' else 240)
         if action == 'summarize_native_anchor_training':
             from compare_native_anchor_training import ready_command
             comparison = ready_command(root)

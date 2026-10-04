@@ -113,7 +113,33 @@ def inpainting_loss(model, context, target, features, keep, mask, coordinates, *
     return loss, dict(unknown_fm=loss.detach()), predicted
 
 
+def context_mask(keep, flank=0):
+    """Hide nearby latent context without changing the fixed-coordinate mask."""
+    if keep.ndim != 2 or keep.dtype != torch.bool or type(flank) is not int or flank < 0 or not keep.any(1).all():
+        raise ValueError('Nonempty boolean fragment masks and nonnegative integer flank required')
+    if flank == 0:
+        return keep
+    positions = torch.arange(keep.shape[1], device=keep.device)[None]
+    start = torch.where(keep, positions, keep.shape[1]).amin(1)[:, None]
+    end = torch.where(keep, positions, -1).amax(1)[:, None] + 1
+    if not torch.equal(keep, (positions >= start) & (positions < end)):
+        raise ValueError('Context flanks require a single contiguous motif')
+    return (positions >= start-flank) & (positions < end+flank)
+
+
 class FragmentInpaintingDecoder(FragmentDenoisingDecoder):
+    def __init__(self, codec, *, context_flank=0, **kwargs):
+        if type(context_flank) is not int or context_flank < 0:
+            raise ValueError('Nonnegative integer context flank required')
+        super().__init__(codec, **kwargs)
+        self.context_flank = context_flank
+
+    def velocity(self, context, features, keep, mask, coordinates, x_t, t, dropped, *, checkpointed=True):
+        if self.context_flank:
+            hidden = context_mask(keep, self.context_flank)
+            context = torch.where(hidden[..., None], torch.zeros_like(context), context)
+        return super().velocity(context, features, keep, mask, coordinates, x_t, t, dropped, checkpointed=checkpointed)
+
     def forward(self, context, features, keep, mask, coordinates, *, anchors, noise,
                 drop_fragment=False, checkpoint_steps=True):
         if anchors.shape != (*mask.shape, 4, 3):

@@ -184,6 +184,10 @@ def compare(plan,root):
         passing={arm:{(r['target_id'],r['generation_slot']) for r in rows if r['scaffold_joint_success']} for arm,rows in arms.items()}
         for candidate,ref in [('native_matched','parent6000'),('repaint_positive','parent6000'),('repaint_positive','native_matched')]:
             a,b=passing[candidate],passing[ref];overlaps.append(dict(candidate=candidate,reference=ref,shared=len(a&b),candidate_only=len(a-b),reference_only=len(b-a)))
+    if inpainting:
+        passing={arm:{(r['target_id'],r['generation_slot']) for r in rows if r['scaffold_joint_success']} for arm,rows in arms.items()}
+        for candidate,ref in [('generated_untrained','parent6000'),('generated_cond','parent6000'),('generated_cond','generated_untrained')]:
+            a,b=passing[candidate],passing[ref];overlaps.append(dict(candidate=candidate,reference=ref,shared=len(a&b),candidate_only=len(a-b),reference_only=len(b-a)))
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=3) as pool:
         tasks={arm:pool.submit(diversity,generations[arm],rows,configs[arm,0]['usalign'],plan.get('diversity',{}).get(arm)) for arm,rows in arms.items()}

@@ -7,7 +7,8 @@ from pathlib import Path
 
 def ready_command(root):
     path=root/'runs/fragment_inpainting_model_comparison.json';output=root/'reports/fragment_inpainting_model_comparison_20261004'
-    if not path.exists() or output.with_suffix('.json').exists():return None
+    junction=root/'reports/fragment_inpainting_junctions_20261004.json'
+    if not path.exists() or (output.with_suffix('.json').exists() and junction.exists()):return None
     plan=json.loads(path.read_text());jobs=plan['jobs']
     if not plan.get('fragment_inpainting_comparison') or set(jobs)!={'generated_untrained','generated_cond'} or any(len(v)!=4 for v in jobs.values()):raise ValueError('Incomplete fragment-decoder comparison')
     ids=[i for v in jobs.values() for i in v]
@@ -30,6 +31,11 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--plan',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
     with a.output.with_suffix('.lock').open('w') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX);write_comparison(a)
+        from audit_inpainting_junctions import analyze
+        result=analyze(a.output.with_suffix('.json'))
+        target=a.output.parent/'fragment_inpainting_junctions_20261004'
+        temporary=target.with_suffix('.json.tmp');temporary.write_text(json.dumps(result,indent=2)+'\n');temporary.replace(target.with_suffix('.json'))
+        target.with_suffix('.md').write_text('# Inpainting junction continuity\n\n'+result['scope']+'\n\n```json\n'+json.dumps(result['summary'],indent=2)+'\n```\n')
 
 
 if __name__=='__main__':main()

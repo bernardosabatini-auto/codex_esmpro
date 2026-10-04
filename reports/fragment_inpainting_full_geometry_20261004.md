@@ -144,3 +144,18 @@
   "scope": "Post hoc description of every output, with unchanged eligibility and no checkpoint selection. Regions refer to supplied20residue motif and its complement. Motif atoms are fixed in conditioned/untrained inpainting, and free in null controls. Latent arrays are masked INPUTS, so no latent reconstruction accuracy is claimed. Bond/clash/gap categories overlap. Learning windows draw different proteins, not paired validation. Geometry cannot establish designability; only the same-valid-refold assay can."
 }
 ```
+
+## Junction limitation
+
+The coarse whole-chain score permits a small fraction of bad bonds. It therefore conceals disconnected supplied fragments. These outputs are not yet usable as intact generated chains, even if the fixed refolding assay later shows realizable motif/scaffold arrangements. No primary threshold or denominator is changed.
+
+|Arm|Both junctions intact /128|Median boundary C–N (A)|
+|---|---:|---:|
+|parent|128|1.342|
+|native_direct|127|1.352|
+|generated_cond|0|4.317|
+|generated_untrained|0|6.042|
+|native_cond|2|2.068|
+|native_untrained|0|6.110|
+
+Both junctions must have C–N1.1–1.6A and CA separation<=4.5A. The fixed3-versus10-step diagnostic separates coarse integration from learned denoising failure before another training hypothesis is selected.

@@ -24,10 +24,15 @@ def main():
     from teacher_numerical_recovery import audit_recovery
     recovered=audit_recovery(c)
     if c.get('teacher_deterministic_algorithms') and c.get('assay') not in ('extra_fragment_refold','fragment_preference_refold'):raise ValueError('Undeclared deterministic teacher assay')
-    for key in ('generation_manifest','predictions','protocol','usalign'):
-        if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
-    for dep in c['dependencies']+c['teacher_artifacts']:
-        if sha(dep['path'])!=dep['sha256']:raise ValueError('Changed dependency '+dep['path'])
+    cpu_verified=c.get('torsion_closure_refold') is True
+    if cpu_verified:
+        from torsion_closure_refolding import audit_worker
+        audit_worker(c)
+    else:
+        for key in ('generation_manifest','predictions','protocol','usalign'):
+            if sha(c[key])!=c[key+'_sha256']:raise ValueError('Changed '+key)
+        for dep in c['dependencies']+c['teacher_artifacts']:
+            if sha(dep['path'])!=dep['sha256']:raise ValueError('Changed dependency '+dep['path'])
     expected_count={'generative_pilot':52,'noise_contact':28,'isolated_motif':20,'fixed_motif':20,'trained_fragment':36,'fragment_fixed_positive':4,'fragment_feedback_profile':2,'fragment_feedback':24,'fragment_strict_followup':c.get('expected_backbones',4),'fragment_repetition_refold':c.get('expected_backbones'),'fragment_refinement':6,'fragment_full_backbone':4,'fragment_endpoint_refold':36,'fragment_validation_refold':c.get('expected_backbones'),'extra_fragment_refold':c.get('expected_backbones'),'fragment_source_refold':c.get('expected_backbones'),'fragment_preference_refold':c.get('expected_backbones')}.get(c.get('assay','generative_pilot'))
     if c['num_sequences']!=8 or c['temperature']!=.1 or expected_count is None or len(c['entries'])!=expected_count:raise ValueError('Unexpected design profile')
     if c.get('assay')=='noise_contact':
@@ -52,7 +57,7 @@ def main():
         from prepare_fragment_repetition_refold import audit_inputs
         audit_inputs(c,check_teacher=False)
     if c.get('mpnn_mode','ca') not in ('ca','backbone') or (c.get('mpnn_mode')=='backbone')!=(c.get('assay')=='fragment_full_backbone'):raise ValueError('Undeclared MPNN design mode')
-    if c.get('assay')=='fragment_preference_refold':
+    if c.get('assay')=='fragment_preference_refold' and not cpu_verified:
         from prepare_fragment_preference_refold import audit_inputs
         audit_inputs(c)
     if c.get('assay')=='fragment_source_refold':
@@ -131,6 +136,9 @@ def main():
                     f.flush();atomic_json(a.output/'manifest.json',m)
                 m['records'].extend(scorer.drain(wait=True));atomic_json(a.output/'manifest.json',m)
                 print('refolded',name,'best',max(x['sc_tm'] for x in m['records'] if x['name']==name),flush=True)
+        if cpu_verified:
+            audit_worker(c)
+            m['cpu_preflight_file_identity_unchanged']=True
         m['status']='complete'
     except BaseException as error:m.update(status='failed',error=f'{type(error).__name__}: {error}');raise
     finally:

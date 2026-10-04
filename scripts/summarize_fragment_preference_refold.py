@@ -27,7 +27,18 @@ def analyze(run):
                 row['scaffold_tm']=usalign_coordinates(c['usalign'],folded[r['name']+'/'+str(k)][:][mask,1],bb[mask,1])
             passing=[k for k in r['successful_refold_indices'] if r['refolds'][k]['scaffold_tm']>.5] if r['raw_gate_passed'] else []
             r.update(scaffold_successful_refold_indices=passing,scaffold_joint_success=bool(passing))
-    skip_preferences=spec.get('repaint_student_model_validation') or gc.get('oracle_teacher_refold') or spec.get('native_anchor_model_validation') or gc.get('native_positive_coverage') or gc.get('pretrained_masked_refold') or gc.get('scaffold_clock_refold') or gc.get('fragment_decoder_refold') or gc.get('fragment_decoder_fm_refold') or gc.get('fragment_inpainting_refold')
+        if gc.get('torsion_closure_refold'):
+            from fragment_junction_core import flank_bonds
+            from latentfold.connected_refold import connected_outcome
+            if m.get('cpu_preflight_file_identity_unchanged') is not True:raise ValueError('Missing post-worker input identity audit')
+            generation=json.loads(Path(c['generation_report']).read_text())
+            physical={(r['target_id'],r['generation_slot']):r['refold_eligible_geometry'] for r in generation['records'] if r['arm']=='generated_cond'}
+            for r in records:
+                for k,row in enumerate(r['refolds']):
+                    edges=flank_bonds(folded[r['name']+'/'+str(k)][:],r['motif_start'],len(r['fixed_sequence']),8)
+                    row['flank_edges_valid']=edges['all_edges_valid']
+                r.update(connected_outcome(r['raw'],r['refolds'],physical_raw=physical[r['target_id'],r['generation_slot']]))
+    skip_preferences=spec.get('repaint_student_model_validation') or gc.get('torsion_closure_refold') or gc.get('oracle_teacher_refold') or spec.get('native_anchor_model_validation') or gc.get('native_positive_coverage') or gc.get('pretrained_masked_refold') or gc.get('scaffold_clock_refold') or gc.get('fragment_decoder_refold') or gc.get('fragment_decoder_fm_refold') or gc.get('fragment_inpainting_refold')
     params={} if skip_preferences else {k:spec['preference'][k] for k in ('minimum_quality','discovery_margin','confirmation_margin')}
     if skip_preferences:
         prefs=[]
@@ -65,6 +76,11 @@ def analyze(run):
     if gc.get('oracle_teacher_refold'):
         result.update(oracle_teacher_refold=True,arm=gc['arm'])
     if gc.get('fragment_inpainting_refold'):result.update(fragment_inpainting_refold=True,arm=gc['arm'])
+    if gc.get('torsion_closure_refold'):
+        result.update(torsion_closure_refold=True,arm=gc['arm'],
+            complete_strict=sum(r['complete_strict'] for r in records),
+            connected_designable=sum(r['connected_designable'] for r in records),
+            complete_connected_designable=sum(r['complete_connected_designable'] for r in records))
     return result
 
 
@@ -87,6 +103,7 @@ def main():
         if d.get('oracle_teacher_refold'):title='Oracle RePaint teacher fixed-motif refolds'
         if d.get('fragment_decoder_fm_refold'):title='Full fragment-conditioned decoder denoising refolds'
         if d.get('fragment_inpainting_refold'):title='Fixed-fragment coordinate-inpainting refolds'
+        if d.get('torsion_closure_refold'):title='Constructive torsion-closure same-refold designability'
         a.output.with_suffix('.md').write_text('# '+title+'\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','preferences')},indent=2)+'\n```\n')
 
 

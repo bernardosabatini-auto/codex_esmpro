@@ -22,6 +22,9 @@ def make_entry(row, q, slot, index, arm='parent6000'):
 
 
 def audit_inputs(c, *, audited_generation=None):
+    if c.get('torsion_closure_refold'):
+        from torsion_closure_refolding import audit_refold
+        return audit_refold(c,audited_generation=audited_generation)
     if c.get('oracle_teacher_refold'):
         from fragment_repaint_teacher_refolding import audit_refold
         return audit_refold(c,audited_generation=audited_generation)

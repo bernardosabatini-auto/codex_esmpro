@@ -200,7 +200,7 @@ def analyze(run):
     recommended = max(10, math.ceil((m['training_seconds']*spec['updates']/c['updates']*1.5 +
         (m['elapsed_seconds']-m['training_seconds'])*10 + 120)/60)) if c['profile_only'] else None
     qualified = recommended <= 150 if c['profile_only'] else eligibility['qualified']
-    return dict(status='complete', fragment_inpainting=True, profile_only=c['profile_only'], numerically_qualified=True,
+    result = dict(status='complete', fragment_inpainting=True, profile_only=c['profile_only'], numerically_qualified=True,
         qualified=qualified, manifest_path=str(mp.resolve()), manifest_sha256=sha(mp), protocol_sha256=sha(c['protocol']),
         fragments_sha256=sha(c['fragments']), checkpoint_sha256=m['checkpoint_sha256'], predictions_sha256=m['predictions_sha256'],
         updates=c['updates'], trainable_parameters=m['trainable_parameters'], training_seconds=m['training_seconds'],
@@ -209,6 +209,10 @@ def analyze(run):
         recommended_full_minutes=recommended, summary=summary, refold_eligibility=eligibility, contrasts=contrasts, records=records,
         scope='Repeated training-only diagnostic. Private decoder adapted with fixed-fragment coordinate flow matching. Exact raw motif retention is imposed, not evidence of designability. Native contexts are oracle controls. Latent arrays are masked decoder inputs, not predicted codes. '
               'Eligibility only excludes mathematically impossible improvement under unchanged joint/designability counts; actual same-refold results decide advancement.')
+    if 'junction_protocol' in c:
+        from fragment_junction_core import augment_report
+        result = augment_report(result, run, m)
+    return result
 
 
 def main():

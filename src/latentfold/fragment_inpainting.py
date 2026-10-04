@@ -68,12 +68,45 @@ def denoising_state(target, noise, t, keep, dropped):
     return clean, noisy, anchors, known
 
 
-def inpainting_loss(model, context, target, features, keep, mask, coordinates, *, noise, t, dropped, checkpointed=True):
+def junction_atom_weights(keep, dropped, *, width, mass):
+    """Unit loss mass per example; emphasize unknown flanks, never anchors.
+
+    Dropout restores uniform mass across every atom. Exact-length batches only.
+    """
+    if (keep.ndim != 2 or keep.dtype != torch.bool or dropped.shape != (len(keep),)
+            or dropped.dtype != torch.bool or not isinstance(width, int) or width < 1
+            or not 0 < mass < 1 or not keep.any(1).all()):
+        raise ValueError('Contained contiguous motifs, positive width and interior mass required')
+    positions = torch.arange(keep.shape[1], device=keep.device)[None]
+    start = torch.where(keep, positions, keep.shape[1]).amin(1)[:, None]
+    end = torch.where(keep, positions, -1).amax(1)[:, None]+1
+    if not torch.equal(keep, (positions >= start) & (positions < end)):
+        raise ValueError('A single contiguous motif is required')
+    flank = (((positions >= start-width) & (positions < start)) |
+             ((positions >= end) & (positions < end+width))) & ~dropped[:, None]
+    unknown = ~(keep & ~dropped[:, None])
+    rest = unknown & ~flank
+    nf, nr = flank.sum(1)[:, None], rest.sum(1)[:, None]
+    if (((nf == 0) | (nr == 0)) & ~dropped[:, None]).any():
+        raise ValueError('Conditioned examples need flank and remaining scaffold atoms')
+    weights = flank*mass/nf.clamp_min(1) + rest*(1-mass)/nr.clamp_min(1)
+    weights = torch.where(dropped[:, None], unknown/unknown.sum(1)[:, None], weights)
+    return weights.repeat_interleave(4, 1)/4
+
+
+def inpainting_loss(model, context, target, features, keep, mask, coordinates, *, noise, t, dropped, checkpointed=True,
+                    junction_width=None, junction_mass=None):
     clean, noisy, anchors, known = denoising_state(target, noise, t, keep, dropped)
     velocity = model.velocity(context, features, keep, mask, coordinates, noisy, t, dropped, checkpointed=checkpointed)
     predicted = constrain_state(noisy+(1-t[:, None, None])*tangent_velocity(velocity, known), anchors, known)
     error = (predicted-clean).square().mean(-1)
-    per_example = (error*~known).sum(1)/(~known).sum(1)/((1-t).square()+1e-5)
+    if junction_width is None and junction_mass is None:
+        per_example = (error*~known).sum(1)/(~known).sum(1)/((1-t).square()+1e-5)
+    else:
+        if not mask.all():
+            raise ValueError('Junction weighting requires exact-length batches')
+        weights = junction_atom_weights(keep, dropped, width=junction_width, mass=junction_mass)
+        per_example = (error*weights).sum(1)/((1-t).square()+1e-5)
     loss = per_example.mean()
     if not torch.isfinite(loss):
         raise FloatingPointError('Nonfinite inpainting loss')

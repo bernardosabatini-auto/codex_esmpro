@@ -40,6 +40,11 @@ def audit(c):
                 or not p.get('fragment_inpainting') or p['protocol_sha256']!=sha(c['protocol'])
                 or c['allocation_minutes']!=p['recommended_full_minutes'] or c['allocation_minutes']>150):
             raise ValueError('Unqualified conditional-state profile')
+    if 'junction_protocol' in c:
+        from fragment_junction_core import audit_sources
+        audit_sources(c)
+    elif any(k.startswith('junction_') for k in c):
+        raise ValueError('Junction settings require a bound prospective protocol')
     return spec
 
 

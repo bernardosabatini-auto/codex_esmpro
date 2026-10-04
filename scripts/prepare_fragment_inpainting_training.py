@@ -9,6 +9,7 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('--profile', action='store_true')
     p.add_argument('--profile-report', type=Path)
+    p.add_argument('--junction-weighted', action='store_true')
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -30,6 +31,17 @@ def main():
                       ('fragments', bc['fragments']), ('decoder_checkpoint', bc['decoder_checkpoint']),
                       ('diagnostic_manifest', cc['diagnostic_manifest']), ('diagnostic_predictions', cc['diagnostic_predictions'])]:
         c[key] = bind(path)
+    if a.junction_weighted:
+        c['junction_protocol'] = bind(root/'configs/fragment_junction_weighted_protocol.json')
+        c['junction_spec'] = js = json.loads(Path(c['junction_protocol']).read_text())
+        c['junction_loss'] = {k: js[k] for k in ('junction_width', 'junction_mass')}
+        prior = root/'runs'/js['baseline_training']
+        for key, path in [('junction_baseline_manifest', prior/'manifest.json'),
+                          ('junction_baseline_predictions', prior/'predictions.h5'),
+                          ('junction_baseline_report', root/'reports'/(prior.name+'.json')),
+                          ('junction_comparison', root/js['baseline_comparison']),
+                          ('junction_diagnostic', root/js['diagnostic'])]:
+            c[key] = bind(path)
     if not a.profile:
         if a.profile_report is None:
             raise ValueError('Completed profile required')

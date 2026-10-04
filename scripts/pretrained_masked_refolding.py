@@ -31,6 +31,8 @@ def require_clock_quality(d,spec):
 def require_decoder_quality(d,spec,*,study='fragment_decoder'):
     from fragment_decoder_training_core import refold_eligibility
     if study=='fragment_inpainting':
+        if d.get('junction_weighted'):
+            raise ValueError('Junction-weighted endpoints require their separate connected-refold assay')
         from fragment_inpainting_core import refold_eligibility
     if (d.get('status')!='complete' or d.get('profile_only') or not d.get(study)
             or any(d.get(other) for other in ('pretrained_masked','scaffold_clock','fragment_decoder','fragment_decoder_fm','fragment_inpainting') if other!=study)

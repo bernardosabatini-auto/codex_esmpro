@@ -31,6 +31,7 @@ def main():
     a = p.parse_args()
     c = json.loads(a.config.read_text())
     spec = audit(c)
+    loss_options = c.get('junction_loss', {})
     data, selected = load_training(c), panel(c)
     items = load_conditions(c['fragments'], [r['id'] for r in selected], 'c20_center', cohort='train')
     initial_ids = [next(r['id'] for r in c['selected'] if r['bucket'] == b) for b in (128, 256, 384, 512)]
@@ -120,7 +121,7 @@ def main():
         with inference_precision('fp32'):
             for checkpointed in (False, True):
                 model.zero_grad(set_to_none=True)
-                loss, _, bb = inpainting_loss(model, context, target, features, keep, mask, coords, noise=noise, t=noise.new_full((1,),.4), dropped=torch.zeros(1,dtype=torch.bool,device='cuda'), checkpointed=checkpointed)
+                loss, _, bb = inpainting_loss(model, context, target, features, keep, mask, coords, noise=noise, t=noise.new_full((1,),.4), dropped=torch.zeros(1,dtype=torch.bool,device='cuda'), checkpointed=checkpointed, **loss_options)
                 loss.backward()
                 predictions.append(bb.detach())
                 losses.append(float(loss.detach()))
@@ -168,7 +169,7 @@ def main():
                 optimizer.param_groups[0]['lr'] = spec['decoder_learning_rate']*factor
                 optimizer.param_groups[1]['lr'] = spec['adapter_learning_rate']*factor
                 optimizer.zero_grad(set_to_none=True)
-                loss, components, predicted = inpainting_loss(model, context, target, features, keep, mask, coords, noise=noise, t=times, dropped=dropped)
+                loss, components, predicted = inpainting_loss(model, context, target, features, keep, mask, coords, noise=noise, t=times, dropped=dropped, **loss_options)
                 loss.backward()
                 norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1., error_if_nonfinite=True)
                 if not torch.isfinite(norm) or norm <= 0:

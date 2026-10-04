@@ -1,0 +1,19 @@
+{
+  "scope": "Matched efficiency diagnostic on eight archived training-panel sequences; no new design attempts or scientific predictions.",
+  "buckets": [128, 256, 384, 512],
+  "sequences_per_bucket": 2,
+  "selection": "First backbone in manifest order per bucket; first two archived sequences, irrespective of scores.",
+  "repeats_including_warmup": 4,
+  "precision": "fp32",
+  "deterministic_algorithms": true,
+  "num_loops": 3,
+  "num_sampling_steps": 50,
+  "num_diffusion_samples": 1,
+  "max_atom_coordinate_difference": 0.00001,
+  "historical_ca_rmsd_max": 0.01,
+  "historical_ca_lddt_min": 0.999,
+  "minimum_timed_seconds_reduction": 0.05,
+  "maximum_bucket_seconds_regression": 0.05,
+  "work_cap_seconds": 600,
+  "allocation_minutes": 12
+}

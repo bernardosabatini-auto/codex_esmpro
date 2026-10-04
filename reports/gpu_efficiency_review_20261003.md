@@ -1,6 +1,6 @@
 # GPU efficiency review
 
-Recent runs have no valid SM/tensor/DRAM/GR counter capture. NVML busy time cannot establish the user's weighted Real GPU Utilization. Counters were disabled after Nsight reported a profiling conflict; no other process was inspected or stopped. The [KempnerPulse formula](https://github.com/KempnerInstitute/kempnerpulse/blob/main/docs/classification.md) uses bandwidth activity, not occupied VRAM. Historical allocation-normalized Nsight SM-issue percentages are also a different metric.
+Historical training runs below have no valid SM/tensor/DRAM/GR counter capture; the new refolding captures are reported separately below. NVML busy time cannot establish the user's weighted Real GPU Utilization. Counters were disabled after Nsight reported a profiling conflict; no other process was inspected or stopped. The [KempnerPulse formula](https://github.com/KempnerInstitute/kempnerpulse/blob/main/docs/classification.md) uses bandwidth activity, not occupied VRAM. Historical allocation-normalized Nsight SM-issue percentages are also a different metric.
 
 | Own run | Measured NVML GPU busy | Peak reserved memory | Worker elapsed |
 |---|---:|---:|---:|
@@ -26,3 +26,17 @@ The replacement60-second window contains59valid rows and one unavailable startup
 A CPU-only validation profile took14.52seconds, including8.76seconds hashing8.34GB across112calls/49unique files. Repeated hashing accounts for4.35GB; this is a smaller optimization opportunity than model/design throughput and is left unchanged to keep the current assay moving.
 
 First overlapped partition50315652 completed0:0 in13:05. All256refolds, sequence checks and repeatability control passed independent scoring. Worker time738.06seconds; accumulated waits for CPU scoring1.63seconds. Historical partition50189270 took739.69worker seconds with different designed sequences/backbones, so this is not a controlled speedup estimate. The verified active-window composite is sufficient to retain current FP32 execution while completing the experiment.
+
+## Complete monitored refolding periods
+
+Three complete refolding jobs used UUID-verified DCGM collection from recorder startup through worker completion. This includes model loading, ProteinMPNN, refolding and intervening CPU work after startup. It excludes approximately 32–47 seconds per allocation before/after recorded samples and is not the dashboard hourly/24-hour statistic.
+
+| Own job | Valid seconds sampled | SM active | Tensor active | DRAM active | GR active | Weighted Real Util | Worker time | Timed refolds | CPU scoring wait |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+|50317915|665|73.61%|0.45%|36.55%|85.86%|41.82%|671.9s|558.9s|1.41s|
+|50317974|768|76.12%|0.47%|38.99%|87.51%|43.35%|773.4s|658.4s|2.06s|
+|50318062|641|73.35%|0.46%|36.07%|85.72%|41.62%|647.6s|537.9s|1.82s|
+
+Each capture has one unavailable startup row; all other rows contain all four finite counters. These 41.6–43.4% averages supersede using the 53.0% active-minute sample as representative of the whole pipeline. The user's acceptance of necessary execution settings is retained: prioritize GPU-seconds per scientifically valid output, preserving FP32 and deterministic kernels. All 768 refolds in these three jobs passed independent audit.
+
+The next bounded profile checks omission of ESMFold2-Fast's confidence head, called after coordinate sampling and unused by our assay. Eight archived sequences, two from each length bucket, receive one warmup and three timed repeats under each execution mode, with alternating order and identical seeds. All 64 saved full-atom outputs must agree within 1e-5 Å, historical backbone controls must retain RMSD ≤0.01 Å and lDDT ≥0.999, and total timed seconds must improve by at least 5% with no bucket more than 5% slower. No precision, MPNN budget, diffusion or scoring changes. No speedup claim until this matched replay completes.

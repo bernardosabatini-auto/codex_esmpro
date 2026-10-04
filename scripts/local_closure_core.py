@@ -12,7 +12,7 @@ OFFSET=np.array([11,13,-9],dtype=np.float64)
 
 
 def make_config(root,profile,profile_report=None):
-    protocol=root/'configs/fragment_local_closure_feasibility.json';spec=json.loads(protocol.read_text())
+    protocol=root/'configs/fragment_local_closure_canonical_protocol.json';spec=json.loads(protocol.read_text())
     run=root/'runs/fragment_inpainting_training_50356015';m=json.loads((run/'manifest.json').read_text());old=m['config']
     selected=old['selected'];profile_ids=[next(r['id'] for r in selected if r['bucket']==b) for b in (128,256,384,512)]
     c=dict(profile_only=profile,spec=spec,profile_ids=profile_ids,selected=[r for r in selected if not profile or r['id'] in profile_ids],sources=[])

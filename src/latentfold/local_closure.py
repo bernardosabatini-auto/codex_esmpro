@@ -103,7 +103,23 @@ def geometry_audit(backbone,parent,start,motif_length,width=4):
 
 
 def close_backbone(source,parent,start,motif_length,spec,*,deadline=None):
-    tick=time.monotonic();problem=ClosureProblem(source,parent,start,motif_length,spec)
+    tick=time.monotonic()
+    if deadline is not None and tick>deadline:raise TimeoutError('CPU closure work cap')
+    origin,basis=None,None
+    if spec['solver'].get('canonical_frame'):
+        if spec['solver']['canonical_frame']!='parent_start_N_CA_C':raise ValueError('Unknown closure frame')
+        reference=np.asarray(parent,dtype=np.float64);original=np.asarray(source,dtype=np.float64)
+        origin=reference[start,1];x_axis=reference[start,2]-origin;x_axis=x_axis/np.linalg.norm(x_axis)
+        y_axis=reference[start,0]-origin;y_axis=y_axis-np.dot(y_axis,x_axis)*x_axis
+        if np.linalg.norm(y_axis)<1e-6:raise ValueError('Degenerate parent frame')
+        y_axis=y_axis/np.linalg.norm(y_axis);basis=np.stack([x_axis,y_axis,np.cross(x_axis,y_axis)],axis=1)
+        grid=spec['solver']['input_grid_angstrom']
+        if grid!=1e-6:raise ValueError('Changed numerical input grid')
+        canonical_source=np.round(((original-origin)@basis)/grid)*grid
+        canonical_parent=np.round(((reference-origin)@basis)/grid)*grid
+        problem=ClosureProblem(canonical_source,canonical_parent,start,motif_length,spec)
+    else:
+        problem=ClosureProblem(source,parent,start,motif_length,spec)
     x=problem.source[problem.graph['editable']].clone().requires_grad_();s=spec['solver']
     before=float(problem.loss(x)[0].detach());calls=0
     optimizer=torch.optim.LBFGS([x],lr=s['lr'],max_iter=s['max_iter'],max_eval=s['max_eval'],
@@ -112,14 +128,17 @@ def close_backbone(source,parent,start,motif_length,spec,*,deadline=None):
         nonlocal calls
         if deadline is not None and time.monotonic()>deadline:raise TimeoutError('CPU closure work cap')
         optimizer.zero_grad(set_to_none=True);loss,_=problem.loss(x);loss.backward();calls+=1;return loss
-    optimizer.step(closure)
+    if before!=0:optimizer.step(closure)
     loss,parts=problem.loss(x)
     result=np.asarray(source).copy().reshape(-1,3)
-    result[problem.graph['editable'].numpy()]=x.detach().numpy()
+    if before!=0:
+        moving=x.detach().numpy()
+        if basis is not None:moving=moving@basis.T+origin
+        result[problem.graph['editable'].numpy()]=moving
     result=result.reshape(np.asarray(source).shape)
     fixed=np.ones(len(result)*4,dtype=bool);fixed[problem.graph['editable'].numpy()]=False
     if not np.array_equal(result.reshape(-1,3)[fixed],np.asarray(source).reshape(-1,3)[fixed]):
         raise ValueError('Closure moved fixed atoms')
     return result,dict(seconds=time.monotonic()-tick,initial_loss=before,final_loss=float(loss.detach()),
-        terms={k:float(v.detach()) for k,v in parts.items()},closure_calls=calls,iterations=optimizer.state[x]['n_iter'],
+        terms={k:float(v.detach()) for k,v in parts.items()},closure_calls=calls,iterations=optimizer.state[x].get('n_iter',0),
         max_editable_displacement=float(np.linalg.norm(result-np.asarray(source),axis=-1).max()))

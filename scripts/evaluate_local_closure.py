@@ -41,18 +41,19 @@ def main():
                 ident=row['id'];item=items[ident]
                 for arm in spec['execution']['arms']:
                     reference='native_direct' if arm=='native_cond' else 'parent'
-                    results=[]
+                    dataset=out.create_dataset(arm+'/'+ident+'/backbone',shape=(4,row['length'],4,3),dtype=inputs[arm+'/'+ident+'/backbone'].dtype,fillvalue=np.nan)
                     for slot in range(4):
                         source=inputs[arm+'/'+ident+'/backbone'][slot];parent=inputs[reference+'/'+ident+'/backbone'][slot]
                         bb,r=close_backbone(source,parent,item['start'],20,spec,deadline=deadline)
-                        results.append(bb);m['records'].append(dict(arm=arm,target_id=ident,slot=slot,reference=reference,**r))
+                        dataset[slot]=bb;out.flush()
+                        m['records'].append(dict(arm=arm,target_id=ident,slot=slot,reference=reference,**r))
                         if ident in c['profile_ids'] and slot==0:
                             posed,rr=close_backbone(source.astype(np.float64)@ROTATION+OFFSET,parent.astype(np.float64)@ROTATION+OFFSET,item['start'],20,spec,deadline=deadline)
                             out.create_dataset('pose/'+arm+'/'+ident,data=posed)
                             error=float(np.max(np.abs(posed-(bb.astype(np.float64)@ROTATION+OFFSET))))
                             m['controls'].append(dict(kind='pose',arm=arm,target_id=ident,max_abs=error,**rr))
                             if error>.005:raise ValueError('Closure proper-pose equivariance failed')
-                    out.create_dataset(arm+'/'+ident+'/backbone',data=np.stack(results));out.flush()
+                    out.flush()
                     atomic_json(a.output/'manifest.json',m)
                 print('closed',ident,flush=True)
         m.update(status='complete',predictions_sha256=sha(a.output/'predictions.h5'))

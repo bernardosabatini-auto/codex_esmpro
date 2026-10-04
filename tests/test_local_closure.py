@@ -8,7 +8,8 @@ from latentfold.local_closure import ClosureProblem, close_backbone, geometry_au
 
 class LocalClosure(unittest.TestCase):
     def setUp(self):
-        self.spec=json.loads((Path(__file__).resolve().parents[1]/'configs/fragment_local_closure_feasibility.json').read_text())
+        torch.manual_seed(31)
+        self.spec=json.loads((Path(__file__).resolve().parents[1]/'configs/fragment_local_closure_canonical_protocol.json').read_text())
         self.parent=np.random.default_rng(31).normal(size=(12,4,3))*10
         self.start=4;self.length=4
 
@@ -47,6 +48,14 @@ class LocalClosure(unittest.TestCase):
         a,_=close_backbone(source,self.parent,self.start,self.length,self.spec)
         b,_=close_backbone(source@rotation+offset,self.parent@rotation+offset,self.start,self.length,self.spec)
         np.testing.assert_allclose(a@rotation+offset,b,atol=.005,rtol=0)
+
+    def test_arbitrary_proper_rotation_equivariance(self):
+        rotation,_=np.linalg.qr(np.random.default_rng(71).normal(size=(3,3)))
+        rotation[:,0]*=np.linalg.det(rotation)
+        source=self.parent.copy();source[3]+=.05
+        a,_=close_backbone(source,self.parent,self.start,self.length,self.spec)
+        b,_=close_backbone(source@rotation+11,self.parent@rotation+11,self.start,self.length,self.spec)
+        np.testing.assert_allclose(a@rotation+11,b,atol=.005,rtol=0)
 
     def test_deadline_is_enforced(self):
         with self.assertRaises(TimeoutError):close_backbone(self.parent,self.parent,self.start,self.length,self.spec,deadline=0)

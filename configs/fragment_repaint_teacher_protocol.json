@@ -1,0 +1,21 @@
+{
+  "purpose": "Qualify full-context RePaint completions as possible training labels for an isolated-fragment student. This oracle teacher is not a deployable isolated-fragment model.",
+  "baseline_generation": "extra_fragment_validation_50188437",
+  "historical_generation": "isolated_motif_49864561",
+  "condition": "c20_center",
+  "targets": 32,
+  "samples": 4,
+  "steps": 50,
+  "repaint": 3,
+  "decoder_steps": 3,
+  "seed": 2026100405,
+  "allocation_minutes": 15,
+  "work_cap_seconds": 780,
+  "inputs": "Original frozen459M unconditional generator; only20 full-context native motif codes copied into an otherwise zero target. These codes intentionally contain native context information. No native scaffold codes or sequence provided directly. Length and insertion position supplied. Original50Euler/AE3/RePaint3, learned null, FP32, outer-only selfconditioning. No final overwrite, geometry repair, retry or selection.",
+  "population": "All32 previously selected training-only diagnostic proteins, four existing flow/decoder seeds. Locked tests untouched. Comparisons to parent are recipe comparisons, not a one-factor architecture ablation. All128 outputs and failures retained.",
+  "controls": "Reproduce all16 saved full-context outputs on four historical control proteins, same archived seeds/codes/sampler. Exact latent maxabs<=1e-5, CA RMSD<=.2A and lDDT>=.99, identical validity/motif decisions. On first protein per length bucket, replacing unused target scaffold codes with nonzero values must leave generation exactly unchanged. Original weights frozen, checkpoint hashes verified. Complete finite32x4 inventory and recorded time/memory<=75GiB.",
+  "refold_eligibility": {"min_raw": 9, "min_valid": 45},
+  "refolding": "If numerical controls and logical upper bounds pass, refold ALL128 outputs using eight fixed-motif CA-onlyProteinMPNN designs,T.1,seed1 and unchanged deterministicFP32 teacher3loops50steps. Four32-backbone partitions onRTX,35minutes each, inherited verified profile. Reuse original parent/native budgets without pooling. Same valid refold must satisfy propermotifCA RMSD<=1A,dRMS<=1A,globalTM>.5 andscaffoldTM>.5, while raw output also passes validity/motif gates. Report designability separately and preserve every failure.",
+  "decision": "Teacher-label expansion requires >8 strict outputs,>=7 successful families and>=45 designable outputs under the unchanged assay; report overlap with parent successes and scaffold diversity. If failed, close this teacher recipe without sampling/step/cutoff sweeps. A pass licenses a separately specified distillation capacity pilot using isolated-fragment inputs only; it is not evidence of student improvement. Existing cached ESMFold multistate augmentation remains closed and is a different source of labels.",
+  "resources": "OneRTX bounded teacher generation using existing qualified50/AE3/RePaint3 execution; no training or expansion before audit. At most8 own running-plus-pending GPUs. Completion watcher required; code/reports synchronized without data."
+}

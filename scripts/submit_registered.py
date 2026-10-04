@@ -5,6 +5,26 @@ import watch_jobs as watch
 from submission_snapshot import freeze_submission
 
 
+def jobs_requiring_poll(registry,watch_state):
+ """Reuse the watcher's completed-allocation evidence, never its live count.
+
+ The caller first requires a healthy watcher heartbeat newer than120seconds.
+ New, unknown, partial-array and still-allocated jobs always get a live poll.
+ Handled jobs are excluded only with exact complete terminal task evidence,
+ matching the watcher's own treatment of completed historical allocations.
+ """
+ all_ids=[i for j in registry['jobs'] for i in watch.job_ids(j)]
+ if len(all_ids)!=len(set(all_ids)):raise ValueError('duplicate registry ownership')
+ pending=[]
+ for job in registry['jobs']:
+  if job.get('state') in watch.TERMINAL:continue
+  entry=watch_state.get('jobs',{}).get(job['id'],{});tasks=entry.get('tasks',{});ids=watch.job_ids(job)
+  finished=(entry.get('handled') is True and set(tasks)==set(ids)
+            and all(tasks[i].get('state') in watch.TERMINAL for i in ids))
+  if not finished:pending.append(job)
+ return pending
+
+
 def policy_deadline(permission,now,minutes):
  """Standing authorization does not override a later user-specified deadline."""
  if permission.get('status')!='active' or permission.get('mode')!='experiment_bounded' or permission.get('max_total_gpus')!=8:
@@ -31,7 +51,8 @@ def main():
   beat=json.loads((root/'runs/watch/heartbeat.json').read_text());now=datetime.datetime.now(datetime.timezone.utc)
   if beat['status']!='ok' or (now-datetime.datetime.fromisoformat(beat['checked_at'])).total_seconds()>=120:raise RuntimeError('watcher heartbeat stale')
   path=root/'runs/jobs.json';registry=json.loads(path.read_text())
-  outstanding=[j for j in registry['jobs'] if j.get('state') not in watch.TERMINAL]
+  state_path=root/'runs/watch/state.json';watch_state=json.loads(state_path.read_text()) if state_path.exists() else {}
+  outstanding=jobs_requiring_poll(registry,watch_state)
   ids=[i for j in outstanding for i in watch.job_ids(j)];states=watch.scheduler_states(ids) if ids else {}
   count=sum(j.get('gpus_per_task',j['gpus']//len(watch.job_ids(j)))*sum(states.get(i,{}).get('state') not in watch.TERMINAL for i in watch.job_ids(j)) for j in outstanding)
   if count+a.gpus_per_task*a.tasks>8:raise RuntimeError('project GPU cap would be exceeded')

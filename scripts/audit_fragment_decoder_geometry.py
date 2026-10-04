@@ -13,7 +13,7 @@ from prepare_overfit import sha
 
 def analyze(run, report):
     m=json.loads((run/'manifest.json').read_text()); d=json.loads(report.read_text()); c=m['config']
-    if (m['status']!='complete' or d['status']!='complete' or not d.get('fragment_decoder')
+    if (m['status']!='complete' or d['status']!='complete' or not (d.get('fragment_decoder') or d.get('fragment_decoder_fm'))
             or not d['numerically_qualified'] or d['manifest_sha256']!=sha(run/'manifest.json')
             or d['predictions_sha256']!=sha(run/'predictions.h5')):
         raise ValueError('Complete audited decoder experiment required')
@@ -56,11 +56,12 @@ def analyze(run, report):
         lost_raw=sum(lookup['parent',i,k]['raw_gate_passed'] and not lookup['generated_cond',i,k]['raw_gate_passed'] for i,k in keys),
         new_raw=sum(not lookup['parent',i,k]['raw_gate_passed'] and lookup['generated_cond',i,k]['raw_gate_passed'] for i,k in keys))
     learning=[]
+    learning_keys=('loss','motif_fm','scaffold_fm','gradient_norm') if d.get('fragment_decoder_fm') else ('loss','position_mse','bond_mse','gradient_norm')
     for start in range(0,len(m['training']),200):
         for bucket in (128,256,384,512):
             rr=[r for r in m['training'][start:start+200] if r['bucket']==bucket]
             if rr: learning.append(dict(first_update=start+1,last_update=min(start+200,len(m['training'])),bucket=bucket,updates=len(rr),
-                **{k:float(np.mean([r[k] for r in rr])) for k in ('loss','position_mse','bond_mse','gradient_norm')}))
+                **{k:float(np.mean([r[k] for r in rr])) for k in learning_keys}))
     return dict(status='complete',profile_only=c['profile_only'],manifest_sha256=sha(run/'manifest.json'),
         source_report_sha256=sha(report),summary=summary,transitions=transitions,learning=learning,records=records,
         scope='Post hoc description of every output, with unchanged eligibility and no checkpoint selection. '

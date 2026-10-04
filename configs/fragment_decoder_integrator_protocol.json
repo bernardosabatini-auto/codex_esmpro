@@ -1,0 +1,17 @@
+{
+  "purpose": "Distinguish limited integration resolution from inaccurate conditional denoising in the failed three-step full-decoder pilot. Diagnostic only; no promotion or refolding.",
+  "source_run": "fragment_decoder_fm_training_50301053",
+  "seed": 2026100405,
+  "decoder_stream": "decoder:0",
+  "steps": [3, 10],
+  "probe_times": [0.0, 0.3333333333333333, 0.6666666666666666, 0.9],
+  "samples": 4,
+  "allocation_minutes": 10,
+  "work_cap_seconds": 480,
+  "inventory": "All32 repeatedly used training diagnostic proteins, original four noises each. Native latent context only, motif codes zeroed. Trained condition on/off, free3and10step integration. Every output retained. Original unmasked native decoder is a separate unchanged control.",
+  "integration": "Frozen saved full EMA. Same FP32 Euler formula,1e-6denominator and Angstrom conversion as original3step path. Original uncentered initial noises for free trajectories. Recompute identical token/pair features eachvelocitycall;3step mustmatch archived native_cond/native_null maxabs<=1e-5A onALL128outputs/arm before interpreting10step results. No coordinateclamping,new attempts,training or checkpointselection.",
+  "path_probes": "Original unitGaussian noise and native target are each centered overall backboneatoms in nm, matching FMtraining. At eachdeclared time, give xt=(1-t)x0+t*x1 to adapted conditionon, adapted conditionoff and original unmaskeddecoder. Save actualvelocity and impliedcleanprediction. Score perregion coordinateMSE and originaltimeweightedFMloss, plus geometry/motif fit. These are ORACLE paths: t>0 exposes native coordinates; even t0 has native latentcontext. They are not generative success or designability measurements.",
+  "controls": "All128original native controls mustmatch source native_direct at<=1e-5A. Both3step adaptedarms reproduce archivedoutputs at<=1e-5A. Suppliedcoordinate rigidpose check at10steps forfirstprotein in eachlengthbucket,conditionon,all4noises<=1e-4A. SourceEMA and originaldecoder hashes unchanged before/after. No executedtrainingupdates; exactlength batches4,FP32. Peak<=75GiB.",
+  "analysis": "All512free candidate outputs and1536oracle path predictions scored independently from saved coordinates. Paired proteinbootstrap3vs10 andconditionon/off forvalidity,rawjointmotif andmotifRMSD; fournoises are not independentproteins. Separately report peptide/clash/gap failurecounts and properCA motiffit. Forcedpath errors compare identicaltarget/noise/time/arms; no blending withfree-sampling scores. No outcome-based filtering. Old3step failure remains unchanged regardlessof10step result.",
+  "resources": "OneRTX10minute diagnostic using alreadyprofiled decoder/exactbatch4. Atmost8ownregisteredrunning-plus-pendingGPUs overall. Completion watcher required. Original project readonly; preserve allfailures andlockedtests; synccode/reports withoutdata. No subsequenttraining orrefolding predetermined bythisdiagnostic."
+}

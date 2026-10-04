@@ -26,7 +26,7 @@ from profile_gpu import Telemetry,atomic_json
 def main():
     p=argparse.ArgumentParser()
     for key in ('source','config','output'):p.add_argument('--'+key,type=Path,required=True)
-    a=p.parse_args();c=json.loads(a.config.read_text());spec,labels=audit(c);data=load_pairs(c)
+    a=p.parse_args();c=json.loads(a.config.read_text());spec,labels=audit(c);data=load_pairs(c,audited=(spec,labels))
     controls=load_conditions(c['fragments'],c['control_ids'],'c20_center',cohort='train')
     a.output.mkdir(exist_ok=False);tick=time.monotonic();m=dict(status='running',config=c,updates=0,training=[],controls=[],evaluations=[]);telemetry=None
     atomic_json(a.output/'manifest.json',m)
@@ -77,7 +77,7 @@ def main():
             for step in range(c['updates']):
                 if time.monotonic()-tick>c['work_cap_seconds']:raise TimeoutError('Native training cap')
                 length=active[step%len(active)];batch=spec['batches'][str(length)];ids=order.choice(buckets[length],size=batch).tolist()
-                positive=torch.zeros(batch,length,8);negative=None if c.get('positive_coverage_training') else torch.zeros_like(positive);features=torch.zeros(batch,length,29);keep=torch.zeros(batch,length,dtype=torch.bool);mask=torch.zeros_like(keep);coords=torch.zeros(batch,length,3)
+                positive=torch.zeros(batch,length,8);negative=None if c.get('positive_coverage_training') or c.get('repaint_student_training') else torch.zeros_like(positive);features=torch.zeros(batch,length,29);keep=torch.zeros(batch,length,dtype=torch.bool);mask=torch.zeros_like(keep);coords=torch.zeros(batch,length,3)
                 for k,ident in enumerate(ids):
                     v=data[ident];n=v['length'];positive[k,:n]=v['positive'];features[k,:n]=v['features'];keep[k,:n]=v['keep'];coords[k,:n]=v['coordinates'];mask[k,:n]=True
                     if negative is not None:negative[k,:n]=v['negative']
@@ -85,7 +85,7 @@ def main():
                 factor=min((step+1)/spec['warmup_updates'],1)*(.1+.9*.5*(1+math.cos(math.pi*step/(spec['updates']-1))))
                 for group in optimizer.param_groups:group['lr']=spec['adapter_lr']*factor
                 optimizer.zero_grad(set_to_none=True)
-                loss,info=native_preference_flow_loss(net,adapter,reference,positive,negative,features,keep,mask,coordinates=coords,generator=rng,beta=spec['beta'],negative_weight=spec['arms'][c['arm']]['negative_weight'])
+                loss,info=native_preference_flow_loss(net,adapter,reference,positive,negative,features,keep,mask,coordinates=coords,generator=rng,beta=spec['beta'],negative_weight=0. if c.get('repaint_student_training') else spec['arms'][c['arm']]['negative_weight'])
                 loss.backward();norm=torch.nn.utils.clip_grad_norm_(adapter.parameters(),spec['gradient_clip'],error_if_nonfinite=True)
                 if not torch.isfinite(loss) or not torch.isfinite(norm) or norm<=0:raise FloatingPointError('Nonfinite or zero training gradient')
                 optimizer.step()
@@ -102,7 +102,13 @@ def main():
         if m['peak_reserved_GiB']>75 or m['generator_initial']!=m['generator_final'] or m['reference_initial']!=m['reference_final'] or m['adapter_initial']==m['adapter_final']:raise ValueError('Resource or frozen/update check failed')
         checkpoint=a.output/f'ema_{c["updates"]}.ckpt'
         torch.save(dict(ema={k:v.detach().cpu() for k,v in net.state_dict().items()},fragment_adapter={k:v.cpu() for k,v in ema.items()},raw_fragment_adapter={k:v.detach().cpu() for k,v in adapter.state_dict().items()},reference_fragment_adapter={k:v.detach().cpu() for k,v in reference.state_dict().items()},adapter_config=adapter_config,arch=arch['architecture'],extra_arch=arch['extra_architecture'],model=arch['model'],experiment=c),checkpoint)
-        m['checkpoint_sha256']=sha(checkpoint);evaluate(c['updates']);m['status']='complete'
+        m['checkpoint_sha256']=sha(checkpoint)
+        if c.get('repaint_student_training'):
+            saved=torch.load(checkpoint,map_location='cpu',weights_only=False,mmap=True)
+            if set(saved['fragment_adapter'])!=set(ema) or any(not torch.equal(saved['fragment_adapter'][k],v.cpu()) for k,v in ema.items()):raise ValueError('Saved EMA differs from trained EMA')
+            ema={k:v.to('cuda').clone() for k,v in saved['fragment_adapter'].items()};del saved
+            m['saved_ema_reloaded']=True
+        evaluate(c['updates']);m['status']='complete'
     except BaseException as error:m.update(status='failed',error=f'{type(error).__name__}: {error}');raise
     finally:
         if telemetry:telemetry.close()

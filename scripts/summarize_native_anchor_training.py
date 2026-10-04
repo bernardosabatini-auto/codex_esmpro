@@ -16,14 +16,15 @@ from prepare_overfit import sha
 def analyze(run):
     path=run/'manifest.json';m=json.loads(path.read_text()) if path.exists() else dict(status='failed',error='Missing manifest')
     if m['status']!='complete':return dict(status=m['status'],error=m.get('error'),profile_qualified=False)
-    c=m['config'];spec,labels=audit(c);data=load_pairs(c);count=c['updates'];active=sorted({r['bucket'] for r in labels['rows']})
+    c=m['config'];spec,labels=audit(c);data=load_pairs(c,audited=(spec,labels));count=c['updates'];active=sorted({r['bucket'] for r in labels['rows']})
+    if c.get('repaint_student_training') and m.get('saved_ema_reloaded') is not True:raise ValueError('Saved student EMA was not reloaded')
     if m['updates']!=count or len(m['training'])!=count or m['active_buckets']!=active or len(m['controls'])!=16 or [r['step'] for r in m['evaluations']]!=[0,count]:raise ValueError('Changed training/evaluation inventory')
     if not math.isfinite(m['peak_reserved_GiB']) or m['peak_reserved_GiB']>75 or m['generator_initial']!=m['generator_final'] or m['reference_initial']!=m['reference_final'] or m['adapter_initial']==m['adapter_final']:raise ValueError('Frozen weights, update or resource check failed')
     for step,row in enumerate(m['training']):
         length=active[step%len(active)];batch=spec['batches'][str(length)];factor=min((step+1)/spec['warmup_updates'],1)*(.1+.9*.5*(1+math.cos(math.pi*step/(spec['updates']-1))))
         if row['step']!=step+1 or row['length']!=length or row['batch']!=batch or len(row['ids'])!=batch or row['learning_rate_factor']!=factor:raise ValueError('Changed draw/schedule')
         if any(i not in data or data[i]['bucket']!=length for i in row['ids']):raise ValueError('Unqualified training example')
-        positive=torch.zeros(batch,length,8);negative=None if c.get('positive_coverage_training') else torch.zeros_like(positive)
+        positive=torch.zeros(batch,length,8);negative=None if c.get('positive_coverage_training') or c.get('repaint_student_training') else torch.zeros_like(positive)
         for k,ident in enumerate(row['ids']):
             n=data[ident]['length'];positive[k,:n]=data[ident]['positive']
             if negative is not None:negative[k,:n]=data[ident]['negative']

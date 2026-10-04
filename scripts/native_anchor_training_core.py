@@ -20,6 +20,9 @@ def state_hash(state):
 
 
 def audit(c):
+    if c.get('repaint_student_training'):
+        from repaint_student_training_core import audit as audit_repaint
+        return audit_repaint(c)
     if c.get('positive_coverage_training'):
         from native_positive_training_core import audit as audit_positive
         return audit_positive(c)
@@ -48,7 +51,10 @@ def audit(c):
     return spec,labels
 
 
-def load_pairs(c):
+def load_pairs(c,*,audited=None):
+    if c.get('repaint_student_training'):
+        from repaint_student_training_core import load_pairs as load_repaint
+        return load_repaint(c,audited=audited)
     if c.get('positive_coverage_training'):
         from native_positive_training_core import load_positives
         return load_positives(c)

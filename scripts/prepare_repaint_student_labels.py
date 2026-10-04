@@ -71,6 +71,7 @@ def prepare(root, output):
     d=dict(status='complete',spec=spec,rows=exported,qualification_records=positive,
            labels=str((output/'labels.h5').resolve()),labels_sha256=sha(output/'labels.h5'),
            parent_manifest=parent_manifest,checkpoint=checkpoint,decoder_checkpoint=decoder_checkpoint,fragments=fragments,
+           generation_manifest=c['generation_manifest'],teacher_predictions=str(predictions.resolve()),
            sources=[dict(path=k,sha256=v) for k,v in sorted(sources.items())],
            scope='Thirteen selected teacher completions in nine training families; isolated conditioning only. Labels are not evidence of student improvement.')
     (output/'manifest.json').write_text(json.dumps(d,indent=2)+'\n')

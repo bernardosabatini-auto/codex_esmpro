@@ -22,7 +22,10 @@ def ready_command(root):
         if output.with_suffix('.json').exists():continue
         return [str(root/'scripts/compare_native_anchor_training.py'),'--runs',*[str(root/f'runs/native_anchor_training_{i}') for i in ids],'--output',str(output)]
     from compare_native_positive_training import ready_command as ready_positive
-    return ready_positive(root)
+    command=ready_positive(root)
+    if command:return command
+    from compare_repaint_student_training import ready_command as ready_repaint
+    return ready_repaint(root)
 
 
 def check_draws(a,b):

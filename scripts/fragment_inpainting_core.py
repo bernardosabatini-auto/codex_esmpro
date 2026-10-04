@@ -50,6 +50,11 @@ def audit(c):
         audit_sources(c)
     elif any(k.startswith('flank_') or k == 'context_flank' for k in c):
         raise ValueError('Context flank requires a bound prospective protocol')
+    if 'bridge_protocol' in c:
+        from scaffold_bridge_core import audit_sources
+        audit_sources(c)
+    elif any(k.startswith('bridge_') for k in c):
+        raise ValueError('Bridge inputs require a bound prospective protocol')
     return spec
 
 

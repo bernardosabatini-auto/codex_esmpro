@@ -13,6 +13,7 @@ from latentfold.decoder import load_proteinae
 from latentfold.fragment_decoder_fm import sample_times
 from latentfold.fragment_inpainting import FragmentInpaintingDecoder, inpainting_loss, place_fragment, context_mask
 from latentfold.fragment_decoder import FragmentDecoder
+from latentfold.scaffold_bridge import ScaffoldBridgeDecoder, scaffold_anchors, coordinate_known, bridge_loss
 from latentfold.flow import target_noise
 from latentfold.precision import inference_precision
 from extra_fragment_validation_core import load_conditions
@@ -38,6 +39,7 @@ def main():
         spec = audit(c)
         data = load_training(c)
     loss_options = c.get('junction_loss', {})
+    loss_fn = bridge_loss if 'bridge_protocol' in c else inpainting_loss
     selected = panel(c)
     items = load_conditions(c['fragments'], [r['id'] for r in selected], 'c20_center', cohort='train')
     initial_ids = [next(r['id'] for r in c['selected'] if r['bucket'] == b) for b in (128, 256, 384, 512)]
@@ -52,7 +54,8 @@ def main():
         torch.cuda.set_per_process_memory_fraction(.85)
         torch.manual_seed(spec['seed'])
         codec = load_proteinae(a.source/'ProteinAE_v1', Path(c['decoder_checkpoint']), steps=3).cuda().eval()
-        model = FragmentInpaintingDecoder(codec, seed=spec['seed'], context_flank=c.get('context_flank', 0)).cuda().eval()
+        model_type = ScaffoldBridgeDecoder if 'bridge_protocol' in c else FragmentInpaintingDecoder
+        model = model_type(codec, seed=spec['seed'], context_flank=c.get('context_flank', 0)).cuda().eval()
         m['frozen_original'] = state_hash(expected_frozen_state(c))
         m['frozen_initial'] = state_hash(canonical_frozen_state(model))
         m['initial_model_sha256'] = state_hash(model.state_dict())
@@ -95,13 +98,15 @@ def main():
                     g['latent'], g['backbone'], g['original_backbone'] = z.cpu().numpy(), bb.cpu().numpy(), expected.cpu().numpy()
                     reference = old['new/'+ident+'/backbone'][:] if kind == 'generated' else native['native/'+ident+'/backbone'][:4]
                     anchors = place_fragment(torch.from_numpy(item['fragment']).cuda(),torch.from_numpy(reference).cuda(),item['start'])
+                    if 'bridge_protocol' in c: anchors = scaffold_anchors(torch.from_numpy(reference).cuda(),anchors,keep)
                     clamped = model(context,features,keep,mask,coords,anchors=anchors,noise=noise)
                     g['anchors'],g['clamped_backbone']=anchors.cpu().numpy(),clamped.cpu().numpy()
+                    if 'bridge_protocol' in c: g['coordinate_known'] = coordinate_known(keep,torch.zeros(4,dtype=torch.bool,device='cuda')).cpu().numpy()
                     if 'flank_protocol' in c:
                         g['source_latent'] = context.cpu().numpy()
                         if ident in initial_ids:
                             model.context_flank = 0
-                            zero = model(context,features,keep,mask,coords,anchors=anchors,noise=noise)
+                            zero = FragmentInpaintingDecoder.forward(model,context,features,keep,mask,coords,anchors=torch.where(keep[...,None,None],anchors,torch.zeros_like(anchors)),noise=noise)
                             model.context_flank = c['context_flank']
                             with h5py.File(c['flank_baseline_predictions']) as baseline:
                                 expected_zero = torch.from_numpy(baseline[kind+'_untrained/'+ident+'/backbone'][:]).cuda()
@@ -140,7 +145,7 @@ def main():
         with inference_precision('fp32'):
             for checkpointed in (False, True):
                 model.zero_grad(set_to_none=True)
-                loss, _, bb = inpainting_loss(model, context, target, features, keep, mask, coords, noise=noise, t=noise.new_full((1,),.4), dropped=torch.zeros(1,dtype=torch.bool,device='cuda'), checkpointed=checkpointed, **loss_options)
+                loss, _, bb = loss_fn(model, context, target, features, keep, mask, coords, noise=noise, t=noise.new_full((1,),.4), dropped=torch.zeros(1,dtype=torch.bool,device='cuda'), checkpointed=checkpointed, **loss_options)
                 loss.backward()
                 predictions.append(bb.detach())
                 losses.append(float(loss.detach()))
@@ -188,7 +193,7 @@ def main():
                 optimizer.param_groups[0]['lr'] = spec['decoder_learning_rate']*factor
                 optimizer.param_groups[1]['lr'] = spec['adapter_learning_rate']*factor
                 optimizer.zero_grad(set_to_none=True)
-                loss, components, predicted = inpainting_loss(model, context, target, features, keep, mask, coords, noise=noise, t=times, dropped=dropped, **loss_options)
+                loss, components, predicted = loss_fn(model, context, target, features, keep, mask, coords, noise=noise, t=times, dropped=dropped, **loss_options)
                 loss.backward()
                 norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1., error_if_nonfinite=True)
                 if not torch.isfinite(norm) or norm <= 0:
@@ -245,6 +250,7 @@ def main():
                     check = check_backbones(bb.cpu().numpy(), reference, item['fragment'], item['start'], ident)
                     m['controls'].append(dict(kind=arm, target_id=ident, **check))
                     anchors = place_fragment(torch.from_numpy(item['fragment']).cuda(),torch.from_numpy(reference).cuda(),item['start'])
+                    if 'bridge_protocol' in c: anchors = scaffold_anchors(torch.from_numpy(reference).cuda(),anchors,keep)
                     g=out.create_group(kind+'_untrained/'+ident)
                     g['latent']=initial[kind+'/'+ident+'/latent'][:]
                     g['backbone']=initial[kind+'/'+ident+'/clamped_backbone'][:]
@@ -257,6 +263,10 @@ def main():
                         g = out.create_group(arm+'/'+ident)
                         g['latent'] = torch.where(context_mask(keep, model.context_flank)[..., None], torch.zeros_like(context), context).cpu().numpy()
                         if 'flank_protocol' in c: g['source_latent'] = context.cpu().numpy()
+                        if 'bridge_protocol' in c:
+                            known = coordinate_known(keep,torch.full((4,),dropped,dtype=torch.bool,device='cuda'))
+                            g['coordinate_known'] = known.cpu().numpy()
+                            g['anchors'] = torch.where(known[...,None,None],anchors,torch.zeros_like(anchors)).cpu().numpy()
                         g['backbone'] = bb.cpu().numpy()
                         m['evaluations'].append(dict(arm=arm, target_id=ident, seconds=time.monotonic()-sample_start))
                         if dropped:
@@ -272,6 +282,7 @@ def main():
                             fragment=torch.from_numpy(item['fragment']).cuda().double()
                             fragment=fragment@coords.new_tensor([[0,-1,0],[1,0,0],[0,0,1]],dtype=torch.float64)+11
                             posed_anchors=place_fragment(fragment,torch.from_numpy(reference).cuda(),item['start'])
+                            if 'bridge_protocol' in c: posed_anchors = scaffold_anchors(torch.from_numpy(reference).cuda(),posed_anchors,keep)
                             posed_bb = model(context, features, keep, mask, posed, anchors=posed_anchors, noise=noise)
                             error = float((bb-posed_bb).abs().max())
                             if error > 1e-4:
@@ -279,7 +290,8 @@ def main():
                             g['pose_backbone'] = posed_bb.cpu().numpy()
                             if 'flank_protocol' in c and ident in initial_ids:
                                 hidden = context.clone(); hidden[context_mask(keep, model.context_flank)] += 97
-                                eps = noise.clone(); eps[keep.repeat_interleave(4, 1)] += 111
+                                known_noise = coordinate_known(keep,torch.zeros(4,dtype=torch.bool,device='cuda')) if 'bridge_protocol' in c else keep
+                                eps = noise.clone(); eps[known_noise.repeat_interleave(4, 1)] += 111
                                 repeat = model(hidden,features,keep,mask,coords,anchors=anchors,noise=eps)
                                 error_hidden = float((repeat-bb).abs().max())
                                 g['nonleak_backbone'] = repeat.cpu().numpy()
@@ -305,6 +317,7 @@ def main():
         m['peak_reserved_GiB'] = max(m['control_peak_reserved_GiB'], torch.cuda.max_memory_reserved()/2**30)
         if m['frozen_final'] != m['frozen_initial'] or m['adapted_decoder_final'] == m['frozen_initial'] or m['peak_reserved_GiB'] > 75:
             raise ValueError('Changed frozen decoder or failed memory profile')
+        if 'bridge_protocol' in c: m['bridge_state_audits'] = model.state_audits
         if 'flank_protocol' in c: audit_worker(c)
         m.update(status='complete', predictions_sha256=sha(a.output/'predictions.h5'))
     except BaseException as error:

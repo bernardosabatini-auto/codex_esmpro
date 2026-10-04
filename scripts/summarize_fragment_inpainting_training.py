@@ -17,6 +17,7 @@ from evaluate_decoder_fragment_variance import check_backbones
 from fragment_validation_core import raw_rows
 from latentfold.metrics import ca_metrics
 from latentfold.fragment_inpainting import place_fragment, context_mask
+from latentfold.scaffold_bridge import scaffold_anchors
 from compare_extra_fragment_refolds import clustered
 from prepare_overfit import sha
 
@@ -126,6 +127,7 @@ def analyze(run):
                         or not np.isfinite(g['backbone'][:]).all() or not math.isfinite(error) or error > 1e-5 or error != logged['backbone_max_abs']):
                     raise ValueError('Changed zero-adapter masked control')
                 anchors=place_fragment(torch.from_numpy(item['fragment']),torch.from_numpy(references[kind]),item['start']).numpy()
+                if 'bridge_protocol' in c: anchors=scaffold_anchors(torch.from_numpy(references[kind]),torch.from_numpy(anchors),item['keep'][None].expand(4,-1)).numpy()
                 if not np.allclose(g['anchors'][:],anchors,rtol=0,atol=1e-5):raise ValueError('Changed supplied anchor placement')
                 bb0=g['clamped_backbone'][:]
                 if bb0.shape!=(4,n,4,3) or not np.isfinite(bb0).all() or np.max(abs(bb0[:,keep]-anchors[:,keep]))>1e-4 or np.max(abs(bb0.mean((1,2))))>1e-4:raise ValueError('Initial clamped trajectory lost anchors or center')
@@ -180,6 +182,7 @@ def analyze(run):
                     if np.max(abs(bb.mean((1,2))))>1e-4:raise ValueError('Conditional state center drifted')
                     if not arm.endswith('_null'):
                         anchors=place_fragment(torch.from_numpy(item['fragment']),torch.from_numpy(references[kind]),item['start']).numpy()
+                        if 'bridge_protocol' in c: anchors=scaffold_anchors(torch.from_numpy(references[kind]),torch.from_numpy(anchors),item['keep'][None].expand(4,-1)).numpy()
                         if np.max(abs(bb[:,keep]-anchors[:,keep]))>1e-4:raise ValueError('Conditional motif anchors moved')
                 rr = raw_rows(bb, item['fragment'], item['start'], arm, ident, item['family'])
                 for k, r in enumerate(rr):

@@ -22,6 +22,7 @@ def file_stats(c):
 def audit_worker(c):
     if file_stats(c)!=c['cpu_verified_file_stats']:raise ValueError('Flank sources changed after CPU verification')
     if c['context_flank']!=8 or c['flank_spec']!=json.loads(Path(c['flank_protocol']).read_text()):raise ValueError('Changed prospective context flank')
+    if 'bridge_protocol' in c and c['bridge_spec']!=json.loads(Path(c['bridge_protocol']).read_text()):raise ValueError('Changed bridge protocol')
     return c['spec']
 
 
@@ -123,4 +124,7 @@ def augment_report(d,run,m):
         count=cs[0]['refold_eligible_geometry'];d['refold_eligibility']=dict(qualified=count>=45,eligible_complete_geometry=count,required=45)
         d['qualified']=count>=45
     d['scope']='Training-only eight-flank context masking with exact20residue coordinate anchors. Same2000training draws as junction-weighted baseline. Untrained wider-mask controls are new; zero-width controls reproduce historical untrained outputs. CPU closure retains original4residue correction window; require every peptide/CAedge in eight hidden flanks valid as well. Only complete128sample endpoint geometry can license matched refolds; geometry is not designability.'
+    if 'bridge_protocol' in c:
+        from scaffold_bridge_core import augment_report as augment_bridge
+        d = augment_bridge(d, run, m)
     return d

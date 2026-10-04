@@ -11,6 +11,7 @@ def main():
     p.add_argument('--profile-report', type=Path)
     p.add_argument('--junction-weighted', action='store_true')
     p.add_argument('--flank-context', action='store_true')
+    p.add_argument('--scaffold-bridge', action='store_true')
     p.add_argument('--output', type=Path, required=True)
     a = p.parse_args()
     root = Path(__file__).resolve().parents[1]
@@ -32,7 +33,7 @@ def main():
                       ('fragments', bc['fragments']), ('decoder_checkpoint', bc['decoder_checkpoint']),
                       ('diagnostic_manifest', cc['diagnostic_manifest']), ('diagnostic_predictions', cc['diagnostic_predictions'])]:
         c[key] = bind(path)
-    if a.junction_weighted or a.flank_context:
+    if a.junction_weighted or a.flank_context or a.scaffold_bridge:
         c['junction_protocol'] = bind(root/'configs/fragment_junction_weighted_protocol.json')
         c['junction_spec'] = js = json.loads(Path(c['junction_protocol']).read_text())
         c['junction_loss'] = {k: js[k] for k in ('junction_width', 'junction_mass')}
@@ -52,7 +53,7 @@ def main():
         c['work_cap_seconds'] = 60*c['allocation_minutes'] - 120
         c['profile_manifest'] = bind(pr['manifest_path'])
         c['profile_checkpoint'] = bind(Path(pr['manifest_path']).parent/'checkpoint.pt')
-    if a.flank_context:
+    if a.flank_context or a.scaffold_bridge:
         from fragment_flank_core import file_stats
         from fragment_inpainting_core import load_training
         import torch
@@ -68,6 +69,14 @@ def main():
                           ('flank_closure_protocol', root/'configs/fragment_local_closure_canonical_protocol.json'),
                           ('flank_closure_code', root/'src/latentfold/local_closure.py')]:
             c[key] = bind(path)
+        if a.scaffold_bridge:
+            c['bridge_protocol'] = bind(root/'configs/fragment_scaffold_bridge_protocol.json')
+            c['bridge_spec'] = bs = json.loads(Path(c['bridge_protocol']).read_text())
+            previous = root/'runs'/bs['failed_predecessor']
+            for key, path in [('bridge_previous_manifest', previous/'manifest.json'),
+                              ('bridge_previous_report', root/'reports'/(previous.name+'.json')),
+                              ('bridge_reachability', root/'reports/scaffold_bridge_reachability_20261004.json')]:
+                c[key] = bind(path)
         before = file_stats(c)
         cache = a.output.with_suffix('.training.pt')
         if cache.exists(): raise FileExistsError(cache)

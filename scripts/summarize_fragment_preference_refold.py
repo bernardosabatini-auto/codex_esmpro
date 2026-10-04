@@ -27,7 +27,7 @@ def analyze(run):
                 row['scaffold_tm']=usalign_coordinates(c['usalign'],folded[r['name']+'/'+str(k)][:][mask,1],bb[mask,1])
             passing=[k for k in r['successful_refold_indices'] if r['refolds'][k]['scaffold_tm']>.5] if r['raw_gate_passed'] else []
             r.update(scaffold_successful_refold_indices=passing,scaffold_joint_success=bool(passing))
-    skip_preferences=gc.get('oracle_teacher_refold') or spec.get('native_anchor_model_validation') or gc.get('native_positive_coverage') or gc.get('pretrained_masked_refold') or gc.get('scaffold_clock_refold') or gc.get('fragment_decoder_refold') or gc.get('fragment_decoder_fm_refold')
+    skip_preferences=spec.get('repaint_student_model_validation') or gc.get('oracle_teacher_refold') or spec.get('native_anchor_model_validation') or gc.get('native_positive_coverage') or gc.get('pretrained_masked_refold') or gc.get('scaffold_clock_refold') or gc.get('fragment_decoder_refold') or gc.get('fragment_decoder_fm_refold')
     params={} if skip_preferences else {k:spec['preference'][k] for k in ('minimum_quality','discovery_margin','confirmation_margin')}
     if skip_preferences:
         prefs=[]

@@ -40,6 +40,9 @@ def select_sources(spec, inventory, excluded, *, per_bucket=8):
 
 
 def audit_generation(c):
+    if c.get('spec',{}).get('repaint_student_model_validation'):
+        from repaint_student_model_validation import audit_generation as audit_student
+        return audit_student(c)
     if c.get('spec',{}).get('native_anchor_model_validation'):
         from native_anchor_model_validation import audit_generation as audit_model
         return audit_model(c)

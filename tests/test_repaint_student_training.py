@@ -42,7 +42,7 @@ class RepaintStudentTests(unittest.TestCase):
 
     def test_watcher_hook_uses_only_stdlib_on_import(self):
         scripts=Path(__file__).resolve().parents[1]/'scripts'
-        subprocess.run([sys.executable,'-I','-S','-c',f'import sys;sys.path.insert(0,{str(scripts)!r});import compare_repaint_student_training'],check=True,capture_output=True)
+        subprocess.run([sys.executable,'-I','-S','-c',f'import sys;sys.path.insert(0,{str(scripts)!r});import compare_repaint_student_training,compare_repaint_student_models'],check=True,capture_output=True)
 
     def test_ready_command_rejects_unregistered_jobs(self):
         from compare_repaint_student_training import ready_command
@@ -51,6 +51,33 @@ class RepaintStudentTests(unittest.TestCase):
             (root/'runs/repaint_student_training_profiles.json').write_text(json.dumps(dict(jobs=['1','2'])))
             (root/'runs/jobs.json').write_text(json.dumps(dict(jobs=[])))
             with self.assertRaises(ValueError):ready_command(root)
+
+    def test_generation_recipe_preserves_sampler_and_budgets(self):
+        from repaint_student_model_validation import check_recipe
+        root=Path(__file__).resolve().parents[1]
+        base=json.loads((root/'configs/fragment_preference_calibration_protocol.json').read_text())
+        spec=json.loads((root/'configs/repaint_student_model_validation_protocol.json').read_text())
+        check_recipe(spec,base)
+        for key,value in [('num_sequences',16),('steps',100),('seed',1),('condition','f30_center')]:
+            with self.assertRaises(ValueError):check_recipe(dict(spec,**{key:value}),base)
+
+    def test_refold_gate_uses_all_outputs_and_both_upper_bounds(self):
+        from repaint_student_model_validation import require_refold_eligibility
+        d=dict(status='complete',controls=68,records=[dict(raw_gate_passed=i<9,coarse_valid=i<45) for i in range(128)])
+        self.assertTrue(require_refold_eligibility(d)['qualified'])
+        for key,index in [('raw_gate_passed',8),('coarse_valid',44)]:
+            changed=copy.deepcopy(d);changed['records'][index][key]=False
+            with self.assertRaises(ValueError):require_refold_eligibility(changed)
+        with self.assertRaises(ValueError):require_refold_eligibility(dict(d,records=d['records'][:45]))
+
+    def test_student_success_requires_both_controls_and_designability(self):
+        from compare_native_anchor_models import repaint_student_gate
+        parent=dict(strong=8,strong_families=7,designable=45);native=dict(strong=10,strong_families=8,designable=48)
+        candidate=dict(strong=11,strong_families=7,designable=48)
+        self.assertTrue(repaint_student_gate(candidate,parent,native))
+        for key,value in [('strong',10),('strong_families',6),('designable',47)]:
+            self.assertFalse(repaint_student_gate(dict(candidate,**{key:value}),parent,native))
+        self.assertFalse(repaint_student_gate(dict(candidate,designable=44),parent,dict(native,designable=43)))
 
 
 if __name__=='__main__':unittest.main()

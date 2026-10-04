@@ -40,6 +40,9 @@ def audit_inputs(c, *, audited_generation=None):
         old_gc,spec=audited_generation
         if gc!=old_gc or gc['spec']!=spec:raise ValueError('Changed previously audited generation')
     d=json.loads(Path(c['generation_report']).read_text());native=bool(spec.get('native_anchor_calibration'));count=16 if native else 32
+    if spec.get('repaint_student_model_validation'):
+        from repaint_student_model_validation import require_refold_eligibility
+        require_refold_eligibility(d)
     if (gm['status']!='complete' or d['status']!='complete' or d['controls']!=4+2*count
             or d['manifest_sha256']!=c['generation_manifest_sha256']
             or d['predictions_sha256']!=c['generated_predictions_sha256']
@@ -95,6 +98,9 @@ def main():
     p.add_argument('--output-prefix',type=Path,required=True);a=p.parse_args()
     root=Path(__file__).resolve().parents[1];run=a.generation.resolve()
     gm=json.loads((run/'manifest.json').read_text());gc=gm['config'];spec=audit_generation(gc);native=bool(spec.get('native_anchor_calibration'))
+    if spec.get('repaint_student_model_validation'):
+        from repaint_student_model_validation import require_refold_eligibility
+        require_refold_eligibility(json.loads((root/'reports'/(run.name+'.json')).read_text()))
     profile=root/'runs'/spec['refold_profile'];prior=json.loads((profile/'manifest.json').read_text())['config']
     for partition in range(4):
         path=Path(str(a.output_prefix)+f'_{partition}.json').resolve();inputs=path.with_suffix('.h5')

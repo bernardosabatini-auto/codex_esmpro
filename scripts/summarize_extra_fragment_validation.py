@@ -44,6 +44,12 @@ def analyze(run):
     if spec.get('native_anchor_calibration'):
         from native_anchor_calibration import score_native_decodes
         result.update(score_native_decodes(run,m,new))
+    if spec.get('repaint_student_model_validation'):
+        labels=set(c['label_target_ids']);result['label_cohorts']=[]
+        for name,wanted in [('label_families',labels),('other_training_families',set(c['target_ids'])-labels)]:
+            rr=[r for r in records if r['target_id'] in wanted]
+            result['label_cohorts'].append(dict(cohort=name,families=len(wanted),samples=len(rr),valid=sum(r['coarse_valid'] for r in rr),raw=sum(r['raw_gate_passed'] for r in rr)))
+        result['refold_eligibility']=dict(qualified=sum(r['raw_gate_passed'] for r in records)>=9 and sum(r['coarse_valid'] for r in records)>=45,raw=sum(r['raw_gate_passed'] for r in records),valid=sum(r['coarse_valid'] for r in records))
     return result
 
 

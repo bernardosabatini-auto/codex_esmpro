@@ -46,3 +46,22 @@ The next bounded profile checks omission of ESMFold2-Fast's confidence head, cal
 Job50324704 completed0:0 in4:08 on one RTX. The independent audit checked all64 saved full-atom outputs: coordinates were exactly equal across modes and repeats; historical CA parity also passed. Timed folds took64.320s with confidence and62.480s without, a2.860% reduction. Each bucket improved1.4–3.1%; peak allocated memory remained29.344GiB. This falls below the predeclared5% adoption threshold, so the optimization is retained as an audited candidate and is not enabled in scientific refolding. No repeat sweep or precision change is warranted for this small effect. CPU scoring overlap remains enabled and verified; its speedup has not been isolated in a matched timing experiment.
 
 The complete teacher assay qualified a separate small isolated-input student-label pilot:13 strict completions in9 families versus parent8 in7;57 designable versus45. All13 qualified latent targets have been exported with identical isolated-fragment inputs for a matched-native control. No student jobs have been launched yet.
+
+## Matched student refolds, completed October 4 UTC
+
+All eight student partitions completed successfully: 2,048 refolds using at most eight RTX GPUs. UUID-verified captures contain 5587 complete one-second samples; their sample-weighted composite is 42.29%. This excludes recorder startup and is not an estimate of the account-wide 24-hour dashboard.
+
+| Own job | Captured seconds | Weighted Real Util |
+|---|---:|---:|
+|50337439|712|42.85%|
+|50337653|665|41.79%|
+|50337903|771|43.07%|
+|50337942|642|41.48%|
+|50337517|715|42.66%|
+|50337789|670|41.38%|
+|50337919|772|43.11%|
+|50337963|640|41.61%|
+
+CPU scoring ran concurrently with inference, with only 1.60–2.20 seconds total waiting per partition. All jobs retained deterministic FP32, fixed sequence budgets, and standard confidence computation. A matched omission-of-confidence test saved only 2.86%, below its predeclared adoption threshold. Scheduling overhead was also reduced by reusing finalized terminal-job evidence and excluding historical reports/tests from runtime snapshots; scientific runtime sources remain frozen. No extra computation was added to raise utilization.
+
+These eight jobs peaked at 28.92–30.36 GiB of device memory on approximately 95 GiB RTX devices, measured by assigned-UUID NVML samples. Spare capacity is not DRAM utilization; using more memory without higher validated throughput is not an optimization.

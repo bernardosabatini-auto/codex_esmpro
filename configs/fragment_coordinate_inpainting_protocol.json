@@ -1,0 +1,54 @@
+{
+  "status": "prospective; implementation and numerical qualification required before GPU submission",
+  "purpose": "Train the coordinate decoder with isolated motif atoms present as a fixed part of the noisy state, rather than only intrinsic token/pair features.",
+  "prerequisite": "The fixed RePaint endpoint student comparison is complete and fails its predeclared advancement rule. Do not extend or sweep that student recipe.",
+  "parent": "fragment_training_50106855",
+  "baseline_generation": "extra_fragment_validation_50188437",
+  "closed_decoder": "fragment_decoder_fm_training_50301053",
+  "closed_decoder_diagnostic": "fragment_decoder_integrator_50310363",
+  "conditions": [
+    "c20_left",
+    "c20_center",
+    "c20_right"
+  ],
+  "architecture": "Fresh private copy of the original pretrained ProteinAE decoder, plus the existing zero-initialized isolated fragment token/pair adapters. Freeze original codec and generator. Train private decoder and adapters; never initialize from the failed adapted decoder.",
+  "context": "Mask all eight latent channels at supplied motif residues. Remaining native latent context is training supervision context; archived parent-generated context is the deployable evaluation input. No native scaffold coordinates, full sequence or full-context motif codes at deployment.",
+  "placement": "Proper FP64 all-backbone-atom Kabsch alignment of supplied N/CA/C/O fragment to the matching region of a parent-generated backbone, after centering that complete generated backbone. Retain the exact supplied fragment geometry. For supervised training, use its corresponding target frame; native placement in evaluation is explicitly oracle-only. Reject degenerate/rank-deficient placement, reflections and malformed inputs. Prove invariance to rigid changes of supplied fragment pose.",
+  "conditional_state": "Known motif atoms are held at their placed coordinates in nm at every network call and update. Unknown initial coordinates are independent Gaussian draws projected to zero unknown mean, then translated by minus the sum of known positions divided by unknown atom count. This gives a zero-center complete state without moving the known atoms. Interpolate only unknown coordinates toward the centered supervised target. Project predicted unknown velocities to zero mean. Never recenter the full state after clamping.",
+  "loss": "Original time-weighted clean-coordinate flow-matching error, averaged over unknown atoms only. Known atoms have zero loss and are not counted as evidence of learning. No new geometric penalty or boundary weighting. With fragment dropout, all atoms become unknown and both token/pair conditioning and coordinate anchors are removed; motif latent codes remain masked.",
+  "time_distribution": "98 percent Beta(1.9,1), 2 percent Uniform, as the original decoder experiment.",
+  "seed": 2026100461,
+  "sampling_seed": 2026100405,
+  "profile_updates": 40,
+  "updates": 2000,
+  "decoder_steps": 3,
+  "condition_dropout": 0.15,
+  "batches": {
+    "128": 64,
+    "256": 32,
+    "384": 16,
+    "512": 8
+  },
+  "decoder_learning_rate": 3e-05,
+  "adapter_learning_rate": 0.0003,
+  "optimizer": {
+    "name": "AdamW",
+    "betas": [
+      0.9,
+      0.95
+    ],
+    "weight_decay": 0.01,
+    "gradient_clip": 1.0
+  },
+  "schedule": "40-step warmup, cosine to 0.1 floor over 2000 updates, EMA 0.99. The profile is the identical first 40 steps. Fixed final endpoint only.",
+  "data": "Original 512 training proteins, three isolated 20-residue placements, uniform protein within cycled length buckets with independent replicate noise/time/placement/dropout. Keep all previous failures and locked tests untouched.",
+  "profile_controls": "One RTX. Independently verify original decoder and generator unchanged; initialization, saved EMA reload, every available checkpoint/direct gradient, nonzero trainable gradients, matched profile/full first40 draws, supplied-pose invariance, latent-mask nonleakage, anchor retention and center conservation. In the null branch, altered hidden fragment features/coordinates must not affect predictions. Record actual memory and training throughput; qualify bounded full runtime before expansion.",
+  "evaluation": "All32 original training diagnostic proteins, four original noises, same frozen parent latent inputs. Original parent and native-direct historical outputs must reproduce. Save untrained-clamp generated/native controls before training; final trained-clamp generated/native and trained-null generated/native outputs. No filter, retry, ranking or checkpoint selection. Geometry and motif are separate; exact coordinate clamping alone cannot demonstrate learning.",
+  "refold_eligibility": {
+    "generated_cond_min_raw": 9,
+    "generated_cond_min_valid": 45
+  },
+  "refolding": "Only numerically complete and logically eligible final models proceed. Refold all128 trained-clamp outputs and all128 untrained-clamp controls with eight fixed-motif CA-only ProteinMPNN designs each and unchanged deterministic FP32 ESMFold2-Fast. Native/parent historical budgets reused without pooling. Retain failures. The same valid refold must retain motif proper CA RMSD<=1A and dRMS<=1A, globalTM>0.5 and scaffoldTM>0.5; raw geometry/motif gate also required.",
+  "decision": "Require more strict successes than both original parent and untrained clamp, at least7 successful families, and at least45 designable outputs without loss versus untrained clamp. Report paired family bootstrap, overlap, per-length and full failure denominators, and diversity among strict successes. A pass licenses a separately specified fresh-noise/placement replication, not a generalization claim. Failure closes this fixed recipe.",
+  "resources": "One RTX profile and one measured-runtime RTX training job; at most8 own running-plus-pending GPUs overall. Bound sources, register exact jobs and completion audits, preserve FP32 and capture assigned-UUID DCGM counters. No jobs until implementation and tests pass."
+}

@@ -1,0 +1,40 @@
+{
+  "status": "Prospective; CPU tests and one four-protein RTX profile before full panel",
+  "purpose": "Allow the whole scaffold latent context to respond to the ORIGINAL supplied fragment, using the frozen autoencoder and explicitly conditioned decoder.",
+  "prerequisite": "Complete compatible-fragment diagnostic50364419 passes its103/128restoration criterion:127/128generated compatible closures versus30/128with the desired fragment. This licenses global scaffold remodeling; artificial compatible inputs are never promoted as scaffolding successes.",
+  "source_training": "fragment_inpainting_training_50356015",
+  "source_closure": "local_closure_canonical_full_20261004",
+  "compatible_diagnostic": "compatible_fragment_50364419",
+  "models": [
+    "trained",
+    "untrained"
+  ],
+  "rounds": 3,
+  "reported_rounds": [
+    1,
+    3
+  ],
+  "primary_round": 3,
+  "starting_backbones": "All128existing CPU-closed generated_cond backbones fortrained and128CPU-closed generated_untrained backbones foruntrained, including failures. Same32training proteins and four archived decoder noises. No native scaffold coordinates enter either generated arm.",
+  "initial_frame": "Subtract the complete starting backbone atom mean once, translating the entire structure rigidly. Copy its supplied20motif atoms into sparse fixed anchors in this centered frame. Do not PCA-canonicalize or rotate whole-chain latent channels. Known geometry and supplied sequence remain the original requested fragment, not the compatible-parent diagnostic fragment.",
+  "iteration": "At each of exactlythree rounds, encode the CURRENT complete generated backbone with the frozen original ProteinAE encoder and apply the existing per-residue layer_norm over8channels. Decode that refreshed context with the frozen trained or untrained inpainting decoder, original isolated-fragment features, unchanged sparse anchors and the original per-protein/per-slot Gaussian noise. Mask all20motif latent positions in the decoder exactly as before. Only context changes; no latent averaging, random restarts, sequence guidance, teacher calls, training or independent native coordinates.",
+  "global_freedom": "All scaffold positions may move through refreshed latent context; the previous four-residue window is only the final local-closure correction, not a restriction on these GPU updates. All supplied motif atoms stay fixed throughout the three decoder passes.",
+  "controls": "Profile the first original protein from each128/256/384/512bucket, allfour noise slots and both models. Verify archived desired-decoder and original-decoder replays, checkpoint/encoder weights unchanged, exact masked-code/noise nonleakage, anchor retention, centered state, and proper supplied-input pose invariance. Repeat a fixed context with identical inputs/noise to prove deterministic output; save every round input, normalized latent and output. Verify profile/full outputs match exactly on allfour profile proteins. No fresh sample selection.",
+  "encoder_frame_control": "Before iteration, original frozenAE re-encodes and decodes the16profile original parent backbones and16native_direct backbones, with the same original noise. Report proper versus centeredCA error; at least15/16percohort must be coarse-valid with properCA RMSD<=1A, and centeredCA error may not exceed properCA error by>.1A. Native data is isolated oracle-only validation, never a generated-arm input. Failure stops qualification rather than changing frame conventions.",
+  "cpu_assay": "After GPU release, independently score all final outputs and apply the EXACT canonical localclosure solver, with original generated-parent bond/angle targets. Keep the current coarse/motif/junction/complete-local-geometry thresholds. Report all failures, every covalent bond touching the editable flanks, and global scaffold displacement. The round1outcomes are explanatory only; only prespecified round3can qualify.",
+  "qualification": "All numerical controls and runtime/memory bounds must pass. Atleast45/128trained round3outputs must meet the unchanged complete geometry gate after closure; do not promote round1 ifround3fails. Preserve untrained matched controls. The failed prior closure recipe remains failed.",
+  "refolding": "Only a qualified round3endpoint permits a separately bound full128backbones x8fixed-motifMPNNdesign/refold assay, with matched untrained and historicalparent controls. Require the SAME valid refold to retain the ORIGINAL supplied motif and demonstrate global+scaffold agreement and junction continuity. Preserve all design attempts and native controls. More than8strict successes,atleast7families,andatleast45connected designable outputs remain the advancement requirements.",
+  "resources": {
+    "gpus": 1,
+    "hardware": "RTX",
+    "precision": "fp32",
+    "decoder_steps": 3,
+    "profile_allocation_minutes": 10,
+    "profile_work_cap_seconds": 480,
+    "max_full_allocation_minutes": 20,
+    "cpu_closure_cap_seconds": 1200,
+    "max_peak_reserved_gib": 75
+  },
+  "cost": "Report incremental encoder/decoder and CPUclosure cost separately. Cached starts do not establish end-to-end speed. No fast-inference or generalization claim from this training-only diagnostic; a later deployment path must include original generation and all correction costs.",
+  "failure_policy": "No duration/round-count/window/strength sweep. Preserve all negative results, avoid locked tests, and register/monitor only own jobs under the eight-GPU running+pending cap."
+}

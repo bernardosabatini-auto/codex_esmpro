@@ -28,14 +28,30 @@ def require_clock_quality(d,spec):
         raise ValueError('Predeclared whole-chain capacity/geometry gate failed')
 
 
+def require_decoder_quality(d,spec):
+    from fragment_decoder_training_core import refold_eligibility
+    if (d.get('status')!='complete' or d.get('profile_only') or not d.get('fragment_decoder')
+            or d.get('pretrained_masked') or d.get('scaffold_clock')
+            or not d.get('numerically_qualified') or d.get('updates')!=spec['updates']):
+        raise ValueError('Completed audited full fragment-decoder experiment required')
+    ids=sorted({r['target_id'] for r in d['records']})
+    gate=refold_eligibility(d['summary'],d['records'],ids,spec)
+    if not gate['qualified'] or gate!=d.get('refold_eligibility') or not d.get('qualified'):
+        raise ValueError('Fragment decoder cannot meet declared same-refold counts')
+
+
 def study_of(c):
-    studies=[s for s in ('pretrained_masked','scaffold_clock') if c.get(s+'_refold') is True]
+    studies=[s for s in ('pretrained_masked','scaffold_clock','fragment_decoder') if c.get(s+'_refold') is True]
     if len(studies)!=1:raise ValueError('Exactly one bound repair study required')
     return studies[0]
 
 
 def qualify_training(gc,d,study,*,audit_sources=True):
-    if study=='scaffold_clock':
+    if study=='fragment_decoder':
+        from fragment_decoder_training_core import audit as audit_decoder
+        if audit_sources:audit_decoder(gc)
+        require_decoder_quality(d,gc['spec'])
+    elif study=='scaffold_clock':
         from scaffold_clock_training_core import audit as audit_clock
         if audit_sources:audit_clock(gc)
         require_clock_quality(d,gc['spec'])
@@ -59,7 +75,7 @@ def audit_refold(c,*,audited_generation=None):
     result=dict(gc,arm=c['arm'],prediction_group=c['arm'],native_sources=original['native_sources']);result[study+'_refold']=True
     if audited_generation is not None and audited_generation!=(result,spec):raise ValueError('Changed previously audited masked generation')
     if (gm['status']!='complete' or gm['config']['profile_only'] or d['manifest_sha256']!=c['generation_manifest_sha256'] or d['predictions_sha256']!=c['generated_predictions_sha256'] or gm['predictions_sha256']!=c['generated_predictions_sha256']
-        or d['protocol_sha256']!=c['protocol_sha256'] or c['protocol']!=gc['protocol'] or d['controls']!=128
+        or d['protocol_sha256']!=c['protocol_sha256'] or c['protocol']!=gc['protocol'] or d['controls']!=(192 if study=='fragment_decoder' else 128)
         or bm['status']!='complete' or bd['status']!='complete' or bd['manifest_sha256']!=c['baseline_refold_manifest_sha256'] or bd['completed_refolds']!=256
         or bc['generation_manifest']!=gc['baseline_manifest'] or bc['generated_predictions']!=gc['baseline_predictions']
         or original['arm']!='parent6000' or original['selected']!=gc['selected'] or c['assay']!='fragment_preference_refold'
@@ -81,7 +97,7 @@ def audit_refold(c,*,audited_generation=None):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--study',choices=('pretrained_masked','scaffold_clock'),default='pretrained_masked');p.add_argument('--generation',type=Path,required=True);p.add_argument('--baseline-run',type=Path,required=True);p.add_argument('--output-prefix',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];run=a.generation.resolve();base=a.baseline_run.resolve()
+    p=argparse.ArgumentParser();p.add_argument('--study',choices=('pretrained_masked','scaffold_clock','fragment_decoder'),default='pretrained_masked');p.add_argument('--generation',type=Path,required=True);p.add_argument('--baseline-run',type=Path,required=True);p.add_argument('--output-prefix',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1];run=a.generation.resolve();base=a.baseline_run.resolve()
     gm=json.loads((run/'manifest.json').read_text());gc=gm['config'];report=root/'reports'/(run.name+'.json');qualify_training(gc,json.loads(report.read_text()),a.study);prior=json.loads((base/'manifest.json').read_text())['config']
     for arm in ('generated_cond','generated_null'):
         cached=None

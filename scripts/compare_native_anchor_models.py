@@ -90,8 +90,9 @@ def compare(plan,root):
     from prepare_fragment_preference_refold import audit_inputs,TEACHER_KEYS
     from prepare_overfit import sha
     coverage=bool(plan.get('positive_coverage_comparison'))
-    clock=bool(plan.get('scaffold_clock_comparison'));masked=bool(plan.get('pretrained_masked_comparison')) or clock
-    if sum(bool(plan.get(k)) for k in ('positive_coverage_comparison','pretrained_masked_comparison','scaffold_clock_comparison'))>1:raise ValueError('Ambiguous comparison family')
+    decoder=bool(plan.get('fragment_decoder_comparison'))
+    clock=bool(plan.get('scaffold_clock_comparison'));masked=bool(plan.get('pretrained_masked_comparison')) or clock or decoder
+    if sum(bool(plan.get(k)) for k in ('positive_coverage_comparison','pretrained_masked_comparison','scaffold_clock_comparison','fragment_decoder_comparison'))>1:raise ValueError('Ambiguous comparison family')
     candidates=('generated_null','generated_cond') if masked else (('positive','positive_coverage') if coverage else ('positive','contrastive'))
     if set(plan['jobs'])!=set(candidates):raise ValueError('Changed comparison arms')
     if coverage:
@@ -133,7 +134,7 @@ def compare(plan,root):
     base=generations['parent6000']['config']
     for arm in candidates:
         gc=generations[arm]['config']
-        if masked and gc.get(('scaffold_clock' if clock else 'pretrained_masked')+'_refold') is not True:raise ValueError('Wrong repair model family')
+        if masked and gc.get(('fragment_decoder' if decoder else ('scaffold_clock' if clock else 'pretrained_masked'))+'_refold') is not True:raise ValueError('Wrong repair model family')
         if gc['selected']!=base['selected'] or gc['native_sources']!=base['native_sources']:raise ValueError('Changed targets or reused native budgets')
         if sha(generations[arm]['generation_manifest'])!=plan['generation_manifest_sha256'][arm]:raise ValueError('Changed declared generation')
         for part in range(4):
@@ -163,6 +164,8 @@ def compare(plan,root):
     if masked:
         if (reference['strong'],reference['strong_families'],reference['designable'])!=(8,7,45):raise ValueError('Changed declared masked-flow comparator')
         qualified={'generated_cond':qualified['generated_cond']}
+    if decoder:
+        qualified={'generated_cond':fragment_decoder_gate(totals['generated_cond'],reference,totals['generated_null'])}
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=3) as pool:
         tasks={arm:pool.submit(diversity,generations[arm],rows,configs[arm,0]['usalign'],plan.get('diversity',{}).get(arm)) for arm,rows in arms.items()}
@@ -170,8 +173,14 @@ def compare(plan,root):
     return dict(status='complete',training_only=True,source_reports=sources,summary=summary,contrasts=contrasts,
                 development_screen_qualified=qualified,new_refolds=1024 if coverage else 2048,reused_refolds=2048 if coverage else 1024,native=prior['native'],
                 diversity=diversity_results,reused_diversity=plan.get('diversity',{}),
-                scope=('Repeated32training-protein diagnostic; whole-chain adjustment trained on original512 proteins. ' if clock else ('Repeated32training-protein diagnostic; masked repair trained on original512 proteins. ' if masked else ('Repeated32training-protein diagnostic; disjoint from16original and64new qualification sources. ' if coverage else 'Repeated32training-protein diagnostic; disjoint from16anchor-source proteins. ')))+
+                scope=('Repeated32training-protein diagnostic; coordinate-decoder conditioning trained on original512 proteins. ' if decoder else ('Repeated32training-protein diagnostic; whole-chain adjustment trained on original512 proteins. ' if clock else ('Repeated32training-protein diagnostic; masked repair trained on original512 proteins. ' if masked else ('Repeated32training-protein diagnostic; disjoint from16original and64new qualification sources. ' if coverage else 'Repeated32training-protein diagnostic; disjoint from16anchor-source proteins. '))))+
                       'Not independent generalization. All128samples/arm and8designs/sample retained. Same valid refold must satisfy motif/global/scaffold gates. Native budgets reused unchanged; teacher RNG not claimed paired. Bootstrap describes family variation, not training-seed replication. Qualification permits a separate development assay only.')
+
+
+def fragment_decoder_gate(candidate,parent,null):
+    return (candidate['strong']>max(parent['strong'],null['strong'])
+            and candidate['strong_families']>=parent['strong_families']
+            and candidate['designable']>=parent['designable'])
 
 
 def positive_coverage_gate(candidate,parent,positive):
@@ -192,6 +201,7 @@ def write_comparison(a):
     lines=['# Native-anchor model diagnostic','',d['scope'],'','|Arm|Raw /128|Strong /128|Designable /128|Successful families|','|---|---:|---:|---:|---:|']
     if json.loads(a.plan.read_text()).get('pretrained_masked_comparison'):lines[0]='# Pretrained masked-flow model diagnostic'
     if json.loads(a.plan.read_text()).get('scaffold_clock_comparison'):lines[0]='# Whole-chain scaffold-clock model diagnostic'
+    if json.loads(a.plan.read_text()).get('fragment_decoder_comparison'):lines[0]='# Fragment-conditioned coordinate-decoder diagnostic'
     for r in d['summary']:
         if r['bucket'] is None:lines.append(f"|{r['arm']}|{r['raw']}|{r['strong']}|{r['designable']}|{r['strong_families']}|")
     lines.extend(['','Development-screen qualification: '+json.dumps(d['development_screen_qualified'])])

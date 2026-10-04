@@ -58,3 +58,10 @@ before submission, checks bound file metadata at GPU startup/end, and independen
 rehashes and scores outputs on CPU after allocation release. Its source verification
 is not billed to GPU time. This preparation pattern preserves content audits without
 repeating the full input scan inside the GPU allocation.
+
+Wider-context-mask training50376770 completed2,000updates in698.46s, released one
+RTX after13:25 and reserved37.17GiB. Assigned-UUID DCGM measured50.37% composite
+over746valid seconds:84.56%SM,57.37%DRAM,93.03%graphics engine and0%tensor. This
+is captured activity, not the account24-hour metric. Full run source verification
+and training-data preparation occurred before allocation; independent scoring and
+all256generated/control CPUclosures run after GPU release.

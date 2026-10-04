@@ -90,11 +90,12 @@ def compare(plan,root):
     from prepare_fragment_preference_refold import audit_inputs,TEACHER_KEYS
     from prepare_overfit import sha
     coverage=bool(plan.get('positive_coverage_comparison'));repaint=bool(plan.get('repaint_student_comparison'))
+    inpainting=bool(plan.get('fragment_inpainting_comparison'))
     decoder_fm=bool(plan.get('fragment_decoder_fm_comparison'))
-    decoder=bool(plan.get('fragment_decoder_comparison')) or decoder_fm
+    decoder=bool(plan.get('fragment_decoder_comparison')) or decoder_fm or inpainting
     clock=bool(plan.get('scaffold_clock_comparison'));masked=bool(plan.get('pretrained_masked_comparison')) or clock or decoder
-    if sum(bool(plan.get(k)) for k in ('repaint_student_comparison','positive_coverage_comparison','pretrained_masked_comparison','scaffold_clock_comparison','fragment_decoder_comparison','fragment_decoder_fm_comparison'))>1:raise ValueError('Ambiguous comparison family')
-    candidates=('native_matched','repaint_positive') if repaint else (('generated_null','generated_cond') if masked else (('positive','positive_coverage') if coverage else ('positive','contrastive')))
+    if sum(bool(plan.get(k)) for k in ('repaint_student_comparison','positive_coverage_comparison','pretrained_masked_comparison','scaffold_clock_comparison','fragment_decoder_comparison','fragment_decoder_fm_comparison','fragment_inpainting_comparison'))>1:raise ValueError('Ambiguous comparison family')
+    candidates=('generated_untrained','generated_cond') if inpainting else ('native_matched','repaint_positive') if repaint else (('generated_null','generated_cond') if masked else (('positive','positive_coverage') if coverage else ('positive','contrastive')))
     if set(plan['jobs'])!=set(candidates):raise ValueError('Changed comparison arms')
     if coverage:
         old_path=root/'reports/native_anchor_model_comparison_20261003.json'
@@ -136,7 +137,7 @@ def compare(plan,root):
     for arm in candidates:
         gc=generations[arm]['config']
         if repaint and gc['spec'].get('repaint_student_model_validation') is not True:raise ValueError('Wrong isolated student model lineage')
-        if masked and gc.get(('fragment_decoder_fm' if decoder_fm else ('fragment_decoder' if decoder else ('scaffold_clock' if clock else 'pretrained_masked')))+'_refold') is not True:raise ValueError('Wrong repair model family')
+        if masked and gc.get(('fragment_inpainting' if inpainting else 'fragment_decoder_fm' if decoder_fm else ('fragment_decoder' if decoder else ('scaffold_clock' if clock else 'pretrained_masked')))+'_refold') is not True:raise ValueError('Wrong repair model family')
         if gc['selected']!=base['selected'] or gc['native_sources']!=base['native_sources']:raise ValueError('Changed targets or reused native budgets')
         if sha(generations[arm]['generation_manifest'])!=plan['generation_manifest_sha256'][arm]:raise ValueError('Changed declared generation')
         for part in range(4):
@@ -166,8 +167,10 @@ def compare(plan,root):
     if masked:
         if (reference['strong'],reference['strong_families'],reference['designable'])!=(8,7,45):raise ValueError('Changed declared masked-flow comparator')
         qualified={'generated_cond':qualified['generated_cond']}
-    if decoder:
+    if decoder and not inpainting:
         qualified={'generated_cond':fragment_decoder_gate(totals['generated_cond'],reference,totals['generated_null'])}
+    if inpainting:
+        qualified={'generated_cond':inpainting_gate(totals['generated_cond'],reference,totals['generated_untrained'])}
     label_cohorts=[];overlaps=[]
     if repaint:
         if (reference['strong'],reference['strong_families'],reference['designable'])!=(8,7,45):raise ValueError('Changed parent baseline')
@@ -190,6 +193,12 @@ def compare(plan,root):
                 diversity=diversity_results,reused_diversity=plan.get('diversity',{}),label_cohorts=label_cohorts,overlaps=overlaps,
                 scope=('Repeated32training-protein diagnostic; isolated-input adapter trained on13 selected labels in9 of these families, with23 other training families. ' if repaint else ('Repeated32training-protein diagnostic; coordinate-decoder conditioning trained on original512 proteins. ' if decoder else ('Repeated32training-protein diagnostic; whole-chain adjustment trained on original512 proteins. ' if clock else ('Repeated32training-protein diagnostic; masked repair trained on original512 proteins. ' if masked else ('Repeated32training-protein diagnostic; disjoint from16original and64new qualification sources. ' if coverage else 'Repeated32training-protein diagnostic; disjoint from16anchor-source proteins. ')))))+
                       'Not independent generalization. All128samples/arm and8designs/sample retained. Same valid refold must satisfy motif/global/scaffold gates. Native budgets reused unchanged; teacher RNG not claimed paired. Bootstrap describes family variation, not training-seed replication. Qualification permits a separate development assay only.')
+
+
+def inpainting_gate(candidate,parent,untrained):
+    return (candidate['strong']>max(parent['strong'],untrained['strong'])
+            and candidate['strong_families']>=parent['strong_families']
+            and candidate['designable']>=max(parent['designable'],untrained['designable']))
 
 
 def fragment_decoder_gate(candidate,parent,null):
@@ -225,6 +234,7 @@ def write_comparison(a):
     if json.loads(a.plan.read_text()).get('fragment_decoder_comparison'):lines[0]='# Fragment-conditioned coordinate-decoder diagnostic'
     if json.loads(a.plan.read_text()).get('fragment_decoder_fm_comparison'):lines[0]='# Full fragment-conditioned decoder denoising diagnostic'
     if json.loads(a.plan.read_text()).get('repaint_student_comparison'):lines[0]='# Isolated-fragment RePaint endpoint student'
+    if json.loads(a.plan.read_text()).get('fragment_inpainting_comparison'):lines[0]='# Fixed-fragment coordinate-inpainting diagnostic'
     for r in d['summary']:
         if r['bucket'] is None:lines.append(f"|{r['arm']}|{r['raw']}|{r['strong']}|{r['designable']}|{r['strong_families']}|")
     lines.extend(['','Development-screen qualification: '+json.dumps(d['development_screen_qualified'])])

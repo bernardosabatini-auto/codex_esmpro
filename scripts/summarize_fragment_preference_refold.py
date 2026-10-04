@@ -27,7 +27,7 @@ def analyze(run):
                 row['scaffold_tm']=usalign_coordinates(c['usalign'],folded[r['name']+'/'+str(k)][:][mask,1],bb[mask,1])
             passing=[k for k in r['successful_refold_indices'] if r['refolds'][k]['scaffold_tm']>.5] if r['raw_gate_passed'] else []
             r.update(scaffold_successful_refold_indices=passing,scaffold_joint_success=bool(passing))
-    skip_preferences=spec.get('repaint_student_model_validation') or gc.get('oracle_teacher_refold') or spec.get('native_anchor_model_validation') or gc.get('native_positive_coverage') or gc.get('pretrained_masked_refold') or gc.get('scaffold_clock_refold') or gc.get('fragment_decoder_refold') or gc.get('fragment_decoder_fm_refold')
+    skip_preferences=spec.get('repaint_student_model_validation') or gc.get('oracle_teacher_refold') or spec.get('native_anchor_model_validation') or gc.get('native_positive_coverage') or gc.get('pretrained_masked_refold') or gc.get('scaffold_clock_refold') or gc.get('fragment_decoder_refold') or gc.get('fragment_decoder_fm_refold') or gc.get('fragment_inpainting_refold')
     params={} if skip_preferences else {k:spec['preference'][k] for k in ('minimum_quality','discovery_margin','confirmation_margin')}
     if skip_preferences:
         prefs=[]
@@ -64,6 +64,7 @@ def analyze(run):
         result.update(fragment_decoder_fm_refold=True,arm=gc['arm'])
     if gc.get('oracle_teacher_refold'):
         result.update(oracle_teacher_refold=True,arm=gc['arm'])
+    if gc.get('fragment_inpainting_refold'):result.update(fragment_inpainting_refold=True,arm=gc['arm'])
     return result
 
 
@@ -85,6 +86,7 @@ def main():
         if d.get('fragment_decoder_refold'):title='Fragment-conditioned coordinate-decoder refolding'
         if d.get('oracle_teacher_refold'):title='Oracle RePaint teacher fixed-motif refolds'
         if d.get('fragment_decoder_fm_refold'):title='Full fragment-conditioned decoder denoising refolds'
+        if d.get('fragment_inpainting_refold'):title='Fixed-fragment coordinate-inpainting refolds'
         a.output.with_suffix('.md').write_text('# '+title+'\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','preferences')},indent=2)+'\n```\n')
 
 

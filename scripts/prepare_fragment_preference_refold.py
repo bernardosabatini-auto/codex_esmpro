@@ -25,7 +25,7 @@ def audit_inputs(c, *, audited_generation=None):
     if c.get('oracle_teacher_refold'):
         from fragment_repaint_teacher_refolding import audit_refold
         return audit_refold(c,audited_generation=audited_generation)
-    if c.get('pretrained_masked_refold') or c.get('scaffold_clock_refold') or c.get('fragment_decoder_refold') or c.get('fragment_decoder_fm_refold'):
+    if c.get('pretrained_masked_refold') or c.get('scaffold_clock_refold') or c.get('fragment_decoder_refold') or c.get('fragment_decoder_fm_refold') or c.get('fragment_inpainting_refold'):
         from pretrained_masked_refolding import audit_refold
         return audit_refold(c,audited_generation=audited_generation)
     if c.get('native_positive_coverage'):

@@ -46,3 +46,15 @@ This changes no model or sampling setting. It avoids GPU allocation during the r
 hash scan; the speedup of that startup change was not separately timed. Existing
 scientific refolding still uses its original input-validation path until a future
 qualified pipeline applies this preparation pattern.
+
+The compatible-fragment diagnostic50364419 used one RTX for1:13 and generated512
+backbones in a58.44s worker. Its short capture measured32.19% composite over20valid
+seconds (SM54.57%,DRAM31.38%,tensor0). The subsequent281.86s of closure solver
+work ran on CPU after GPU release. Short necessary diagnostics carry proportionally
+more startup overhead; prolonging them would waste allocated GPU time.
+
+The new context-refresh frame preflight likewise verifies source content on CPU
+before submission, checks bound file metadata at GPU startup/end, and independently
+rehashes and scores outputs on CPU after allocation release. Its source verification
+is not billed to GPU time. This preparation pattern preserves content audits without
+repeating the full input scan inside the GPU allocation.

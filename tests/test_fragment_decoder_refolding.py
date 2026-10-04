@@ -56,6 +56,29 @@ class DecoderRefoldTests(unittest.TestCase):
         for other in ('scaffold_clock','pretrained_masked'):
             with self.assertRaises(ValueError): study_of(dict(fragment_decoder_refold=True,**{other+'_refold':True}))
 
+    def test_fm_study_cannot_be_confused_with_frozen_decoder_adapter(self):
+        spec,d=fixture()
+        d['fragment_decoder_fm']=True; del d['fragment_decoder']
+        require_decoder_quality(d,spec,study='fragment_decoder_fm')
+        with self.assertRaises(ValueError): require_decoder_quality(d,spec)
+        with patch('fragment_decoder_fm_core.audit') as audit:
+            qualify_training(dict(spec=spec),d,'fragment_decoder_fm')
+            audit.assert_called_once()
+        self.assertEqual(study_of(dict(fragment_decoder_fm_refold=True)),'fragment_decoder_fm')
+        with self.assertRaises(ValueError): study_of(dict(fragment_decoder_fm_refold=True,fragment_decoder_refold=True))
+        d['fragment_decoder']=True
+        with self.assertRaises(ValueError): require_decoder_quality(d,spec,study='fragment_decoder_fm')
+
+    def test_fm_watcher_waits_for_declared_registered_jobs(self):
+        from compare_fragment_decoder_fm_models import ready_command as ready_fm
+        with tempfile.TemporaryDirectory() as t:
+            root=Path(t); (root/'runs').mkdir(); (root/'reports').mkdir()
+            self.assertIsNone(ready_fm(root))
+            plan=dict(fragment_decoder_fm_comparison=True,jobs={'generated_cond':['1','2','3','4'],'generated_null':['5','6','7','8']})
+            (root/'runs/fragment_decoder_fm_model_comparison.json').write_text(json.dumps(plan))
+            (root/'runs/jobs.json').write_text('{"jobs":[]}')
+            with self.assertRaises(ValueError): ready_fm(root)
+
     def test_strict_improvement_must_beat_both_parent_and_null(self):
         parent = dict(strong=8,strong_families=7,designable=45)
         candidate = dict(strong=9,strong_families=7,designable=45)

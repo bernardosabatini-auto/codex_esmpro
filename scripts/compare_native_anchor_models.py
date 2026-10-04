@@ -90,9 +90,10 @@ def compare(plan,root):
     from prepare_fragment_preference_refold import audit_inputs,TEACHER_KEYS
     from prepare_overfit import sha
     coverage=bool(plan.get('positive_coverage_comparison'))
-    decoder=bool(plan.get('fragment_decoder_comparison'))
+    decoder_fm=bool(plan.get('fragment_decoder_fm_comparison'))
+    decoder=bool(plan.get('fragment_decoder_comparison')) or decoder_fm
     clock=bool(plan.get('scaffold_clock_comparison'));masked=bool(plan.get('pretrained_masked_comparison')) or clock or decoder
-    if sum(bool(plan.get(k)) for k in ('positive_coverage_comparison','pretrained_masked_comparison','scaffold_clock_comparison','fragment_decoder_comparison'))>1:raise ValueError('Ambiguous comparison family')
+    if sum(bool(plan.get(k)) for k in ('positive_coverage_comparison','pretrained_masked_comparison','scaffold_clock_comparison','fragment_decoder_comparison','fragment_decoder_fm_comparison'))>1:raise ValueError('Ambiguous comparison family')
     candidates=('generated_null','generated_cond') if masked else (('positive','positive_coverage') if coverage else ('positive','contrastive'))
     if set(plan['jobs'])!=set(candidates):raise ValueError('Changed comparison arms')
     if coverage:
@@ -134,7 +135,7 @@ def compare(plan,root):
     base=generations['parent6000']['config']
     for arm in candidates:
         gc=generations[arm]['config']
-        if masked and gc.get(('fragment_decoder' if decoder else ('scaffold_clock' if clock else 'pretrained_masked'))+'_refold') is not True:raise ValueError('Wrong repair model family')
+        if masked and gc.get(('fragment_decoder_fm' if decoder_fm else ('fragment_decoder' if decoder else ('scaffold_clock' if clock else 'pretrained_masked')))+'_refold') is not True:raise ValueError('Wrong repair model family')
         if gc['selected']!=base['selected'] or gc['native_sources']!=base['native_sources']:raise ValueError('Changed targets or reused native budgets')
         if sha(generations[arm]['generation_manifest'])!=plan['generation_manifest_sha256'][arm]:raise ValueError('Changed declared generation')
         for part in range(4):
@@ -202,6 +203,7 @@ def write_comparison(a):
     if json.loads(a.plan.read_text()).get('pretrained_masked_comparison'):lines[0]='# Pretrained masked-flow model diagnostic'
     if json.loads(a.plan.read_text()).get('scaffold_clock_comparison'):lines[0]='# Whole-chain scaffold-clock model diagnostic'
     if json.loads(a.plan.read_text()).get('fragment_decoder_comparison'):lines[0]='# Fragment-conditioned coordinate-decoder diagnostic'
+    if json.loads(a.plan.read_text()).get('fragment_decoder_fm_comparison'):lines[0]='# Full fragment-conditioned decoder denoising diagnostic'
     for r in d['summary']:
         if r['bucket'] is None:lines.append(f"|{r['arm']}|{r['raw']}|{r['strong']}|{r['designable']}|{r['strong_families']}|")
     lines.extend(['','Development-screen qualification: '+json.dumps(d['development_screen_qualified'])])

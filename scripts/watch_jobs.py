@@ -289,7 +289,8 @@ def tick(root, config, query=scheduler_states, analyze=followup):
         from compare_pretrained_masked_models import ready_command as ready_masked_models
         from compare_scaffold_clock_models import ready_command as ready_clock_models
         from compare_fragment_decoder_models import ready_command as ready_decoder_models
-        command = ready_native_models(root) or ready_positive_models(root) or ready_masked_models(root) or ready_clock_models(root) or ready_decoder_models(root)
+        from compare_fragment_decoder_fm_models import ready_command as ready_decoder_fm_models
+        command = ready_native_models(root) or ready_positive_models(root) or ready_masked_models(root) or ready_clock_models(root) or ready_decoder_models(root) or ready_decoder_fm_models(root)
         if command:
             env = dict(os.environ, CUDA_VISIBLE_DEVICES='', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1', OPENBLAS_NUM_THREADS='1', PYTHONPATH=str(root/'src'))
             with (root/'runs/watch/native_anchor_model_comparison.log').open('a') as log:

@@ -11,7 +11,7 @@ from fragment_validation_core import raw_rows
 from audit_inpainting_junctions import junctions
 from extra_fragment_validation_core import load_conditions
 from prepare_overfit import sha
-from native_anchor_training_core import atomic_json
+from profile_gpu import atomic_json
 
 
 def score(output,source,parent,item,slot,bucket,spec):

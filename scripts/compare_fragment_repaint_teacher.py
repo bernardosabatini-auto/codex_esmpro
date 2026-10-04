@@ -69,7 +69,7 @@ def compare(plan,root):
     if tuple(totals['parent6000'][k] for k in ('strong','strong_families','designable'))!=(8,7,45):raise ValueError('Parent outcomes changed')
     passing={a:{(r['target_id'],r['generation_slot']) for r in rows if r['scaffold_joint_success']} for a,rows in arms.items()}
     overlap=dict(shared=len(passing['parent6000']&passing['oracle_repaint']),teacher_only=len(passing['oracle_repaint']-passing['parent6000']),parent_only=len(passing['parent6000']-passing['oracle_repaint']))
-    dr=diversity(generations['oracle_repaint'],arms['oracle_repaint'],configs['oracle_repaint',0]['usalign'])
+    dr=diversity(generations['oracle_repaint'],arms['oracle_repaint'],configs['oracle_repaint',0]['usalign'],plan.get('teacher_diversity'))
     return dict(status='complete',oracle_teacher=True,source_reports=sources,summary=summary,contrasts=contrasts,teacher_label_pilot_qualified=teacher_gate(totals['oracle_repaint']),overlap=overlap,teacher_diversity=dr,native=prior['native'],new_refolds=1024,reused_parent_refolds=1024,scope='Repeated32training-protein oracle-label feasibility. Native-context motif codes are teacher-only information. Same valid refold must retain motif and agree globally and on scaffold. No student improvement, generalization or experimental claim.')
 
 

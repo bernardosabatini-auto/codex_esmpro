@@ -51,6 +51,8 @@ class Telemetry:
         else:
             indices = []
         dcgmi = shutil.which("dcgmi")
+        if os.environ.get('LATENTFOLD_GPU_COUNTERS') == 'dcgm':
+            nsys_metrics = False
         self.info["dcgm_status"] = "unavailable"
         counters_off = os.environ.get('LATENTFOLD_GPU_COUNTERS') == 'off'
         if counters_off:
@@ -60,12 +62,18 @@ class Telemetry:
             self.info["dcgm_status"] = "disabled to avoid counter conflict with Nsight Systems"
             self.info["nsys_status"] = "requested by job wrapper; validate exported GPU_METRICS before claiming utilization"
         if dcgmi and len(indices) == 1 and not nsys_metrics and not counters_off:
-            catalog = subprocess.run([dcgmi, "profile", "-l", "-i", indices[0]],
-                                     capture_output=True, text=True, timeout=15)
-            (output / "dcgm_catalog.txt").write_text(catalog.stdout + catalog.stderr)
-            if catalog.returncode == 0:
-                self.start([dcgmi, "dmon", "-i", indices[0], "-e", "1002,1004,1005", "-d", "1000"], output / "dcgm.txt")
-                self.info["dcgm_status"] = "requested; counter output must be validated"
+            try:
+                catalog = subprocess.run([dcgmi, "profile", "-l", "-i", indices[0]],
+                                         capture_output=True, text=True, timeout=5)
+                (output / "dcgm_catalog.txt").write_text(catalog.stdout + catalog.stderr)
+                if catalog.returncode == 0:
+                    self.start([dcgmi, "dmon", "-i", indices[0], "-e", "1001,1002,1004,1005", "-d", "1000"], output / "dcgm.txt")
+                    self.info.update(dcgm_status="requested; counter output must be validated",
+                                     dcgm_gpu_index=indices[0],dcgm_fields=[1001,1002,1004,1005])
+                else:
+                    self.info["dcgm_status"] = "profiling fields unavailable; no composite-utilization claim"
+            except (OSError, subprocess.TimeoutExpired) as error:
+                self.info["dcgm_status"] = "counter probe unavailable: " + type(error).__name__
         self.info["nvml_caveat"] = "GPU busy time is not SM activity or FLOP efficiency"
 
         atomic_json(output / "device_metadata.json", self.info)

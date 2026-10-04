@@ -9,11 +9,17 @@ from benchmark_esmfold2 import backbone_indices
 from designability_core import design_sequences,write_ca_pdb,write_backbone_pdb
 from prepare_overfit import sha
 from profile_gpu import Telemetry,atomic_json
+from ordered_cpu_scoring import OrderedCPUScoring
+
+
+def score_refold(record,bb,reference,binary):
+    return dict(record,sc_tm=usalign_coordinates(binary,bb[:,1],reference[:,1]),**ca_metrics(bb[:,1],reference[:,1]))
 
 
 def main():
     p=argparse.ArgumentParser()
     for key in ('source','config','output'):p.add_argument('--'+key,type=Path,required=True)
+    p.add_argument('--overlap-cpu-scoring',action='store_true')
     a=p.parse_args();c=json.loads(a.config.read_text())
     from teacher_numerical_recovery import audit_recovery
     recovered=audit_recovery(c)
@@ -71,7 +77,8 @@ def main():
         from prepare_fragment_fixed_positive import audit_inputs
         audit_inputs(c)
     a.output.mkdir(parents=True,exist_ok=False);inputs=a.output/'inputs';inputs.mkdir();torch.set_num_threads(4)
-    start=time.monotonic();telemetry=None;m=dict(status='running',config=c,records=[],controls=[],sequences={},training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
+    scorer=OrderedCPUScoring(a.overlap_cpu_scoring)
+    start=time.monotonic();telemetry=None;m=dict(cpu_scoring_mode='overlapped' if a.overlap_cpu_scoring else 'serial',status='running',config=c,records=[],controls=[],sequences={},training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
     try:
         torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
         if recovered is not None or c.get('teacher_deterministic_algorithms'):torch.use_deterministic_algorithms(True)
@@ -115,15 +122,19 @@ def main():
                         with h5py.File(c['numerical_recovery']['failed_refolded']) as old_file:previous=old_file[name+'/0'][:]
                         m['recovery_control']=ca_metrics(previous[:,1],bb[:,1]);atomic_json(a.output/'manifest.json',m)
                         if m['recovery_control']['ca_rmsd']>.01 or m['recovery_control']['ca_lddt']<.999:raise ValueError('Recovery original-output parity failed')
-                    g.create_dataset(str(index),data=bb);metric=usalign_coordinates(c['usalign'],bb[:,1],ref[:,1]);m['records'].append(dict(name=name,sequence_index=index,seed=seed,sc_tm=metric,seconds=seconds,peak_reserved_bytes=torch.cuda.max_memory_reserved(),**ca_metrics(bb[:,1],ref[:,1])))
+                    g.create_dataset(str(index),data=bb)
+                    record=dict(name=name,sequence_index=index,seed=seed,seconds=seconds,peak_reserved_bytes=torch.cuda.max_memory_reserved())
+                    m['records'].extend(scorer.submit(score_refold,record,bb,ref,c['usalign']))
                     if (r['head']=='experimental' or r.get('repeatability_control',False)) and index==0:
                         torch.manual_seed(seed);repeat=model.fold(**features,num_loops=3,num_sampling_steps=50,num_diffusion_samples=1);again=repeat.sample_atom_coords.float().cpu().numpy()[0,indices,:];del repeat;control=dict(name=name,**ca_metrics(bb[:,1],again[:,1]));m['controls'].append(control);atomic_json(a.output/'manifest.json',m)
                         if control['ca_rmsd']>.01 or control['ca_lddt']<.999:raise ValueError('Teacher repeatability failed')
                     f.flush();atomic_json(a.output/'manifest.json',m)
+                m['records'].extend(scorer.drain(wait=True));atomic_json(a.output/'manifest.json',m)
                 print('refolded',name,'best',max(x['sc_tm'] for x in m['records'] if x['name']==name),flush=True)
         m['status']='complete'
     except BaseException as error:m.update(status='failed',error=f'{type(error).__name__}: {error}');raise
     finally:
+        scorer.close();m['cpu_scoring_wait_seconds']=scorer.wait_seconds
         if telemetry:telemetry.close()
         m['elapsed_seconds']=time.monotonic()-start;atomic_json(a.output/'manifest.json',m)
 

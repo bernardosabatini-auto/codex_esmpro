@@ -21,8 +21,15 @@ def freeze_submission(root,script,commit):
     if (target/'submission.json').exists():return target/'submitted.sbatch',target
     target.mkdir(parents=True,exist_ok=False)
     archive=target/'source.tar'
-    subprocess.run(['git','archive','--format=tar','--output',str(archive),commit],cwd=root,check=True)
+    # Reports and tests are not worker inputs. Extracting hundreds of historical
+    # reports on shared storage dominated guarded submission time. Runtime code,
+    # protocols, batch scripts and provenance still come from the exact commit;
+    # generated entry configurations remain frozen separately below.
+    top=subprocess.check_output(['git','ls-tree','--name-only',commit],cwd=root,text=True).splitlines()
+    runtime=[name for name in top if name not in ('reports','tests','.gitignore')]
+    subprocess.run(['git','archive','--format=tar','--output',str(archive),commit,'--',*runtime],cwd=root,check=True)
     subprocess.run(['tar','-xf',str(archive),'-C',str(target)],check=True);archive.unlink()
+    (target/'reports').mkdir(exist_ok=True)
     (target/'runs').symlink_to(root/'runs',target_is_directory=True)
     # Generated development configuration files are ignored by Git but required
     # by a few entry points. Preserve them with this source revision as well.

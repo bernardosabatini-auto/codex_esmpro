@@ -1,7 +1,6 @@
 """Audit oracle teacher positives under the unchanged same-valid-refold assay."""
 import argparse,fcntl,json
 from pathlib import Path
-from prepare_overfit import sha
 
 
 def ready_command(root):
@@ -21,6 +20,7 @@ def teacher_gate(summary):
 
 
 def compare(plan,root):
+    from prepare_overfit import sha
     import numpy as np
     from prepare_fragment_preference_refold import audit_inputs,TEACHER_KEYS
     from compare_native_anchor_models import verify_outcome,diversity
@@ -74,6 +74,7 @@ def compare(plan,root):
 
 
 def main():
+    from prepare_overfit import sha
     p=argparse.ArgumentParser();p.add_argument('--plan',type=Path,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args();root=Path(__file__).resolve().parents[1]
     with a.output.with_suffix('.lock').open('w') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX);plan=json.loads(a.plan.read_text());d=compare(plan,root);d['plan_sha256']=sha(a.plan)

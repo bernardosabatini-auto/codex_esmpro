@@ -46,6 +46,12 @@ class TeacherRefolding(unittest.TestCase):
         for key,value in [('strong',8),('strong_families',6),('designable',44)]:
             self.assertFalse(teacher_gate(dict(row,**{key:value})))
 
+    def test_watcher_import_requires_only_standard_library(self):
+        import subprocess,sys
+        from pathlib import Path
+        scripts=Path(__file__).resolve().parents[1]/"scripts"
+        subprocess.run([sys.executable,"-I","-S","-c",f"import sys;sys.path.insert(0,{str(scripts)!r});import compare_fragment_repaint_teacher"],check=True,capture_output=True)
+
     def test_watcher_only_accepts_four_own_completed_jobs(self):
         import json,tempfile
         from pathlib import Path

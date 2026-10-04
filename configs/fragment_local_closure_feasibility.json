@@ -10,7 +10,39 @@
   "scope": "Only existing32training-diagnostic proteins and four archived samples; locked tests untouched. No retraining, checkpoint sweep, extra noise, ranking or filtering.",
   "method": "CPU float64 local constrained optimization. Only four scaffold residues immediately before and after the supplied20residue motif can move. All motif atoms and remaining scaffold atoms stay bitwise fixed. Use bond lengths, adjacent bond angles and peptide-omega targets from the corresponding original PARENT-GENERATED backbone, never native scaffold coordinates. Allow backbonephi/psi to change to close the bridge; penalize displacement. Report every optimized atom and every bond/angle touching editable residues. No native coordinates beyond the supplied fragment at deployment.",
   "validity": "Require original coarse validity and motif criteria, both junctionC-N1.1to1.6A andCA<=4.5A, every covalent bond touching editable residues within0.05A of its parent target, all corresponding bond angles and peptideomega within10degrees. Report full failure categories and displacement; these are geometry-feasibility tolerances, not proof of chemistry or designability.",
-  "controls": "No-op parent controls, recoverable local perturbations, proper rigid-pose equivariance, exact fixed-atom identity and finiteness. Verify gradients numerically on a tiny example. Full dataset/source hashes and deterministic solver settings before any output. CPU profile first; fixed bounded iteration count and CPU walltime, no tolerance/window/strength search.",
+  "controls": "No-op parent controls, recoverable local perturbations, proper rigid-pose equivariance, exact fixed-atom identity and finiteness. Verify gradients numerically on a tiny example. Full dataset/source hashes and deterministic solver settings before any output. CPU profile first; fixed bounded iteration count and CPU walltime, no tolerance/window/strength search. Use four no-op parents and four seeded0.05Aeditable-only perturbations; recovered local geometry must meet declared tolerances. For firstslot ofeacharm/bucket, rigidly rotate/translate candidate+parent and compare transformed solution within0.005A; fullgradientcheck onsynthetic input before realdata. Fail numericalcontrols rather than relax thresholds.",
   "preliminary_gate": "First implement/test and specify numerical objective coefficients and solver cap before real outputs. Then process all128weighted generated and128untrained-clamp controls; raw connected+geometry count must reach45for a prospective refolding comparison to be possible. Native inputs are separate oracle diagnostics.",
-  "next_gpu": "No GPU refolding until the CPU feasibility audit passes and a separate fixed8design/refold protocol is bound. Any subsequent SAME valid refold must retain supplied motif, global agreement, scaffold agreement AND junction continuity. Untrained-clamp plus closure is required to isolate the trained model contribution. Geometry alone cannot establish designability."
+  "next_gpu": "No GPU refolding until the CPU feasibility audit passes and a separate fixed8design/refold protocol is bound. Any subsequent SAME valid refold must retain supplied motif, global agreement, scaffold agreement AND junction continuity. Untrained-clamp plus closure is required to isolate the trained model contribution. Geometry alone cannot establish designability.",
+  "solver": {
+    "algorithm": "torchLBFGSfloat64,strong_wolfe",
+    "max_iter": 300,
+    "max_eval": 400,
+    "history_size": 50,
+    "lr": 1,
+    "tolerance_grad": 1e-08,
+    "tolerance_change": 1e-12,
+    "width": 4
+  },
+  "objective": {
+    "bond_scale_angstrom": 0.02,
+    "angle_cosine_scale": 0.05,
+    "peptide_torsion_sincos_scale": 0.05,
+    "ca_clash_scale_angstrom": 0.25,
+    "displacement_weight": 0.01,
+    "description": "Sum of category means of squared normalized residuals, plus0.01mean squared editable-coordinate displacement inAngstrom. Two peptide torsions per edge:CA-C-N-CA andO-C-N-CA, retaining carbonyl orientation. NonlocalCArepulsion atmin(2.5A,parent-pairdistance) for pairs touching editable residues with sequence separation>2; existingparentcontacts do not invalidate no-op controls."
+  },
+  "execution": {
+    "profile_ids": "First original diagnostic protein per128/256/384/512bucket;allfour archived slots",
+    "arms": [
+      "generated_cond",
+      "generated_untrained",
+      "native_cond"
+    ],
+    "profile_work_cap_seconds": 600,
+    "full_work_cap_seconds": 3600,
+    "threads": 1,
+    "parallel_workers": 1,
+    "profile_qualification": "Allnumericalcontrols pass, all48outputs retained, estimated384-output CPUwork<=3600s. No scientific filter atprofile. Fullrunexact48profileoutputs replay."
+  },
+  "oracle_geometry": "Native_cond diagnostics use their corresponding native_direct decoded backbone as the geometry reference, explicitly oracle-only. Generated_cond and generated_untrained always use parent-generated reference geometry."
 }

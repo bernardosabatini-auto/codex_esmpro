@@ -1,0 +1,16 @@
+{
+  "status": "Prospective CPU-only feasibility; no GPU jobs authorized by this protocol itself",
+  "purpose": "Test explicit local backbone closure after isolated-fragment conditional decoding, rather than another weighting or duration sweep.",
+  "evidence": "Matched2000-update junction weighting yields1/128connected generated and15/128native, versus0/2uniform. Median boundaryC-N improves4.317to3.867A generated and2.068to1.746A native; still not usable. All matched numerical controls pass.",
+  "sources": [
+    "reports/fragment_junction_comparison_20261004.json",
+    "runs/fragment_inpainting_training_50356015/manifest.json",
+    "runs/fragment_inpainting_training_50356015/predictions.h5"
+  ],
+  "scope": "Only existing32training-diagnostic proteins and four archived samples; locked tests untouched. No retraining, checkpoint sweep, extra noise, ranking or filtering.",
+  "method": "CPU float64 local constrained optimization. Only four scaffold residues immediately before and after the supplied20residue motif can move. All motif atoms and remaining scaffold atoms stay bitwise fixed. Use bond lengths, adjacent bond angles and peptide-omega targets from the corresponding original PARENT-GENERATED backbone, never native scaffold coordinates. Allow backbonephi/psi to change to close the bridge; penalize displacement. Report every optimized atom and every bond/angle touching editable residues. No native coordinates beyond the supplied fragment at deployment.",
+  "validity": "Require original coarse validity and motif criteria, both junctionC-N1.1to1.6A andCA<=4.5A, every covalent bond touching editable residues within0.05A of its parent target, all corresponding bond angles and peptideomega within10degrees. Report full failure categories and displacement; these are geometry-feasibility tolerances, not proof of chemistry or designability.",
+  "controls": "No-op parent controls, recoverable local perturbations, proper rigid-pose equivariance, exact fixed-atom identity and finiteness. Verify gradients numerically on a tiny example. Full dataset/source hashes and deterministic solver settings before any output. CPU profile first; fixed bounded iteration count and CPU walltime, no tolerance/window/strength search.",
+  "preliminary_gate": "First implement/test and specify numerical objective coefficients and solver cap before real outputs. Then process all128weighted generated and128untrained-clamp controls; raw connected+geometry count must reach45for a prospective refolding comparison to be possible. Native inputs are separate oracle diagnostics.",
+  "next_gpu": "No GPU refolding until the CPU feasibility audit passes and a separate fixed8design/refold protocol is bound. Any subsequent SAME valid refold must retain supplied motif, global agreement, scaffold agreement AND junction continuity. Untrained-clamp plus closure is required to isolate the trained model contribution. Geometry alone cannot establish designability."
+}

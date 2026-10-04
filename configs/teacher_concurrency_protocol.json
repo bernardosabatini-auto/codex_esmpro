@@ -1,0 +1,14 @@
+{
+  "purpose": "Test two independent FP32 refolding workers sharing one assigned RTX; preserve all scientific outputs.",
+  "reference_run": "teacher_coordinates_profile_50324704",
+  "sequences": "Same eight archived sequences, two per128/256/384/512bucket, seeds and complete confidence head.",
+  "recipe": "Two persistent spawned processes, each with private model and RNG,40percent device allocator cap. Parent coordinates each pair sequentially or concurrently. Same resident workers in both modes; no MPS or node configuration changes. One warmup pair per mode and three timed repetitions, alternating mode order per bucket/repeat. ExactFP32 deterministic algorithms,3loops,50steps,1sample.",
+  "memory_fraction_per_worker": 0.4,
+  "repeats_including_warmup": 4,
+  "max_atom_difference": 1e-5,
+  "minimum_seconds_reduction": 0.10,
+  "maximum_bucket_regression": 0.05,
+  "allocation_minutes": 12,
+  "work_cap_seconds": 600,
+  "decision": "All64 full-atom predictions must match the archived full-model reference within1e-5A. All model parameters unchanged. Aggregate concurrent pair walltime must fall>=10percent, no bucket>5percent slower, no OOM. Otherwise close this concurrency recipe. A pass only licenses a separately matched end-to-end8design/refold pipeline profile before adoption. Do not change precision or pad compute."
+}

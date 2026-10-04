@@ -50,5 +50,7 @@
   },
   "refolding": "Only numerically complete and logically eligible final models proceed. Refold all128 trained-clamp outputs and all128 untrained-clamp controls with eight fixed-motif CA-only ProteinMPNN designs each and unchanged deterministic FP32 ESMFold2-Fast. Native/parent historical budgets reused without pooling. Retain failures. The same valid refold must retain motif proper CA RMSD<=1A and dRMS<=1A, globalTM>0.5 and scaffoldTM>0.5; raw geometry/motif gate also required.",
   "decision": "Require more strict successes than both original parent and untrained clamp, at least7 successful families, and at least45 designable outputs without loss versus untrained clamp. Report paired family bootstrap, overlap, per-length and full failure denominators, and diversity among strict successes. A pass licenses a separately specified fresh-noise/placement replication, not a generalization claim. Failure closes this fixed recipe.",
-  "resources": "One RTX profile and one measured-runtime RTX training job; at most8 own running-plus-pending GPUs overall. Bound sources, register exact jobs and completion audits, preserve FP32 and capture assigned-UUID DCGM counters. No jobs until implementation and tests pass."
+  "resources": "One RTX profile and one measured-runtime RTX training job; at most8 own running-plus-pending GPUs overall. Bound sources, register exact jobs and completion audits, preserve FP32 and capture assigned-UUID DCGM counters. No jobs until implementation and tests pass.",
+  "warmup_updates": 40,
+  "ema_decay": 0.99
 }

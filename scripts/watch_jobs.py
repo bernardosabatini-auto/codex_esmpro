@@ -168,7 +168,8 @@ def followup(root, job, config):
     env = dict(os.environ, CUDA_VISIBLE_DEVICES='', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1',
                OPENBLAS_NUM_THREADS='1', PYTHONPATH=str(root/'src'))
     with (root/'runs/watch'/f"analysis_{job['id']}.log").open('a') as log:
-        run_monitored_analysis(command, root=root, env=env, log=log, timeout=900 if action=='summarize_fragment_preference_refold' else 240)
+        run_monitored_analysis(command, root=root, env=env, log=log,
+            timeout=1260 if action=='summarize_compatible_fragment' else 900 if action=='summarize_fragment_preference_refold' else 240)
         if action == 'summarize_native_anchor_training':
             from compare_native_anchor_training import ready_command
             comparison = ready_command(root)

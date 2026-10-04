@@ -1,0 +1,44 @@
+{
+  "parent": "fragment_training_50106855",
+  "baseline_generation": "extra_fragment_validation_50188437",
+  "diagnostic": "decoder_fragment_variance_50267175",
+  "conditions": [
+    "c20_left",
+    "c20_center",
+    "c20_right"
+  ],
+  "decoder_steps": 3,
+  "updates": 2000,
+  "profile_updates": 40,
+  "warmup_updates": 40,
+  "ema_decay": 0.99,
+  "refold_eligibility": {
+    "generated_cond_min_raw": 9,
+    "generated_cond_min_valid": 45
+  },
+  "purpose": "Adapt a private full pretrained coordinate decoder to isolated-fragment inputs after frozen tinyadapter failed0/128geometry.",
+  "closed_decoder_run": "fragment_decoder_training_50293210",
+  "seed": 2026100491,
+  "sampling_seed": 2026100405,
+  "batches": {
+    "128": 64,
+    "256": 32,
+    "384": 16,
+    "512": 8
+  },
+  "decoder_learning_rate": 3e-05,
+  "adapter_learning_rate": 0.0003,
+  "condition_dropout": 0.15,
+  "architecture": "Private copy of original9.233M-state-element decoder, all decoder parameters enabled, plus original82944parameter zero token/pair adapters. Original codec/generator/encoder remain frozen and separate. Use existingwrapper, no external source edits. Decoder stays eval-mode; gradient graph active. Adapter routes confined to motif tokens and intramotif pairs; all output atoms free.",
+  "data": "Original512proteins, three standalone20residue conditions. One uniform protein draw within cycled128/256/384/512 strata perupdate, exactlength batches. Independent noise,time,placement,conditiondropout perreplicate. No padding, no independent-protein claim for noise replicates. Repeated32training-only diagnostic; lockedtests untouched.",
+  "inputs": "Zero eight latent channels ONLY at supplied20residue motif in training and every candidate. Remaining context native duringtraining; archivedparentgenerated or native-oracle duringevaluation. Explicit fragment inputs are independently encoded8codes,20sequencechannels,mask and intrinsicCA distances. Never expose native motif endpoint codes or native scaffold coordinates/sequence as inferencefeatures.",
+  "objective": "Original ProteinAE clean-coordinate flow-matching loss in nm: atomcentered target and unitGaussian noise, straight interpolation, velocitynetwork, x1hat=xt+(1-t)*v, squared coordinateerror dividedby((1-t)^2+1e-5). Average over xyz and fouratoms, assigning half totalweight to motifresidues and half to scaffold. No target/prediction Kabsch duringtraining, no auxiliaryendpointbondloss. Time=98percent Beta(1.9,1),2percentUniform, exactoriginaldistribution; Beta via inverseCDF. Explicitdifference fromoriginalAEtraining: fixedcachednativecodes, no reencoding/globalrotation/latentnoise or selfconditioning; this matches existing3step no-selfconditioning endpointpath. Center target andnoise overALL backboneatoms.",
+  "target_frames": "Read-only originalAE encodes the SAME coordinatepose used as FMtarget, and does not actuallyKabsch-align noise despitecomment. Existing32native controlprobe mean centeredCAerror.2356A versusproper.2295A; no largeposemismatch. Verify this on each first-per-bucket originaldecode control before GPUtraining; centeredCAerror<=properCAerror+.1A. Fixedpose cache only, no unpairedrotations.",
+  "optimization": "AdamW(.9,.95),wd.01,clip1; decoderLR3e-5,adapterLR3e-4,40warmup,cosine to.1floor over2000,EMA.99. Seed2026100491 independent NumPydata andCUDAnoise/time/dropout generators.15percentconditiondropout perexample; null is trainedmasked-context branch. One checkpointed decoder forward perupdate; final2000 only, no duration/mask/weight/batch sweep afterqualification.",
+  "profile": "40updates,oneRTX25min. Initial zero-adapter copieddecoder must exactly match originalmasked andunmasked decodes. Actualone-step checkpoint/direct outputs/loss/ALLavailableparametergradients at1e-4atol/rtol, nonzerodecoder/token/pairgradients. Originalcodecstate unchanged. Peak<=75GiB. Qualitydescriptive. Fullallocation measuredprofileextrapolation withheadroom<=150min.",
+  "controls": "All128originalparent and128native directcontrol predictions use unchangedoriginalcodec. Initialmaskedcandidate outputs archived forbothcontexts. Finalcandidate cond/null bothuseadapteddecoder; nullisnotexpectedtomatchinitial. Independent sameinputnullreplay, suppliedcoordinate rigidpose parity<=1e-4A; firstshortprotein fullmodel reset/reload EMA replay<=1e-5A,bothcontexts. Copiedinitialdecoder hash equalsoriginalcheckpoint; originalcodec remainsfrozenunchanged, newdecoder MUSTchange. Full/profile initial40 target/placement/noise/time/dropout/LRtraces match andALLraw/EMA prefixweights<=1e-4.",
+  "sampling": "Unchanged3FP32Eulersteps,original1e-6denominator,nmtoAngstrom conversion; original fourdecoder noises. No acceptancefilter,extraattempts,coordinateclamping,latentrepairororacle selection. All128outputs eachof generated_cond/generated_null/native_cond/native_null,plusunchangedoriginalparent/native_direct. Savedlatent arrays are decoderINPUTS, not predictions.",
+  "eligibility_reason": "These are logical upper bounds for the PRIMARY joint outcome, not surrogate improvements: a model with<=8 raw-valid motif matches cannot exceed8 strict successes, and fewer than45 valid raw backbones cannot produce45 valid-designable outputs under the unchanged assay. Native capacity, raw gain over parent25 and raw gain over null are reported but are NOT additional vetoes for this NEW experiment. Earlier failed experiments and their locked gates remain closed.",
+  "refolding": "Every numerically complete, mathematically eligible final model gets ALL128generated-conditioned AND ALL128masked-null backbones refolded,8fixed-motifCA-onlyProteinMPNNdesigns each,unchanged deterministicFP32teacher3loops50steps. Reuse original parent1024refolds and native budgets unchanged; no poolingattempts. Same valid refold must satisfy propermotifCA RMSD<=1A,dRMS<=1A,globalTM>.5 andscaffoldTM>.5; raw backbone must itself satisfy its established validity/motif gate. Designability requires valid raw and same valid globally agreeing refold. Advancement requires >max(8,null_strong) strong outputs,>=7successfulfamilies and>=45designable outputs, with protein/family bootstrap intervals. Report raw,strict anddesignable separately,including failures andall-pair/joint-success diversity. A pass qualifies fresh development evaluation, not a generalization claim.",
+  "resources": "One RTX profile then one RTX training; at most8 registered running-plus-pending own GPUs overall. Every job bounded and monitored. Code/tests/protocol/generated Markdown reports synced without data. No refold configurations/submissions before final eligibility audit. Preserve failures; no automatic extensions."
+}

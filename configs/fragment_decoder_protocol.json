@@ -1,0 +1,41 @@
+{
+  "purpose": "Train isolated-fragment token and geometry inputs directly in the coordinate decoder, after closed latent repair pilots failed to improve raw motif retention.",
+  "parent": "fragment_training_50106855",
+  "baseline_generation": "extra_fragment_validation_50188437",
+  "closed_clock_run": "scaffold_clock_training_50283116",
+  "diagnostic": "decoder_fragment_variance_50267175",
+  "seed": 2026100481,
+  "sampling_seed": 2026100405,
+  "conditions": [
+    "c20_left",
+    "c20_center",
+    "c20_right"
+  ],
+  "decoder_steps": 3,
+  "updates": 2000,
+  "profile_updates": 40,
+  "batches": {
+    "128": 32,
+    "256": 16,
+    "384": 8,
+    "512": 4
+  },
+  "learning_rate": 0.0003,
+  "warmup_updates": 40,
+  "ema_decay": 0.99,
+  "architecture": "Frozen original ProteinAE coordinate decoder; add zero-output residuals to cond_factory (256 channels) and pair_repr_builder (128 channels), before atom processing/registers. Token MLP29->256->256 uses isolated8codes,20 supplied sequence channels and mask. Pair MLP17->64->128 uses FP64-computed intramotif CA distances with established16 radial bases plus bounded distance scalar. Residuals are confined to supplied motif tokens/pairs; all output coordinates remain free. Train ONLY these new adapters; original decoder and global generator stay frozen. No external-source edits.",
+  "inputs": "Zero the full-context eight-channel latent ONLY at the20 supplied motif residues, both during training and sampling. All other latent residues stay unchanged. No native motif endpoint code, scaffold sequence or native coordinates enter inference features. Separately encoded fragment codes/sequence and fragment CA distances are the explicit condition. Conditioning-off arm uses the same zero-masked codes and original decoder; it is not an unconditional global generator.",
+  "data": "All512 original training proteins and three independently encoded20residue conditions. Training targets are complete native N/CA/C/O reference backbones in Angstrom. Uniform one-protein draw within cycled128/256/384/512 length strata, then a batch of independent decoder noises and uniformly drawn condition placements for that protein. EXACT-length batches only, no padded decoder computation. Repeated draws are noise/condition replication, not additional proteins. Evaluation remains the same repeatedly used32 training diagnostic proteins; locked tests untouched.",
+  "objective": "Differentiate the ACTUAL three-step FP32 Euler decoder, preserving the original1e-6 denominator and unit conversion. Minimize weighted proper all-backbone Procrustes MSE in Angstrom squared: half total mass on supplied motif atoms, half on scaffold atoms, with proper weighted SVD alignment detached for the envelope derivative. Add mean squared error of native N-CA,CA-C,C-O and consecutive C-N bond lengths with weight1. Full native structure is supervision only. No latent-flow loss, no coordinate clamping or replacement, no extra decoder steps. All training conditions present; a frozen base guarantees the disabled adapter reproduces the original decoder without needing dropout training.",
+  "optimization": "AdamW betas(.9,.95),weight_decay.01,clip1,LR3e-4;40-update warmup and cosine to.1 floor over2000,EMA.99,final2000 only. Three whole-decoder nonreentrant checkpoints bound training memory; frozen base always eval. Dedicated CUDA training-noise generator seeded2026100481 and independent NumPy target/placement stream. No weight,duration,mask-width orbatch sweep after qualification.",
+  "profile": "One40-update RTX profile,25minuteallocation. First selected protein per length stratum,4original decoder noises each. Initial zero adapters must reproduce original unmasked parent/native backbones and independently called original masked decoder outputs at<=1e-5A maxabs; historical parent/native parity remains RMSD<=.2A,lDDT>=.99 and same raw/valid decisions. On first short protein, compare checkpointed versus direct actual3step outputs/loss/adapter gradients (atol1e-4,rtol1e-4), with nonzero token/pair output gradients and frozen base. All outputs finite; peak<=75GiB. Profile quality is descriptive. Full allocation extrapolated from measured profile with headroom and <=150minutes; no full submission until numerical audit passes.",
+  "controls": "All original128 parent and128 native direct decode controls reproduced at evaluation with adapter disabled and unmasked codes. All initial masked outputs saved. After training, masked-null outputs must exactly reproduce initial masked outputs for all128 samples in both contexts. Supplied-coordinate pose transform changes conditioned outputs<=1e-4A. Initial-zero unmasked16controls; savedEMA reset/reload GPU replay<=1e-5A on first short protein,all4noises,bothcontexts. Frozen decoder state hash must match original checkpoint before/after; saved adapter raw/EMA finite and updated. Profile/full initial40protein/placement/target/noise/LRdraws identical and adapter raw/EMA prefix maxabs<=1e-4.",
+  "sampling": "Archive original generated latents,zero motif codes,then exactly one conditional three-step decode peroriginal noise. Four arms: generated/native context crossed with new decoder condition on/off; native contexts are oracle controls. Parent and native-direct retain full original codes with condition off. All128outputs perarm retained; no acceptance filter,new noise attempts,latent changes outside motif or coordinate repair. Untrained masked conditioned output equals masked null at zero initialization; preserve it as a control.",
+  "refold_eligibility": {
+    "generated_cond_min_raw": 9,
+    "generated_cond_min_valid": 45
+  },
+  "eligibility_reason": "These are logical upper bounds for the PRIMARY joint outcome, not surrogate improvements: a model with<=8 raw-valid motif matches cannot exceed8 strict successes, and fewer than45 valid raw backbones cannot produce45 valid-designable outputs under the unchanged assay. Native capacity, raw gain over parent25 and raw gain over null are reported but are NOT additional vetoes for this NEW experiment. Earlier failed experiments and their locked gates remain closed.",
+  "refolding": "Every numerically complete, mathematically eligible final model gets ALL128generated-conditioned AND ALL128masked-null backbones refolded,8fixed-motifCA-onlyProteinMPNNdesigns each,unchanged deterministicFP32teacher3loops50steps. Reuse original parent1024refolds and native budgets unchanged; no poolingattempts. Same valid refold must satisfy propermotifCA RMSD<=1A,dRMS<=1A,globalTM>.5 andscaffoldTM>.5; raw backbone must itself satisfy its established validity/motif gate. Designability requires valid raw and same valid globally agreeing refold. Advancement requires >max(8,null_strong) strong outputs,>=7successfulfamilies and>=45designable outputs, with protein/family bootstrap intervals. Report raw,strict anddesignable separately,including failures andall-pair/joint-success diversity. A pass qualifies fresh development evaluation, not a generalization claim.",
+  "resources": "One RTX profile then one RTX training; at most8 registered running-plus-pending own GPUs overall. Every job bounded and monitored. Code/tests/protocol/generated Markdown reports synced without data. No refold configurations/submissions before final eligibility audit. Preserve failures; no automatic extensions."
+}

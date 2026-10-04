@@ -1,0 +1,24 @@
+{
+  "source": "fragment_inpainting_training_50344679",
+  "seed": 2026100405,
+  "decoder_stream": "decoder:0",
+  "steps": [
+    3,
+    10
+  ],
+  "probe_times": [
+    0,
+    0.3333333333333333,
+    0.6666666666666666,
+    0.9
+  ],
+  "samples": 4,
+  "purpose": "Diagnose whether broken junctions in the trained fixed-fragment decoder reflect coarse integration or learned denoising; no parameter updates or reranking.",
+  "evidence": "The fixed2000 endpoint has97/128 coarse-valid generated outputs but0/128 with both fragment junctions intact; native controls122 coarse-valid but2 junction-intact. Generated boundaryC-N median4.317A,native2.068A,parent1.342A.",
+  "inputs": "Same32 training diagnostic proteins, four archived noises, exact frozen EMA and masked motif latent inputs; generated placement uses only supplied fragment and parent-generated backbone. Native contexts and known-path probes are labelled oracle controls. Locked tests untouched.",
+  "outputs": "Both generated/native contexts at exactly3 and10steps. Native known-path predictions at0,1/3,2/3,.9 for adapted masked and original unmasked decoders on the identical clamped state. Original native full decode controls and exact3step archive replay; four bucket pose controls per context at10steps.",
+  "controls": "Frozen adapted/original weight hashes unchanged; no training. Save every backbone, anchors and explicit noise. Require3step maxerror<=1e-5A, posed10step<=1e-4A, motif anchor and center errors<=1e-4A. Same geometry and junction definitions as prior reports.",
+  "interpretation": "Raw motif fit is imposed. Compare unknown scaffold and junction quality on actual free samples, and separately on known native paths. Ten-step selection is a prospective separate sampler experiment; never pool its attempts with the completed3step model.",
+  "followup": "No automatic refolds. A ten-step model must first have>=9 generated samples meeting coarse/motif AND BOTH junction criteria and>=45 coarse-valid generated outputs, and improve junction-intact generated count over3steps. A positive result licenses a separately bound matched-budget comparison against completed3step refolds; failure closes this resolution diagnostic without a step sweep.",
+  "resources": "OneRTX,10minute cap, submitted only when an own GPU slot is free under the8 running+pending cap. Exact registered monitoring, independentCPUaudit, FP32 and UUID-verified counters."
+}

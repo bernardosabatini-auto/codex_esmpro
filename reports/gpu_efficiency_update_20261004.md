@@ -65,3 +65,11 @@ over746valid seconds:84.56%SM,57.37%DRAM,93.03%graphics engine and0%tensor. This
 is captured activity, not the account24-hour metric. Full run source verification
 and training-data preparation occurred before allocation; independent scoring and
 all256generated/control CPUclosures run after GPU release.
+
+Fixed-scaffold bridge training50385481 completed2,000updates in690.12s and released
+one RTX after13:06. Its737valid captured seconds measured51.01% composite:
+85.66%SM,58.13%DRAM,94.03%graphics engine and0%tensor. The worker took769.62s,
+including generation and numerical controls. CPU preparation and subsequent
+independent scoring/256closure calculations remain outside the GPU allocation.
+These captures exclude recorder startup and do not reproduce the dashboard's
+24-hour hourly-allocation statistic. No other agents' jobs were inspected.

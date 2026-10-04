@@ -12,9 +12,9 @@ set -euo pipefail
 cd /n/netscratch/bsabatini_lab/Users/bsabatini/codex/esm_proae_reboot
 export PYTHONPATH="$PWD/src" PYTHONDONTWRITEBYTECODE=1
 export OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1
-export LATENTFOLD_GPU_COUNTERS=off
+export LATENTFOLD_GPU_COUNTERS=dcgm
 export PYTORCH_ALLOC_CONF=expandable_segments:True
 PYTHON=/n/home08/bsabatini/.conda/envs/proteinae/bin/python
 RUN="runs/fragment_preference_refold_${SLURM_JOB_ID}"
 exec "$PYTHON" -u scripts/evaluate_designability.py --source /n/netscratch/bsabatini_lab/Users/bsabatini/esm_proae \
- --config runs/fragment_repaint_teacher_refold_20261003_3.json --output "$RUN"
+ --config runs/fragment_repaint_teacher_refold_20261003_3.json --output "$RUN" --overlap-cpu-scoring

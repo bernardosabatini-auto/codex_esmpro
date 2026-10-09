@@ -14,6 +14,9 @@ from prepare_overfit import sha
 
 def analyze(run):
     mp=run/'manifest.json';m=json.loads(mp.read_text())
+    if m['config'].get('context_normalization_profile'):
+        from context_normalization_profile import analyze as normalization_audit
+        return normalization_audit(run)
     if m['status']!='complete':return dict(status='failed',error=m.get('error'))
     c=m['config'];audit(c)
     if m['predictions_sha256']!=sha(run/'predictions.h5') or m['training_updates_executed']!=0:

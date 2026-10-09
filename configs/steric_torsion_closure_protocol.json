@@ -1,0 +1,24 @@
+{
+  "purpose": "Test whether explicit nonbonded backbone repulsion removes the atomic overlaps missed by CA-only closure before considering new refolds or training",
+  "baseline_report": "reports/torsion_closure_full_20261004.json",
+  "baseline_report_sha256": "18dced564834de25b4f33a7d85c870c490078265f666191ccd697fe68f8815bc",
+  "baseline_protocol": "configs/torsion_bridge_closure_protocol.json",
+  "failure_evidence": "reports/torsion_refold_comparison_20261008.json",
+  "steric_evidence": "reports/torsion_nonbonded_diagnostic_20261008.json",
+  "evidence": "Unchanged8/128strict successes; designability20vs45parent; only14complete connected designable. Graph-based nonbonded atom distances reveal77/128overlap cases versus1parent;21of61previously physically eligible have overlaps. Native controls have0. This is a mechanistic hypothesis, not proof that sterics explains the whole designability loss.",
+  "change": "Add one nonbonded-backbone repulsion term to the otherwise unchanged torsion-closure loss. Preserve both endpoint terms, CA repulsion, displacement coefficient, initialization, eight-residue flanks,200iterations,250evaluations and single start. No weight/window/duration/restart sweep.",
+  "nonbonded": {
+    "exclude_covalent_distance_at_most": 3,
+    "cutoff_angstrom": 2.5,
+    "scale_angstrom": 0.25,
+    "coefficient": 1.0,
+    "normalization": "Sum squared violations divided by64editable atoms; avoid diluting rare overlaps by all possible pairs",
+    "cutoffs": "min(2.5A,original generated-parent distance) per unordered nonbonded pair touching an editable atom. No native scaffold or sequence in generated arm. Native arm remains an oracle only.",
+    "audit_threshold_angstrom": 1.5
+  },
+  "profile": "Same first target per length bucket and four slots,16generated+16native. Read original parent+isolated-anchor source from completed baseline; never initialize from its optimized output. Keep all cases. Record old and new atomic overlaps plus original complete physical gate; original results unchanged.",
+  "controls": "Exact parent no-op, exact deterministic repeat and proper-pose <=0.005A, for first slot of each bucket/arm. Independent NumPy molecular/steric scoring; save every output and torsion vector. Test objective finite-difference gradients and nonbonded covalent exclusions before the profile.",
+  "full_gate": "Technical controls pass; at least12/16generated meet BOTH unchanged complete eight-flank geometry and zero nonbonded distances below1.5A, compared with9/16baseline; all16native controls meet this joint gate. Then specify one unfiltered full32family CPU assay. No GPU work on this profile.",
+  "resources": "CPU only, one numerical-library thread,1200second profile cap. Immutable inputs read without HDF5 shared-file locks because those locks currently stall; output file is exclusively created and independently reopened only after completion. No concurrent writers.",
+  "scope": "Constructive supervision feasibility only, not a learned model or designability. A positive geometry result must still pass an independently specified same-refold assay before being used to justify isolated-fragment training. Failed preceding construction stays closed."
+}

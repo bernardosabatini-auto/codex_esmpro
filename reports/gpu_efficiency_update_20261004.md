@@ -73,3 +73,10 @@ including generation and numerical controls. CPU preparation and subsequent
 independent scoring/256closure calculations remain outside the GPU allocation.
 These captures exclude recorder startup and do not reproduce the dashboard's
 24-hour hourly-allocation statistic. No other agents' jobs were inspected.
+
+The subsequently audited torsion-refold jobs50392677/50392728/50392771/50392833
+used0.815allocated RTX GPU-hours total, peaked at29.64GiB and captured42.06%
+composite utilization across2,809seconds. CPU scoring wait totaled7.21s. Input and
+teacher content hashing occurred before GPU allocation. This fixed construction
+failed the designability comparison (20/128versus45/128parent); no training
+expansion is justified by its physical-geometry success alone.

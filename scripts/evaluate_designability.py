@@ -89,7 +89,7 @@ def main():
     preflight_seconds=time.monotonic()-preflight_start
     a.output.mkdir(parents=True,exist_ok=False);inputs=a.output/'inputs';inputs.mkdir();torch.set_num_threads(4)
     scorer=OrderedCPUScoring(a.overlap_cpu_scoring)
-    start=time.monotonic();telemetry=None;m=dict(import_seconds=import_seconds,preflight_seconds=preflight_seconds,cpu_scoring_mode='overlapped' if a.overlap_cpu_scoring else 'serial',status='running',config=c,records=[],controls=[],sequences={},training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
+    start=time.monotonic();telemetry=None;teacher_local=None;m=dict(import_seconds=import_seconds,preflight_seconds=preflight_seconds,cpu_scoring_mode='overlapped' if a.overlap_cpu_scoring else 'serial',status='running',config=c,records=[],controls=[],sequences={},training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
     try:
         torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
         if recovered is not None or c.get('teacher_deterministic_algorithms'):torch.use_deterministic_algorithms(True)
@@ -123,8 +123,12 @@ def main():
         if recovered is not None and m['sequences']!=recovered['sequences']:raise ValueError('Recovery changed fixed sequence attempts')
         if len(list((designs/'seqs').glob('*.fa')))!=len(c['entries']):raise ValueError('Unexpected design coverage')
         atomic_json(a.output/'manifest.json',m);print('MPNN complete',len(c['entries']),flush=True)
+        teacher_path=a.source/'data/esmfold2_fast'
+        if c.get('teacher_checkpoint_staging'):
+            from teacher_staging_replication import stage_for_validation
+            teacher_local,teacher_path,m['teacher_staging_seconds']=stage_for_validation(c)
         load_start=time.monotonic()
-        model,m['teacher_adapter']=load_fast_model(a.source/'data/esmfold2_fast')
+        model,m['teacher_adapter']=load_fast_model(teacher_path)
         m['teacher_load_seconds']=time.monotonic()-load_start;atomic_json(a.output/'manifest.json',m)
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'refolded.h5','x') as f:
             for r in c['entries']:
@@ -157,6 +161,7 @@ def main():
     finally:
         scorer.close();m['cpu_scoring_wait_seconds']=scorer.wait_seconds
         if telemetry:telemetry.close()
+        if teacher_local is not None:teacher_local.cleanup()
         m['elapsed_seconds']=time.monotonic()-start;atomic_json(a.output/'manifest.json',m)
 
 if __name__=='__main__':main()

@@ -103,6 +103,9 @@ def analyze(run):
             complete_connected_designable=sum(r['complete_connected_designable'] for r in records))
     if gc.get('movable_motif_refold'):
         result['movable_motif_refold']=True
+    if c.get('teacher_checkpoint_staging'):
+        from teacher_staging_replication import audit_result
+        result['teacher_staging_validation']=audit_result(run,m,result)
     return result
 
 

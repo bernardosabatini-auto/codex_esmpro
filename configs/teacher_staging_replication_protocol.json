@@ -1,0 +1,10 @@
+{
+  "purpose": "One end-to-end repeat of the first completed retrieval refold partition, changing only checkpoint location.",
+  "reference_run": "fragment_preference_refold_51491050",
+  "profile_run": "teacher_concurrency_51492972",
+  "allocation_minutes": 35,
+  "work_cap_seconds": 2010,
+  "backbones": 32,
+  "sequences_per_backbone": 8,
+  "decision": "Require a qualified24-output staging profile, unchanged original32input backbones/teacher/precision/seeds, identical256MPNNsequences, all256refold backbones within1e-5A of the reference, and identical strict/designability decisions. Retain every failure. This is a technical replay, not256additional scientific attempts. Report whole-job/staging/load/fold times. Different job/node/cache observations are not a controlled wall-clock speedup claim."
+}

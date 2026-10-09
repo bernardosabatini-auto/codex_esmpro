@@ -16,10 +16,11 @@ def audit_worker(c):
     verify_identity(c)
 
 
-def audit_refold(c,*,audited_generation=None):
+def audit_refold(c,*,audited_generation=None,verified_sources=None):
     audit_worker(c)
-    for r in c['sources']:
-        if sha(r['path'])!=r['sha256']:raise ValueError('Changed retrieval-refold input')
+    from verified_sources import VerifiedSources
+    verifier=verified_sources if verified_sources is not None else VerifiedSources()
+    for r in c['sources']:verifier.verify(r)
     gm=json.loads(Path(c['generation_manifest']).read_text());gc=gm['config'];d=json.loads(Path(c['generation_report']).read_text())
     from retrieved_context_profile import audit
     if audited_generation is None:audit(gc)

@@ -54,6 +54,15 @@ def analyze(run):
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs=1,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
+    # Preserve an already audited staging report's identity: downstream jobs
+    # bind its bytes and metadata before allocating a GPU.
+    target=a.output.with_suffix('.json');mp=a.runs[0]/'manifest.json'
+    if target.exists() and a.output.with_suffix('.md').exists():
+        old=json.loads(target.read_text());m=json.loads(mp.read_text())
+        if (old.get('teacher_staging') and old['status']=='complete' and m['status']=='complete'
+                and old['manifest_sha256']==sha(mp) and old['coordinates_sha256']==sha(a.runs[0]/'coordinates.h5')):
+            from teacher_staging import audit as audit_staging
+            audit_staging(m['config']);return
     d=analyze(a.runs[0]);a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n')
     visible={k:v for k,v in d.items() if k!='parity'}
     title='Teacher checkpoint staging' if d.get('teacher_staging') else 'Concurrent refolding efficiency'

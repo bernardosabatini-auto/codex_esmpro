@@ -28,12 +28,16 @@ def analyze(root,jobs,diversity_prefix=None):
     if base['status']!='complete' or any(sha(s['report'])!=s['report_sha256'] for s in base['sources']):raise ValueError('Changed original parent')
     paths={'parent6000':[Path(s['report']) for s in base['sources']]}
     paths.update({arm:[root/f'reports/fragment_preference_refold_{j}.json' for j in values] for arm,values in jobs.items()})
+    from verified_sources import VerifiedSources
+    from retrieved_context_refolding import audit_refold
+    verifier=VerifiedSources()
     arms={};configs={};sources=[];generation_hash=None;native_sources=None
     for arm,reports in paths.items():
         rows=[];parts=set();cached=None
         for path in reports:
             run=root/'runs'/path.stem;mp=run/'manifest.json';m=json.loads(mp.read_text());d=json.loads(path.read_text());c=m['config']
-            gc,spec=audit_inputs(c,audited_generation=cached);cached=(gc,spec)
+            gc,spec=(audit_inputs(c,audited_generation=cached) if arm=='parent6000' else audit_refold(c,audited_generation=cached,verified_sources=verifier))
+            cached=(gc,spec)
             if (m['status']!='complete' or d['status']!='complete' or d['manifest_sha256']!=sha(mp)
                     or d['refolded_sha256']!=sha(run/'refolded.h5') or d['completed_refolds']!=256 or len(d['records'])!=32
                     or c['partition'] in parts or d['partition']!=c['partition'] or gc['arm']!=arm

@@ -1,0 +1,9 @@
+{
+  "gradient_branch_diagnostic": true,
+  "failed_run": "trajectory_guidance_51511139",
+  "purpose": "Numerical diagnosis only, no new scientific candidates. Reproduce the first failed composed gradient at t=.5; distinguish ProteinMPNN neighbor-list discontinuities from a wrong derivative or FP32 error.",
+  "epsilons": [0.03,0.01,0.003,0.001,0.0003,0.0001],
+  "control": "Same first query,batch4,flow state,detached history,models,precision and fixed decoder noise. Compare current velocity and proper motif loss with archived geometric-only step25. Original composed analytic derivative must match failed record. Record both loss components and all neighbor-membership changes for each plus/minus perturbation. Repeat the identical epsilon series while holding the reference neighbor indices fixed, checking reference outputs and analytic gradients are unchanged. Never loosen5percent derivative tolerance.",
+  "interpretation": "A diagnostic result cannot turn the failed scientific pilot into a pass. Any repaired qualification requires a separate prospective protocol and retains the failed run. Do not change objective strength, weights or sampling schedule.",
+  "resources": "OneRTX5minute ceiling,<=75GiB. No generation or refolding expansion from this diagnostic alone."
+}

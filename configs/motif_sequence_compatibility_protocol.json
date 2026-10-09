@@ -1,0 +1,10 @@
+{
+  "purpose": "CPU diagnostic: does fixed motif sequence compatibility with the generated surrounding backbone explain geometric matches that refold away? A surrogate is not a designability label.",
+  "assay": "fragment_preference_refold_51502645",
+  "inventory": "All36 original assay backbones. Also the first sequence-index refold with valid/global/scaffold agreement for each eligible backbone; selection never uses motif fit or sequence score. Preserve every input and failure.",
+  "score": "Frozen qualified CA-onlyProteinMPNN unconditional_probs: negative mean log probability of ONLY the supplied20-residue motif sequence, conditioned on the entire backbone and no scaffold sequence. Also reverse the supplied sequence as a composition-preserving specificity diagnostic. No generated amino-acid scoring head.",
+  "geometry": "Report CA-aligned N/CA/C/O motif RMSD and individual atom RMSD, alongside original CA-only scores. This is diagnostic; original strict criteria remain unchanged.",
+  "controls": "Zero backbone augmentation, eval/frozen weights. Each of four native backbones: rigid-pose logprob max error<=1e-4; finite nonzero coordinate gradient; central directional derivative at one of .01,.001,.0001 within max(.001,.05abs(analytic)). State digest unchanged. CPU only,one numerical thread.",
+  "interpretation": "Descriptive four-family diagnostic. Neither likelihood nor geometry qualifies training positives or proves designability. Do not launch GPU guidance from this result alone without a distinct prospectively defined objective and matched same-valid-refold assay. No reopening the closed strength/time-window recipe.",
+  "control_failure_handling": "Initial CPU trial failed on the first native coordinate gradient. Preserve that failure/source snapshot; continue forward-score diagnostics with all failed gradients recorded, without claiming gradient qualification or changing numerical tolerances."
+}

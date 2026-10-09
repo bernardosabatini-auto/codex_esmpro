@@ -1,0 +1,12 @@
+{
+  "purpose": "CPU diagnostic: does fixed motif sequence compatibility with the generated surrounding backbone explain geometric matches that refold away? A surrogate is not a designability label.",
+  "assay": "fragment_preference_refold_51502645",
+  "inventory": "All36 original assay backbones. Also the first sequence-index refold with valid/global/scaffold agreement for each eligible backbone; selection never uses motif fit or sequence score. Preserve every input and failure.",
+  "score": "Frozen qualified full-backbone ProteinMPNN unconditional_probs, with N/CA/C/O inputs; negative mean log probability of ONLY the supplied motif sequence. No scaffold sequence. Same inventory and diagnostic interpretation as failed CA-only scorer.",
+  "geometry": "Report CA-aligned N/CA/C/O motif RMSD and individual atom RMSD, alongside original CA-only scores. This is diagnostic; original strict criteria remain unchanged.",
+  "controls": "Zero backbone augmentation, eval/frozen weights. Each of four native backbones: rigid-pose logprob max error<=1e-4; finite nonzero coordinate gradient; central directional derivative at one of .01,.001,.0001 within max(.001,.05abs(analytic)). State digest unchanged. CPU only,one numerical thread.",
+  "interpretation": "Descriptive four-family diagnostic. Neither likelihood nor geometry qualifies training positives or proves designability. Do not launch GPU guidance from this result alone without a distinct prospectively defined objective and matched same-valid-refold assay. No reopening the closed strength/time-window recipe.",
+  "control_failure_handling": "The CA-only scorer failed finite coordinate gradients in all4native controls and rigid-pose log-probability invariance (max0.019to0.093). Preserve those results. This separately qualified full-backbone architecture avoids using that failed scorer; thresholds unchanged.",
+  "mode": "backbone",
+  "qualified_weight_source": "runs/fragment_full_backbone_50045261/manifest.json"
+}

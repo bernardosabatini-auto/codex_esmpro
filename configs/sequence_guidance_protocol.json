@@ -1,0 +1,29 @@
+{
+  "hypothesis": "Raw motif geometry alone failed strict refolding. Add full-backbone ProteinMPNN likelihood of the supplied motif sequence so the surrounding generated backbone must support that sequence. This is a distinct objective, not a strength/time-window sweep.",
+  "parent_generation": "extra_fragment_validation_50188437",
+  "selection": "First query in each128/256/384/512 bucket from the unchanged retrieval panel; four original noise slots each. Training diagnostic, no independent-test claim.",
+  "seed": 2026100405,
+  "steps": 50,
+  "decoder_steps": 3,
+  "strength": 0.5,
+  "first": 25,
+  "stop": 45,
+  "schedule": "At steps25through44 compute clean=layer_norm(x+(1-t)*v), decode with the original fixed AE3 noise, and sum half squared proper CA motif RMSD plus1nat-weighted mean full-backbone ProteinMPNN motif NLL. Differentiate this joint loss through current frozen velocity and decoder with detached history. Subtract .5*(1-t)/t times unit-RMS total gradient. Finalfive steps unguided. Identical timestep/strength to the failed geometry-only control; heuristic, not exact posterior sampling.",
+  "controls": "Original replay and joint directional derivative/pose controls unchanged. Additionally reproduce all16geometric-only latents exactly, freeze full-backbone ProteinMPNN, check its final-score rigid-pose invariance, and independently recompute final NLLs on CPU. The CA-only scorer is not used.",
+  "gate": {
+    "minimum_valid": 15,
+    "minimum_raw": 5,
+    "minimum_raw_families": 2
+  },
+  "followup": "Only after numerical controls, the original raw geometry gate, and >=.1nat mean motif NLL improvement over geometric-only outputs: preregister eight fixed-motif refolds for all16newbackbones. Reuse the unchanged original baseline/native budgets without pooling. Same valid refold must retain original motif and global/scaffold agreement. No geometry/likelihood-only training positives.",
+  "failure": "Close this single joint objective on failed quality gates; no weight, strength or schedule sweep.",
+  "resources": "OneRTX,15minute ceiling,780second work cap,<=75GiB. No expansion before profile audit. At most8own running-plus-pending GPUs.",
+  "work_cap_seconds": 780,
+  "joint_sequence_guidance": true,
+  "sequence_weight": 1.0,
+  "minimum_nll_improvement": 0.1,
+  "sequence_units": "Joint loss=half squared proper CA RMSD in squareAngstroms +1.0 times mean motif negative log probability in nats. Normalize the TOTAL latent-state gradient to unit per-example RMS, retaining strength.5 and steps25:45. No coefficient grid.",
+  "compatibility_report": "reports/full_backbone_compatibility_20261009.json",
+  "geometry_generation": "trajectory_guidance_51501401",
+  "purpose": "Mechanism pilot for a possible later designability-qualified conditioning teacher, not new training."
+}

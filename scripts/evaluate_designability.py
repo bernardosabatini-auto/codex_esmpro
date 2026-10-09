@@ -1,5 +1,6 @@
 """ProteinMPNN plus guarded teacher refolding with no silently dropped outputs."""
 import argparse,hashlib,json,subprocess,sys,time
+IMPORT_START=time.monotonic()
 from pathlib import Path
 import h5py,numpy as np,torch
 from latentfold.teacher import fast_features,load_fast_model
@@ -17,10 +18,11 @@ def score_refold(record,bb,reference,binary):
 
 
 def main():
+    import_seconds=time.monotonic()-IMPORT_START
     p=argparse.ArgumentParser()
     for key in ('source','config','output'):p.add_argument('--'+key,type=Path,required=True)
     p.add_argument('--overlap-cpu-scoring',action='store_true')
-    a=p.parse_args();c=json.loads(a.config.read_text())
+    a=p.parse_args();preflight_start=time.monotonic();c=json.loads(a.config.read_text())
     from teacher_numerical_recovery import audit_recovery
     recovered=audit_recovery(c)
     if c.get('teacher_deterministic_algorithms') and c.get('assay') not in ('extra_fragment_refold','fragment_preference_refold'):raise ValueError('Undeclared deterministic teacher assay')
@@ -81,14 +83,16 @@ def main():
     if c.get('assay')=='fragment_fixed_positive':
         from prepare_fragment_fixed_positive import audit_inputs
         audit_inputs(c)
+    preflight_seconds=time.monotonic()-preflight_start
     a.output.mkdir(parents=True,exist_ok=False);inputs=a.output/'inputs';inputs.mkdir();torch.set_num_threads(4)
     scorer=OrderedCPUScoring(a.overlap_cpu_scoring)
-    start=time.monotonic();telemetry=None;m=dict(cpu_scoring_mode='overlapped' if a.overlap_cpu_scoring else 'serial',status='running',config=c,records=[],controls=[],sequences={},training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
+    start=time.monotonic();telemetry=None;m=dict(import_seconds=import_seconds,preflight_seconds=preflight_seconds,cpu_scoring_mode='overlapped' if a.overlap_cpu_scoring else 'serial',status='running',config=c,records=[],controls=[],sequences={},training_updates_executed=0);atomic_json(a.output/'manifest.json',m)
     try:
         torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
         if recovered is not None or c.get('teacher_deterministic_algorithms'):torch.use_deterministic_algorithms(True)
         m['teacher_deterministic_algorithms']=torch.are_deterministic_algorithms_enabled()
         telemetry=Telemetry(a.output,True);backbones={}
+        m['cuda_and_telemetry_seconds']=time.monotonic()-start;export_start=time.monotonic()
         with h5py.File(c['predictions']) as f:
             for r in c['entries']:
                 bb=f[r['dataset']][:] if r['head']=='experimental' else f[r['dataset']][r['slot']]
@@ -96,6 +100,7 @@ def main():
                 backbones[r['name']]=bb
                 if c.get('mpnn_mode')=='backbone':write_backbone_pdb(inputs/(r['name']+'.pdb'),bb)
                 else:write_ca_pdb(inputs/(r['name']+'.pdb'),bb[:,1])
+        m['backbone_export_seconds']=time.monotonic()-export_start
         mpnn=Path(c['mpnn']);parsed=a.output/'parsed.jsonl';designs=a.output/'mpnn';tick=time.monotonic()
         mode_args=[] if c.get('mpnn_mode')=='backbone' else ['--ca_only']
         model_weights='vanilla_model_weights' if c.get('mpnn_mode')=='backbone' else 'ca_model_weights'
@@ -103,6 +108,7 @@ def main():
         constrained=requires_fixed_motifs(c['entries'])
         with (a.output/'mpnn.log').open('w') as log:
             subprocess.run([sys.executable,str(mpnn/'helper_scripts/parse_multiple_chains.py'),'--input_path',str(inputs),'--output_path',str(parsed)]+mode_args,check=True,stdout=log,stderr=subprocess.STDOUT,timeout=120)
+            m['mpnn_parse_seconds']=time.monotonic()-tick
             fixed_args=[]
             if constrained:
                 from fixed_motif_design import fix_parsed_motifs
@@ -114,7 +120,9 @@ def main():
         if recovered is not None and m['sequences']!=recovered['sequences']:raise ValueError('Recovery changed fixed sequence attempts')
         if len(list((designs/'seqs').glob('*.fa')))!=len(c['entries']):raise ValueError('Unexpected design coverage')
         atomic_json(a.output/'manifest.json',m);print('MPNN complete',len(c['entries']),flush=True)
-        model,m['teacher_adapter']=load_fast_model(a.source/'data/esmfold2_fast');atomic_json(a.output/'manifest.json',m)
+        load_start=time.monotonic()
+        model,m['teacher_adapter']=load_fast_model(a.source/'data/esmfold2_fast')
+        m['teacher_load_seconds']=time.monotonic()-load_start;atomic_json(a.output/'manifest.json',m)
         with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'refolded.h5','x') as f:
             for r in c['entries']:
                 name=r['name'];ref=backbones[name];g=f.create_group(name)
@@ -137,7 +145,9 @@ def main():
                 m['records'].extend(scorer.drain(wait=True));atomic_json(a.output/'manifest.json',m)
                 print('refolded',name,'best',max(x['sc_tm'] for x in m['records'] if x['name']==name),flush=True)
         if cpu_verified:
+            final_check_start=time.monotonic()
             audit_worker(c)
+            m['final_input_identity_check_seconds']=time.monotonic()-final_check_start
             m['cpu_preflight_file_identity_unchanged']=True
         m['status']='complete'
     except BaseException as error:m.update(status='failed',error=f'{type(error).__name__}: {error}');raise

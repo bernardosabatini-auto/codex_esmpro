@@ -43,7 +43,7 @@ def analyze(run):
                     edges=flank_bonds(folded[r['name']+'/'+str(k)][:],r['motif_start'],len(r['fixed_sequence']),8)
                     row['flank_edges_valid']=edges['all_edges_valid']
                 r.update(connected_outcome(r['raw'],r['refolds'],physical_raw=physical[r['target_id'],r['generation_slot']]))
-        if gc.get('retrieved_context_refold') or gc.get('trajectory_guidance_refold'):
+        if gc.get('retrieved_context_refold') or gc.get('trajectory_guidance_refold') or gc.get('sequence_guidance_refold'):
             from fragment_junction_core import flank_bonds
             from latentfold.connected_refold import connected_outcome
             if m.get('cpu_preflight_file_identity_unchanged') is not True:raise ValueError('Missing post-worker input identity audit')
@@ -53,7 +53,7 @@ def analyze(run):
                     row['flank_edges_valid']=flank_bonds(folded[r['name']+'/'+str(k)][:],r['motif_start'],len(r['fixed_sequence']),8)['all_edges_valid']
                 r['raw_flank_edges_valid']=raw_edges['all_edges_valid']
                 r.update(connected_outcome(r['raw'],r['refolds'],physical_raw=r['raw']['coarse_valid'] and raw_edges['all_edges_valid']))
-    skip_preferences=gc.get('trajectory_guidance_refold') or gc.get('retrieved_context_refold') or spec.get('repaint_student_model_validation') or gc.get('torsion_closure_refold') or gc.get('oracle_teacher_refold') or spec.get('native_anchor_model_validation') or gc.get('native_positive_coverage') or gc.get('pretrained_masked_refold') or gc.get('scaffold_clock_refold') or gc.get('fragment_decoder_refold') or gc.get('fragment_decoder_fm_refold') or gc.get('fragment_inpainting_refold')
+    skip_preferences=gc.get('sequence_guidance_refold') or gc.get('trajectory_guidance_refold') or gc.get('retrieved_context_refold') or spec.get('repaint_student_model_validation') or gc.get('torsion_closure_refold') or gc.get('oracle_teacher_refold') or spec.get('native_anchor_model_validation') or gc.get('native_positive_coverage') or gc.get('pretrained_masked_refold') or gc.get('scaffold_clock_refold') or gc.get('fragment_decoder_refold') or gc.get('fragment_decoder_fm_refold') or gc.get('fragment_inpainting_refold')
     params={} if skip_preferences else {k:spec['preference'][k] for k in ('minimum_quality','discovery_margin','confirmation_margin')}
     if skip_preferences:
         prefs=[]
@@ -106,6 +106,9 @@ def analyze(run):
     if gc.get('trajectory_guidance_refold'):
         from trajectory_guidance_refolding import add_summary
         add_summary(result,spec)
+    if gc.get('sequence_guidance_refold'):
+        from sequence_guidance_refolding import add_summary
+        add_summary(result,c,spec)
     if c.get('teacher_checkpoint_staging'):
         from teacher_staging_replication import audit_result
         result['teacher_staging_validation']=audit_result(run,m,result)
@@ -140,7 +143,8 @@ def main():
         if d.get('movable_motif_refold'):title='Movable rigid-motif same-refold designability'
         if d.get('retrieved_context_refold'):title='Retrieved native-code same-refold designability'
         if d.get('trajectory_guidance_refold'):title='Mid-flow guidance: matched same-refold assay'
-        a.output.with_suffix('.md').write_text('# '+title+'\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','preferences')},indent=2)+'\n```\n')
+        if d.get('sequence_guidance_refold'):title='Joint sequence/geometry guidance: same-refold assay'
+        a.output.with_suffix('.md').write_text('# '+title+'\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','preferences','reused_baseline_records')},indent=2)+'\n```\n')
 
 
 if __name__=='__main__':main()

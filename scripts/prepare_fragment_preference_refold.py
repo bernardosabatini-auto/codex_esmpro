@@ -22,6 +22,9 @@ def make_entry(row, q, slot, index, arm='parent6000'):
 
 
 def audit_inputs(c, *, audited_generation=None):
+    if c.get('sequence_guidance_refold'):
+        from sequence_guidance_refolding import audit_refold
+        return audit_refold(c)
     if c.get('trajectory_guidance_refold'):
         from trajectory_guidance_refolding import audit_refold
         return audit_refold(c)

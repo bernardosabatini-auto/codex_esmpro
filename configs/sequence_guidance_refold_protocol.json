@@ -1,0 +1,11 @@
+{
+  "generation": "trajectory_guidance_51515025",
+  "baseline_assay": "fragment_preference_refold_51502645",
+  "inventory": "All16joint-guided candidates,including raw/validity failures,eight fixed-original-motif designs each:128newrefolds. Reuse exactly the prior16baseline and4native eight-design budgets unchanged; never pool historical attempts. Repeat the first new sequence for numerical control.",
+  "recipe": "Unchanged CA-only ProteinMPNN,T.1,seed1;deterministicFP32 ESMFold2Fast3loops50steps,one teacher worker,overlapped CPU scoring. The full-backbone ProteinMPNN scoring objective does not change the evaluation pipeline.",
+  "primary": "Raw validity and both1A motif limits,then ONE SAME valid refold with original-motif properCA RMSD<=1A,dRMS<=1A,globalTM>.5ANDscaffoldTM>.5. Connectivity supplementary. All16 remain in denominator.",
+  "advance": {"minimum_strict_gain":3,"minimum_guided_strict_families":2,"minimum_native_global_scaffold":3,"maximum_designability_loss":0},
+  "failure": "Close this joint objective if any control or advance gate fails. No extra designs,coefficient/strength/schedule sweep,or raw/likelihood-only positive training labels.",
+  "resources": "OneRTX20minute ceiling. Inherited matched288refold assay measured16m36s;128newrefolds with startup headroom.<=75GiB,atmost8ownrunning-plus-pending GPUs.",
+  "scope": "Four training diagnostic families. This is an inference objective,not a newly trained model or an independent benchmark. Only measured same-refold successes could support later training."
+}

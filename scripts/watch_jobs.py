@@ -7,6 +7,7 @@ start explicitly registered, bounded CPU state scorers.
 import argparse
 from datetime import datetime, timezone
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -309,6 +310,16 @@ def tick(root, config, query=scheduler_states, analyze=followup):
     return state
 
 
+def watcher_lock_path(root,config,*,purpose='watch'):
+    """One watcher on its declared host; avoid shared-filesystem flock stalls."""
+    if purpose not in ('watch','submit'):raise ValueError('Unknown project lock purpose')
+    if config.get('host')!=socket.gethostname():raise RuntimeError('Watcher belongs to another host')
+    runtime=Path(os.environ.get('XDG_RUNTIME_DIR',f'/run/user/{os.getuid()}'))
+    if not runtime.is_dir() or runtime.stat().st_uid!=os.getuid():raise RuntimeError('Owned local runtime directory required')
+    key=hashlib.sha256(str(Path(root).resolve()).encode()).hexdigest()[:16]
+    return runtime/f'esm-proae-{purpose}-{key}.lock'
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, default=Path(__file__).resolve().parents[1])
@@ -316,12 +327,12 @@ def main():
     root = a.root.resolve()
     directory = root/'runs/watch'
     directory.mkdir(parents=True, exist_ok=True)
-    with (directory/'lock').open('w') as lock:
+    config = json.loads((directory/'config.json').read_text())
+    with watcher_lock_path(root,config).open('w') as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         except BlockingIOError:
             return
-        config = json.loads((directory/'config.json').read_text())
         try:
             state = tick(root, config)
             write_json(directory/'heartbeat.json', dict(checked_at=stamp(), status='ok', host=socket.gethostname(),

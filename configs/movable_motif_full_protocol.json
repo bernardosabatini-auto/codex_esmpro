@@ -1,0 +1,16 @@
+{
+  "purpose": "Expand the qualified paired movable-motif CPU mechanism profile to all original training-diagnostic families before spending GPU refolding time",
+  "profile_protocol": "configs/movable_motif_closure_protocol.json",
+  "profile_report": "reports/movable_motif_profile_20261009.json",
+  "profile_report_sha256": "179530d0699946a7c1a2be19d560cf3cbc6dd5b8272ab94dfb46579545de7843",
+  "profile_audit": "reports/movable_motif_profile_audit_20261009.json",
+  "profile_predictions_sha256": "40aeaeef77d72bea939b00808cfe226599c3a9fee3a0f9e7c697eb346bf83379",
+  "panel": "All original32training-diagnostic families, four generation slots each, both generated_cond and native_cond, both fixed_pose and free_pose;512outputs total. Original parent and original placed isolated fragment from torsion_closure_full_20261004; never initialize from optimized outputs or refolds.",
+  "implementation": "Use the exact solver, objective, atom pairs, six-pose parameterization, 8-residue bridges,200iteration/250evaluation optimizer and canonical-frame/grid policies bound by the qualified profile. No restarts, coefficient changes, wider windows or duration sweeps. The posthoc endpoint-triangle mismatch diagnostic does NOT change this experiment.",
+  "controls": "Verify full profile code/protocol/data hashes and independent audit before execution. Repeat all64profile outputs within the full assay and require bitwise equality; retain profile16no-op/repeat/external-pose controls. Every full output must retain original all-atom motif shape within1e-4A and far scaffold bitwise. Independently replay all512savedparameter outputs exactly and rescore all geometry on CPU. Preserve all failures and all original cases.",
+  "physical_gate": "Same complete eight-flank molecular geometry, original isolated motif CA/distance fit, all junctions/flank connectivity, coarse validity and zero graph-nonbonded distances below1.5A touching the movable36residue block. Never substitute ghost endpoint loss for actual coordinates.",
+  "advancement_gate": "All technical controls and full independent audit pass; free_pose at least45/128generated physical-plus-overlap-free cases, strictly more than matched fixed_pose, and at least124/128native cases (the historical native physical count). Report paired gains/losses, family counts, motif displacements and torsion changes. This is feasibility, not designability or learned capacity.",
+  "future_refolding": "Only after this full gate passes, specify an unfiltered128backbone x8ProteinMPNN/refold assay of free_pose with unchanged original motif sequence and original reference. Reuse all original parent and experimental-control budgets. Same valid refold must retain original motif and global/scaffold agreement and complete eight-flank connectivity. Compare against parent45/128designable and8/128strict in7families; spend no GPU budget until that separate fixed assay is prepared and audited.",
+  "cpu_seconds_cap": 7200,
+  "scope": "CPU-only, one numerical-library thread, no GPU allocation, no locked test access. Full expansion is one prespecified experiment, not a trained-model gain. A positive screen may support a later explicit fragment-conditioned training target only after designability qualification."
+}

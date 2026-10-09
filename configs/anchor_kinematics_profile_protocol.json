@@ -1,0 +1,10 @@
+{
+  "purpose": "CPU representation and initialization diagnostic before considering a whole-chain kinematic conditional decoder.",
+  "source_generation": "context_flow_scaffolds_51489000",
+  "selection": "First original query per128/256/384/512bucket; one original native backbone and allfour unchanged parent and retrieved backbones perquery.36outputs, no retries or filtering.",
+  "construction": "Encode the ordered N,CA,C chain into bond lengths, angles and dihedrals, plus oxygen offsets in residue frames. Align only the supplied original20residue fragment to each input's corresponding atoms. Reconstruct both complete chain halves from that rigid motif with original internal parameters. No distant atoms fixed, no latent interpolation, no optimization, no learned weights.",
+  "controls": "Exact self-roundtrip inFP64<=1e-7A andFP32<=0.005A, known motif atoms bitwise preserved, and unknown/cross-boundary bond parameters conserved. Four unit tests cover proper rigid transforms, both endpoint anchors, noncommuting parallel-prefix products, and finite-difference gradients. All errors retained.",
+  "measurements": "Raw coarse/motif gates, flank peptide connectivity, whole-chain nonlocal backbone overlaps, and fixed-correspondence TM against the original input. Native control's supplied fragment must agree with its reference after proper alignment. Compare source and constructed geometry; geometry does not establish designability.",
+  "decision": "This validates representational capacity only. No automatic full graft assay, refolding, or training follows from good bond geometry. A training proposal additionally needs an explicit capacity/control plan addressing global packing and generated-versus-native context mismatch.",
+  "resources": "CPU only, CUDA hidden,one numerical-library thread; frozen completedH5inputs only. No extra sequence designs or scientific refolds."
+}

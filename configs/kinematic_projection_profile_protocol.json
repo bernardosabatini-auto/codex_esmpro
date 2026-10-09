@@ -1,0 +1,9 @@
+{
+  "purpose": "CPU-only test of bond-geometry projection on already conditioned Cartesian-decoder outputs, not another local closure optimizer.",
+  "source_generation": "fragment_inpainting_training_50344679",
+  "selection": "Same first originalquery per128/256/384/512bucket. Allfour samples in generated_cond,generated_untrained,native_cond, plus one native reference each:52outputs, all failures retained.",
+  "bounds": "Perbond-type lengths and percentral-atom angles:empirical0.001/0.999quantiles from the464training families in fragment_context_flow_data_20261009;exclude all32query and16validation families. Fix these bounds once, no sweep. Preserve all dihedrals and oxygen local offsets.",
+  "projection": "Clip only chain bond lengths/angles to these training-derived bounds, then reconstruct both entire chain halves around the original output's unchanged motif. The trained/untrained inpainting outputs already contain the exact supplied motif; native references are reconstruction controls. No distant-coordinate or totalcenter constraint. No optimization or learned parameters.",
+  "decision": "A full prospective assay is only worth proposing if all4native-reference controls remain coarsevalid/connected/overlapfree withTM>=0.95;native_cond has>=14/16joint raw/coarse/connected/overlapfree andmean inputTM>=0.95;generated_cond has>=12/16joint andmean inputTM>=0.8. No automatic GPU training/refolds. Otherwise close this deterministic projection recipe without altered bounds or subsets.",
+  "resources": "CPU only,CUDA hidden,one numerical-library thread. No new sequence designs."
+}

@@ -12,7 +12,11 @@ def decision(parity, reduction, buckets):
 
 
 def analyze(run):
-    m=json.loads((run/'manifest.json').read_text());spec=audit(m['config'])
+    m=json.loads((run/'manifest.json').read_text())
+    if m.get('teacher_staging'):
+        from teacher_staging import analyze as analyze_staging
+        return analyze_staging(run)
+    spec=audit(m['config'])
     if m['status']!='complete':return dict(status='failed',qualified=False,error=m.get('error'))
     wanted={(i,mode,r) for i in range(8) for mode in ('sequential','concurrent') for r in range(4)}
     if (len(m['records'])!=64 or {(r['entry_index'],r['mode'],r['repeat']) for r in m['records']}!=wanted
@@ -52,7 +56,8 @@ def main():
     p=argparse.ArgumentParser();p.add_argument('--runs',type=Path,nargs=1,required=True);p.add_argument('--output',type=Path,required=True);a=p.parse_args()
     d=analyze(a.runs[0]);a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n')
     visible={k:v for k,v in d.items() if k!='parity'}
-    a.output.with_suffix('.md').write_text('# Concurrent refolding efficiency\n\n```json\n'+json.dumps(visible,indent=2)+'\n```\n');print(json.dumps(visible))
+    title='Teacher checkpoint staging' if d.get('teacher_staging') else 'Concurrent refolding efficiency'
+    a.output.with_suffix('.md').write_text('# '+title+'\n\n```json\n'+json.dumps(visible,indent=2)+'\n```\n');print(json.dumps(visible))
 
 
 if __name__=='__main__':main()

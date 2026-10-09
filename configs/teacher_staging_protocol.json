@@ -1,0 +1,11 @@
+{
+  "purpose": "Reduce shared-filesystem weight page faults without changing refolding computations.",
+  "reference_run": "teacher_coordinates_profile_50324704",
+  "modes": ["shared_initial", "local_staged", "shared_warm"],
+  "recipe": "One assigned RTX, sequential model loads with deletion/cache release between modes. Copy exactly the hash-bound HF checkpoint files to a private node-local directory before local_staged. Preserve FP32, deterministic algorithms, full confidence,3loops,50steps,1sample and eight archived sequences/seeds. Never clear system caches or touch other jobs.",
+  "allocation_minutes": 15,
+  "work_cap_seconds": 810,
+  "max_atom_difference": 0.00001,
+  "minimum_initial_load_reduction": 0.10,
+  "decision": "All24 full-atom outputs and post-fold CUDA RNG states must match the historical reference. Local copy-plus-load time must beat shared_initial load by at least10percent. Report shared_warm separately: caches and order are confounded; a pass licenses one matched end-to-end replication only. Failed runtime is retained; no scientific samples or design attempts added."
+}

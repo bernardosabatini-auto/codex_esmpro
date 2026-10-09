@@ -3,7 +3,7 @@ import argparse,json
 from pathlib import Path
 import h5py
 import numpy as np
-from compare_native_anchor_models import verify_outcome
+from compare_native_anchor_models import verify_outcome,diversity
 from compare_extra_fragment_refolds import clustered
 from fragment_junction_core import flank_bonds
 from latentfold.connected_refold import connected_outcome
@@ -18,7 +18,7 @@ def gate(totals):
                 designability=a['designable']>=max(45,b['designable']))
 
 
-def analyze(root,jobs):
+def analyze(root,jobs,diversity_prefix=None):
     ids=[j for values in jobs.values() for j in values]
     registry={j['id']:j for j in json.loads((root/'runs/jobs.json').read_text())['jobs']}
     if (set(jobs)!={'retrieved','random'} or any(len(v)!=4 for v in jobs.values()) or len(set(ids))!=8
@@ -84,8 +84,16 @@ def analyze(root,jobs):
     overlaps=[dict(candidate=a,reference=b,shared=len(passing[a]&passing[b]),candidate_only=len(passing[a]-passing[b]),reference_only=len(passing[b]-passing[a]))
               for a,b in [('retrieved','parent6000'),('random','parent6000'),('retrieved','random')]]
     qualified=gate({r['arm']:r for r in summary if r['bucket'] is None})
+    diversity_results={}
+    if diversity_prefix is not None:
+        for arm in ('retrieved','random'):
+            c=configs[arm,0];gc=json.loads(Path(c['generation_manifest']).read_text())['config']
+            cache=Path(str(diversity_prefix)+'_'+arm+'.json');source=dict(path=str(cache.resolve()),sha256=sha(cache))
+            sources.append(source)
+            diversity_results[arm]=diversity(dict(generation_manifest=c['generation_manifest'],config=dict(gc,prediction_group=arm)),arms[arm],c['usalign'],source)
+
     return dict(status='complete',source_reports=sources,baseline_comparison_sha256=sha(bp),summary=summary,contrasts=contrasts,
-        overlaps=overlaps,gate=qualified,qualified=all(qualified.values()),records=arms,new_refolds=2048,reused_parent_refolds=1024,
+        overlaps=overlaps,diversity=diversity_results,gate=qualified,qualified=all(qualified.values()),records=arms,new_refolds=2048,reused_parent_refolds=1024,
         native=dict(budgets_reused=base['native_budgets_reused'],global_scaffold=base['native_global_scaffold'],controls=base['native']),
         scope='Repeated training-protein diagnostic, not novel-protein generalization. Retrieval excludes all query and validation families. '
               'All128 outputs per arm, eight fixed-original-motif designs each; all failures retained. Strict success requires one valid refold with '
@@ -96,8 +104,8 @@ def analyze(root,jobs):
 
 def main():
     p=argparse.ArgumentParser();p.add_argument('--retrieved',nargs=4,required=True);p.add_argument('--random',nargs=4,required=True)
-    p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-    d=analyze(Path(__file__).resolve().parents[1],dict(retrieved=a.retrieved,random=a.random))
+    p.add_argument('--output',type=Path,required=True);p.add_argument('--diversity-prefix',type=Path);a=p.parse_args()
+    d=analyze(Path(__file__).resolve().parents[1],dict(retrieved=a.retrieved,random=a.random),a.diversity_prefix)
     a.output.with_suffix('.json').write_text(json.dumps(d,indent=2)+'\n')
     lines=['# Retrieved native-code designability','',d['scope'],'','|Arm|Raw|Strict|Designable|Strict families|Connected strict|',
            '|---|---:|---:|---:|---:|---:|']

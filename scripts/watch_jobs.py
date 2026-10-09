@@ -168,6 +168,10 @@ def followup(root, job, config):
         command += ['--references', *[str(root/'runs'/f'comparison_{i}') for i in job_ids(reference)]]
     env = dict(os.environ, CUDA_VISIBLE_DEVICES='', OMP_NUM_THREADS='1', MKL_NUM_THREADS='1',
                OPENBLAS_NUM_THREADS='1', PYTHONPATH=str(root/'src'))
+    if action == 'summarize_fragment_preference_refold':
+        # These audits read completed, checksum-bound HDF5 archives only.
+        # Shared-filesystem flock has stalled otherwise idle completion workers.
+        env['HDF5_USE_FILE_LOCKING'] = 'FALSE'
     with (root/'runs/watch'/f"analysis_{job['id']}.log").open('a') as log:
         run_monitored_analysis(command, root=root, env=env, log=log,
             timeout=1260 if action in ('summarize_compatible_fragment','summarize_context_refresh','summarize_fragment_inpainting_training') else 900 if action=='summarize_fragment_preference_refold' else 240)

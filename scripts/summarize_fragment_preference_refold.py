@@ -33,7 +33,11 @@ def analyze(run):
             from latentfold.connected_refold import connected_outcome
             if m.get('cpu_preflight_file_identity_unchanged') is not True:raise ValueError('Missing post-worker input identity audit')
             generation=json.loads(Path(c['generation_report']).read_text())
-            physical={(r['target_id'],r['generation_slot']):r['refold_eligible_geometry'] for r in generation['records'] if r['arm']=='generated_cond'}
+            if gc.get('movable_motif_refold'):
+                physical={(r['target_id'],r['generation_slot']):r['steric_eligible'] for r in generation['records']
+                          if r['arm']=='generated_cond' and r['pose_arm']=='free_pose'}
+            else:
+                physical={(r['target_id'],r['generation_slot']):r['refold_eligible_geometry'] for r in generation['records'] if r['arm']=='generated_cond'}
             for r in records:
                 for k,row in enumerate(r['refolds']):
                     edges=flank_bonds(folded[r['name']+'/'+str(k)][:],r['motif_start'],len(r['fixed_sequence']),8)
@@ -82,6 +86,8 @@ def analyze(run):
             complete_strict=sum(r['complete_strict'] for r in records),
             connected_designable=sum(r['connected_designable'] for r in records),
             complete_connected_designable=sum(r['complete_connected_designable'] for r in records))
+    if gc.get('movable_motif_refold'):
+        result['movable_motif_refold']=True
     return result
 
 
@@ -110,6 +116,7 @@ def main():
         if d.get('fragment_decoder_fm_refold'):title='Full fragment-conditioned decoder denoising refolds'
         if d.get('fragment_inpainting_refold'):title='Fixed-fragment coordinate-inpainting refolds'
         if d.get('torsion_closure_refold'):title='Constructive torsion-closure same-refold designability'
+        if d.get('movable_motif_refold'):title='Movable rigid-motif same-refold designability'
         a.output.with_suffix('.md').write_text('# '+title+'\n\n```json\n'+json.dumps({k:v for k,v in d.items() if k not in ('records','preferences')},indent=2)+'\n```\n')
 
 

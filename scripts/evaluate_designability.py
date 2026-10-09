@@ -26,9 +26,12 @@ def main():
     from teacher_numerical_recovery import audit_recovery
     recovered=audit_recovery(c)
     if c.get('teacher_deterministic_algorithms') and c.get('assay') not in ('extra_fragment_refold','fragment_preference_refold'):raise ValueError('Undeclared deterministic teacher assay')
-    cpu_verified=c.get('torsion_closure_refold') is True
+    cpu_verified=c.get('torsion_closure_refold') is True or c.get('retrieved_context_refold') is True
     if cpu_verified:
-        from torsion_closure_refolding import audit_worker
+        if c.get('retrieved_context_refold'):
+            from retrieved_context_refolding import audit_worker
+        else:
+            from torsion_closure_refolding import audit_worker
         audit_worker(c)
     else:
         for key in ('generation_manifest','predictions','protocol','usalign'):

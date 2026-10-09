@@ -4,13 +4,14 @@ import json
 import os
 import tempfile
 import time
+from contextlib import ExitStack
 from pathlib import Path
 IMPORT_START=time.monotonic()
 import h5py
 import numpy as np
 import torch
 from latentfold.checkpoints import load_legacy
-from latentfold.decoder import load_proteinae
+from latentfold.decoder import load_proteinae,load_proteinae_decoder_only
 from latentfold.precision import inference_precision
 from context_flow_generation import audit_worker
 from generate_fragment_repaint_teacher import generate
@@ -26,6 +27,8 @@ def main():
     a=p.parse_args();c=json.loads(a.config.read_text());audit_worker(c);parent=c['parent'];a.output.mkdir(exist_ok=False)
     start=time.monotonic();telemetry=None;m=dict(status='running',config=c,controls=[],batches=[],training_updates_executed=0,
         import_seconds=time.monotonic()-IMPORT_START,phases={})
+    full=c.get('full_panel',False)
+    control_ids={r['id'] for r in json.loads(Path(c['profile_manifest']).read_text())['config']['selected']} if full else {r['id'] for r in c['selected']}
     atomic_json(a.output/'manifest.json',m)
     try:
         torch.set_num_threads(2);torch.cuda.set_device(0);torch.cuda.set_per_process_memory_fraction(.85)
@@ -39,13 +42,20 @@ def main():
             m['phases']['local_staging_seconds']=time.monotonic()-tick;tick=time.monotonic()
             model,_=load_legacy(checkpoint,trusted_pickle=True);model.cuda().eval().requires_grad_(False)
             m['phases']['generator_load_seconds']=time.monotonic()-tick;tick=time.monotonic()
-            decoder=load_proteinae(a.source/'ProteinAE_v1',decoder_checkpoint,steps=3).cuda().eval().requires_grad_(False)
+            loader=load_proteinae_decoder_only if c.get('decoder_runtime')=='decoder_only' else load_proteinae
+            decoder=loader(a.source/'ProteinAE_v1',decoder_checkpoint,steps=3).cuda().eval().requires_grad_(False)
             m['phases']['decoder_load_seconds']=time.monotonic()-tick;atomic_json(a.output/'manifest.json',m)
-            with torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'predictions.h5','x') as out,h5py.File(c['inputs']) as inputs,h5py.File(c['oracle_predictions']) as oracle,h5py.File(c['fragments']) as queries:
+            with ExitStack() as stack,torch.no_grad(),inference_precision('fp32'),h5py.File(a.output/'predictions.h5','x') as out,h5py.File(c['inputs']) as inputs,h5py.File(c['oracle_predictions']) as oracle,h5py.File(c['fragments']) as queries:
+                previous=stack.enter_context(h5py.File(c['profile_predictions'])) if full else None
                 for row in c['selected']:
                     ident=row['id'];n=row['length'];q=queries['train/'+ident+'/conditions/c20_center'];st=int(q.attrs['start'])
-                    for arm in ('oracle_original',*c['spec']['arms'],'donor_self'):
+                    arms=('oracle_original',*c['spec']['arms'],'donor_self') if ident in control_ids else c['spec']['arms']
+                    for arm in arms:
                         if time.monotonic()-start>c['work_cap_seconds']:raise TimeoutError('Retrieval profile cap')
+                        if full and ident in control_ids and arm!='oracle_original':
+                            previous.copy(previous[arm+'/'+ident],out.require_group(arm),name=ident)
+                            m['batches'].append(dict(arm=arm,target_id=ident,seconds=0.,peak_reserved_GiB=0.,reused=True))
+                            continue
                         name,length,offset=ident,n,st
                         if arm=='oracle_original':target=oracle['new/'+ident+'/target'][:,st:st+20]
                         elif arm=='donor_self':

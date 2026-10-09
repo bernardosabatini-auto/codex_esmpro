@@ -1,0 +1,23 @@
+{
+  "purpose": "Full matched native-code retrieval assay after qualified four-query profile; assess all32original training-diagnostic queries, then same-refold designability if eligible.",
+  "library": "runs/broad_fragment_corpora_20261003/broad",
+  "queries": "runs/fragment_context_flow_data_20261009",
+  "search": "reports/context_windows_broad_20261009.json",
+  "source_generation": "runs/context_flow_scaffolds_51477995",
+  "panel": "All32original selected queries, four slots each, two arms. Preserve all32profile query outputs exactly, plus16donor-self controls. Replay16original oracle controls under the current runtime.224newquery samples,48reused outputs,16neworacle controls.",
+  "retrieval": "Search every contiguous20-residue window of the7893 certified training proteins, excluding every family in the32query and16validation panels. Match query length bucket. Select the four distinct donor families minimizing max(properCA RMSD,dRMS), breaking ties by RMSD,dRMS,donorID,start. The branch bound dRMS<=joint-score threshold is exact and is tested against exhaustive search. Preserve native code arrays bit-for-bit; no averaging, target re-encoding, latent rotation, or projection. Query input consists only of isolated motif geometry, length and position. Supplied query sequence is reserved for the subsequent fixed-motif design assay.",
+  "control": "Four distinct hash-selected training donor families in the same length bucket, independent of query geometry; choose a hash-selected valid20-residue window in each. Seed2026100911. All32query/16validation families remain excluded. Both arms use actual complete native context codes; only input-based retrieval versus random donor selection differs.",
+  "seed": 2026100911,
+  "arms": [
+    "retrieved",
+    "random"
+  ],
+  "sampler": "Original frozen459M unconditional50Euler/AE3/RePaint3, FP32, original target IDs and scaffold/motif/decoder seeds2026100405. One donor-code sample per noise slot; no retries or generated-output ranking. All failures retained.",
+  "controls": "Replay all16 original oracle outputs on four queries: latentmaxabs<=1e-5, CA RMSD<=.2A,lDDT>=.99, identical raw/valid decisions. Additionally run four noise samples for the first retrieved donor of each query at the donor's actual length and motif placement. These16 donor-self samples test the transferred-code data source; they are controls, not query predictions or replacements. Independent CPU audit verifies all code arrays against source reference_z, donor exclusions, nearest-neighbor certificates, random selection, and original query constraints.",
+  "qualification": "Before full generation require the unchanged qualified profile. After generation, retrieved raw>=9andvalid>=45 permits BOTH entire128-output arms to enter refolding; random raw need not reach9 because its designability is the matched control. No refolding if retrieval fails the bound.",
+  "refolding_boundary": "If retrieved generation qualifies, refold all128retrieved andall128random outputs,8original-motif-fixedMPNN designs each,T.1,seed1,deterministicFP32 ESMFold2-Fast3loops50steps; preserveall failures and originalpairedpartitions. Reuse originalparent/nativecontrols unchanged. Samevalidrefold must satisfyproperoriginalmotifCA RMSD<=1A,dRMS<=1A,globalTM>.5,andscaffoldTM>.5. No geometric corrections,rankings,retries,or pooling.",
+  "resources": "One RTX,15minute allocation,780second worker cap. Four disjoint128-slot refold partitions per eligible arm only afterCPU audit; atmost8ownrunning-plus-pendingGPUs. CPUpreparationandfinalscoring outsideallocation, exactregisteredmonitoring.",
+  "profile_generation": "runs/context_flow_scaffolds_51485391",
+  "decision": "Require retrieved same-valid-refold motif/global/scaffold strict successes>8andgreaterthanrandom,atleast7strictfamilies,andatleast45valid-designable samples with no loss againstrandom. Report raw/refold junctions and same-refold connectivity separately. Paired family-bootstrap intervals,allfailures,reusedparent/nativebudgets unchanged. A pass licenses separately specified fresh-noise/placement replication or training from qualified completions; no step/checkpoint/threshold sweep.",
+  "decoder_runtime": "A decoder-only loader may replace the full training-framework loader only after a bound CPU audit proves identical frozen decoder state,settings,andFP32 outputs on fixed padded and unpadded inputs. Sixteen historical GPU oracle replays remain mandatory. This is an execution optimization,not a scientific intervention."
+}

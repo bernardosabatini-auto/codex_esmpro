@@ -30,6 +30,41 @@ def load_proteinae(checkout, checkpoint, *, steps=3):
         parameter.requires_grad_(False)
     return DifferentiableDecoder(ae, n_steps=steps).eval()
 
+
+def load_proteinae_decoder_only(checkout, checkpoint, *, steps=3):
+    """Inference-only adapter: same external decoder, without trainer/encoder imports.
+
+    This intentionally does not supply an encoder. Call the original loader for
+    encoding work. Only trusted local checkpoints should be passed, as above.
+    """
+    import sys
+    from pathlib import Path
+    from types import SimpleNamespace
+    checkout = Path(checkout).resolve()
+    sys.path.insert(0, str(checkout))
+    try:
+        import hydra
+        from proteinfoundation.nn.protein_transformer import ProteinTransformerAF3
+        with hydra.initialize_config_dir(config_dir=str(checkout / 'configs/experiment_config'),
+                                         version_base=None):
+            hydra.compose(config_name='inference_proteinae', return_hydra_config=True)
+        state = torch.load(checkpoint, map_location='cpu', weights_only=False, mmap=True)
+        cfg = state['hyper_parameters']['cfg_exp']
+        if cfg.model.ca_only:
+            raise ValueError('Decoder-only adapter requires the qualified four-atom checkpoint')
+        ae = nn.Module()
+        ae.cfg_exp = cfg
+        ae.fm = SimpleNamespace(scale_ref=1.0)
+        ae.decoder = ProteinTransformerAF3(
+            **cfg.model.ae.decoder, ca_only=cfg.model.ca_only,
+            apply_inv_folding=cfg.loss.get('use_inv_folding_loss', False) and cfg.model.get('apply_inv_folding', False),
+            latent_add_place=cfg.model.get('latent_add_place', 'cond'))
+        weights = {k.removeprefix('decoder.'): v for k,v in state['state_dict'].items() if k.startswith('decoder.')}
+        ae.decoder.load_state_dict(weights, strict=True)
+    finally:
+        sys.path.remove(str(checkout))
+    return DifferentiableDecoder(ae.eval().requires_grad_(False), n_steps=steps).eval()
+
 class DifferentiableDecoder(nn.Module):
     """Wraps ProteinAE decoder for differentiable z → coords mapping.
 

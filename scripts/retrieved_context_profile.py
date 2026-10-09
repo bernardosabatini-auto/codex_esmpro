@@ -48,14 +48,29 @@ def audit(c):
     corpus=json.loads(Path(c['corpus_manifest']).read_text());search=json.loads(Path(c['search_report']).read_text())
     original=json.loads(Path(c['original_generation_manifest']).read_text());parent=original['config']
     excluded={r['family'] for r in data['records'] if r['split']!='train'}
-    selected=[next(r for r in parent['selected'] if r['bucket']==b) for b in (128,256,384,512)]
+    full=c.get('full_panel',False)
+    selected=parent['selected'] if full else [next(r for r in parent['selected'] if r['bucket']==b) for b in (128,256,384,512)]
     if (spec!=c['spec'] or c['parent']!=parent or c['selected']!=selected or not c['retrieved_context_profile']
-            or c['allocation_minutes']!=10 or c['work_cap_seconds']!=480
+            or c['allocation_minutes']!=(15 if full else 10) or c['work_cap_seconds']!=(780 if full else 480)
             or corpus['status']!='complete' or not corpus['training_gate_passed']
             or search['status']!='complete' or search['fragments_sha256']!=sha(c['library'])
             or search['corpus_manifest_sha256']!=sha(c['corpus_manifest'])
             or search['data_manifest_sha256']!=sha(c['data_manifest'])):
         raise ValueError('Changed retrieval scope or certified data')
+    if full:
+        pm=json.loads(Path(c['profile_manifest']).read_text());pd=json.loads(Path(c['profile_report']).read_text())
+        if (pm['status']!='complete' or pd['status']!='complete' or not pd['qualified']
+                or not pd.get('retrieved_context_profile') or pd['manifest_sha256']!=sha(c['profile_manifest'])
+                or pd['predictions_sha256']!=sha(c['profile_predictions'])
+                or Path(c['profile_manifest']).parent.name!=Path(spec['profile_generation']).name
+                or pm['config']['parent']!=parent
+                or any(c['donors'][r['id']]!=pm['config']['donors'][r['id']] for r in pm['config']['selected'])):
+            raise ValueError('Unqualified or changed profile prefix')
+    if c.get('decoder_runtime')=='decoder_only':
+        d=json.loads(Path(c['decoder_runtime_audit']).read_text())
+        if (d['status']!='complete' or not d['qualified'] or d['checkpoint_sha256']!=sha(c['decoder_checkpoint'])
+                or d['decoder_source_sha256']!=sha(d['decoder_source']) or any(d['cpu_output_max_abs'].values())):
+            raise ValueError('Unqualified decoder-only runtime')
     nearest={r['target_id']:r['neighbors'] for r in search['rows']}
     with h5py.File(c['library']) as f,h5py.File(c['inputs']) as inputs,h5py.File(parent['fragments']) as queries:
         metadata=library_metadata(f,excluded)
@@ -82,13 +97,15 @@ def audit(c):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);a=p.parse_args()
-    root=Path(__file__).resolve().parents[1];protocol=root/'configs/retrieved_context_profile_protocol.json';spec=json.loads(protocol.read_text())
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--full',action='store_true')
+    p.add_argument('--decoder-runtime-audit',type=Path);a=p.parse_args()
+    root=Path(__file__).resolve().parents[1];protocol=root/('configs/retrieved_context_full_protocol.json' if a.full else 'configs/retrieved_context_profile_protocol.json');spec=json.loads(protocol.read_text())
     original=root/spec['source_generation']/'manifest.json';parent=json.loads(original.read_text())['config']
     dm=root/spec['queries']/'manifest.json';data=json.loads(dm.read_text());cm=root/spec['library']/'manifest.json'
     search=root/spec['search'];nearest={r['target_id']:r['neighbors'] for r in json.loads(search.read_text())['rows']}
-    c=dict(retrieved_context_profile=True,parent=parent,spec=spec,selected=[next(r for r in parent['selected'] if r['bucket']==b) for b in (128,256,384,512)],
-           allocation_minutes=10,work_cap_seconds=480,sources=[],donors={})
+    c=dict(retrieved_context_profile=True,full_panel=a.full,parent=parent,spec=spec,
+           selected=parent['selected'] if a.full else [next(r for r in parent['selected'] if r['bucket']==b) for b in (128,256,384,512)],
+           allocation_minutes=15 if a.full else 10,work_cap_seconds=780 if a.full else 480,sources=[],donors={})
     def bind(key,path):
         path=Path(path).resolve();c[key]=str(path);c['sources'].append(dict(path=str(path),sha256=sha(path)))
     for key,path in [('protocol',protocol),('original_generation_manifest',original),('data_manifest',dm),('corpus_manifest',cm),('search_report',search),('library',root/spec['library']/'fragments.h5')]:bind(key,path)
@@ -98,6 +115,13 @@ def main():
     for key in ('checkpoint','decoder_checkpoint'):
         sidecar=Path(parent[key]+'.meta.json')
         if sidecar.exists():bind(key+'_metadata',sidecar)
+    if a.full:
+        profile=root/spec['profile_generation']
+        for key,path in [('profile_manifest',profile/'manifest.json'),('profile_report',root/'reports'/(profile.name+'.json')),('profile_predictions',profile/'predictions.h5')]:bind(key,path)
+    if a.decoder_runtime_audit:
+        if not a.full:raise ValueError('Decoder runtime qualification follows the original profile')
+        bind('decoder_runtime_audit',a.decoder_runtime_audit);c['decoder_runtime']='decoder_only'
+        runtime=json.loads(a.decoder_runtime_audit.read_text());bind('decoder_runtime_source',runtime['decoder_source'])
     inputs=a.output.with_suffix('.h5').resolve()
     excluded={r['family'] for r in data['records'] if r['split']!='train'}
     with h5py.File(c['library']) as f,h5py.File(inputs,'x') as out:
@@ -108,7 +132,7 @@ def main():
     bind('inputs',inputs);c['file_identity']=[identity(r['path']) for r in c['sources']]
     c['config_sha256']=hashlib.sha256(json.dumps(c,sort_keys=True).encode()).hexdigest();audit(c)
     with a.output.open('x') as f:json.dump(c,f,indent=2)
-    print('Four isolated queries; retrieved/random native codes, oracle replay and donor-self controls')
+    print(len(c['selected']),'isolated queries; retrieved/random native codes, oracle replay and donor-self controls')
 
 
 if __name__=='__main__':main()

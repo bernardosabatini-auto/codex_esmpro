@@ -1,5 +1,7 @@
 """Joint geometry and fixed-sequence compatibility guidance, with unchanged total strength."""
 import argparse,json,tempfile,time
+from contextlib import nullcontext
+from latentfold.neighbor_branch import capture_neighbors,fixed_neighbors
 from pathlib import Path
 import h5py,numpy as np,torch
 from latentfold.checkpoints import load_legacy
@@ -47,14 +49,21 @@ def main():
                     _,bb=decoder(z,mask,noise=dn,return_backbone=True)
                     return proper_loss(bb,query,st)+spec['sequence_weight']*motif_nll(sequence_model,bb,sequence,st)
                 def derivative_check(current,estimate,loss_fn,ad_loss,gradient):
-                    with torch.no_grad():
+                    with torch.no_grad(),capture_neighbors(sequence_model) as captured:
                         loss=loss_fn(estimate(current)[1]);err=float((loss-ad_loss).abs().max())
                     norm=gradient[0].norm()
                     if not torch.isfinite(gradient).all() or norm<=1e-10:raise ValueError('Missing actual gradient')
                     direction=torch.zeros_like(gradient);direction[0]=gradient[0]/norm;analytic=float((gradient*direction).sum());fd=[]
-                    with torch.no_grad():
-                        for eps in (.01,.001):
-                            numeric=float((loss_fn(estimate(current+eps*direction)[1])[0]-loss_fn(estimate(current-eps*direction)[1])[0])/(2*eps));fd.append(dict(epsilon=eps,numeric=numeric,analytic=analytic,passed=abs(numeric-analytic)<=max(.01,.05*abs(analytic))))
+                    branch=fixed_neighbors(sequence_model,captured['indices']) if spec.get('branch_checked_gradient') else nullcontext()
+                    with branch:
+                        if spec.get('branch_checked_gradient'):
+                            with torch.enable_grad():
+                                probe=current.detach().requires_grad_();bloss=loss_fn(estimate(probe)[1]);bg,=torch.autograd.grad(bloss.sum(),probe)
+                            control.update(branch_forward_error=float((bloss.detach()-ad_loss).abs().max()),branch_gradient_error=float((bg-gradient).abs().max()))
+                            if control['branch_forward_error']>1e-8 or control['branch_gradient_error']>1e-6:raise ValueError('Derivative branch changed reference')
+                        with torch.no_grad():
+                            for eps in (.01,.001):
+                                numeric=float((loss_fn(estimate(current+eps*direction)[1])[0]-loss_fn(estimate(current-eps*direction)[1])[0])/(2*eps));fd.append(dict(epsilon=eps,numeric=numeric,analytic=analytic,passed=abs(numeric-analytic)<=max(.01,.05*abs(analytic))))
                     rotation=fragment.new_tensor([[0,-1,0],[1,0,0],[0,0,1]]);posed=fragment@rotation+fragment.new_tensor([11,7,-3])
                     with torch.enable_grad():
                         probe=current.detach().requires_grad_();posed_loss=objective(estimate(probe)[1],posed);pg,=torch.autograd.grad(posed_loss.sum(),probe)

@@ -9,14 +9,19 @@ from extra_fragment_validation_core import load_conditions
 from prepare_overfit import sha
 
 
-def prepare(root,output):
-    protocol=root/'configs/sequence_guidance_protocol.json';spec=json.loads(protocol.read_text());gm=root/'runs'/spec['geometry_generation']/'manifest.json';m=json.loads(gm.read_text());c=m['config'].copy();c.pop('config_sha256');c['spec']=spec;c['sources']=[r for r in c['sources'] if r['path']!=c['protocol']];c['protocol']=str(protocol.resolve())
+def prepare(root,output,protocol=None):
+    protocol=protocol or root/'configs/sequence_guidance_protocol.json';spec=json.loads(protocol.read_text());gm=root/'runs'/spec['geometry_generation']/'manifest.json';m=json.loads(gm.read_text());c=m['config'].copy();c.pop('config_sha256');c['spec']=spec;c['sources']=[r for r in c['sources'] if r['path']!=c['protocol']];c['protocol']=str(protocol.resolve())
     cr=root/spec['compatibility_report'];d=json.loads(cr.read_text())
     if d['status']!='complete' or d['mode']!='backbone' or not d['gradient_qualified'] or len(d['controls'])!=4:raise ValueError('Unqualified sequence objective')
     utils=next(Path(r['path']) for r in d['sources'] if r['path'].endswith('protein_mpnn_utils.py'));weights=next(Path(r['path']) for r in d['sources'] if r['path'].endswith('v_48_020.pt'))
     for key,pth in [('protocol',protocol),('compatibility_report',cr),('geometry_manifest',gm),('geometry_predictions',gm.parent/'predictions.h5'),('sequence_utils',utils),('sequence_weights',weights),('sequence_source',root/'src/latentfold/motif_sequence_score.py')]:
         c[key]=str(pth.resolve());c['sources'].append(dict(path=c[key],sha256=sha(pth)))
     if any(sha(r['path'])!=r['sha256'] for r in d['sources'] if r['path'] in (str(utils),str(weights))):raise ValueError('Changed qualified sequence model')
+    if spec.get('branch_checked_gradient'):
+        path=root/spec['gradient_diagnostic_report'];proof=json.loads(path.read_text())
+        if proof['status']!='complete' or not proof['gradient_branch_diagnostic'] or proof['scientific_candidates']!=0 or not any(r['mode']=='fixed' and r['epsilon']==.01 and r['passed'] for r in proof['rows']):raise ValueError('Unqualified derivative correction')
+        for key,pth in [('gradient_diagnostic_report',path),('branch_source',root/'src/latentfold/neighbor_branch.py')]:
+            c[key]=str(pth.resolve());c['sources'].append(dict(path=c[key],sha256=sha(pth)))
     c['file_identity']=[identity(r['path']) for r in c['sources']];c['config_sha256']=hashlib.sha256(json.dumps(c,sort_keys=True).encode()).hexdigest();audit(c);output.write_text(json.dumps(c,indent=2)+'\n')
 
 
@@ -25,6 +30,7 @@ def analyze(run):
     if not spec.get('joint_sequence_guidance'):raise ValueError('Wrong objective')
     for control in m['controls']:
         if control['geometry_replay_max_abs']!=0 or control['sequence_pose_error']>1e-4:raise ValueError('Sequence/geometry control failed')
+    if spec.get('branch_checked_gradient') and any(r['branch_forward_error']>1e-8 or r['branch_gradient_error']>1e-6 for r in m['controls']):raise ValueError('Changed derivative branch')
     model=load_model(c['sequence_utils'],c['sequence_weights']);conditions=load_conditions(c['fragments'],[r['id'] for r in c['selected']],'c20_center',cohort='train');scores=[]
     with torch.no_grad(),h5py.File(run/'predictions.h5',locking=False) as f,h5py.File(c['geometry_predictions'],locking=False) as old,h5py.File(c['fragments'],locking=False) as fr:
         for row in c['selected']:
@@ -38,4 +44,4 @@ def analyze(run):
     return result
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);a=p.parse_args();prepare(Path(__file__).resolve().parents[1],a.output)
+    p=argparse.ArgumentParser();p.add_argument('--output',type=Path,required=True);p.add_argument('--protocol',type=Path);a=p.parse_args();prepare(Path(__file__).resolve().parents[1],a.output,a.protocol)

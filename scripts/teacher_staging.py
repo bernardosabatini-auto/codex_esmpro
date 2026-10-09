@@ -95,7 +95,7 @@ def analyze(run):
             or [r['mode'] for r in m['loads']]!=modes or m['new_design_attempts'] or m['coordinates_sha256']!=sha(run/'coordinates.h5')):
         raise ValueError('Incomplete staging profile')
     parity=[]
-    with h5py.File(run/'coordinates.h5') as f,h5py.File(c['reference_coordinates']) as old:
+    with h5py.File(run/'coordinates.h5',locking=False) as f,h5py.File(c['reference_coordinates'],locking=False) as old:
         if set(f)!=set(modes) or any(set(f[s])!={str(i) for i in range(8)} for s in modes):raise ValueError('Changed output inventory')
         for r in m['records']:
             a,b=f[f"{r['mode']}/{r['index']}"][:],old[f"{r['index']}/full_0"][:]

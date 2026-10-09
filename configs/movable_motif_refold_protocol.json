@@ -1,0 +1,23 @@
+{
+  "purpose": "Test designability of qualified movable rigid-motif constructions before any explicit isolated-fragment training on their outputs",
+  "source_run": "movable_motif_full_20261009",
+  "source_report": "reports/movable_motif_full_20261009.json",
+  "source_audit": "reports/movable_motif_full_audit_20261009.json",
+  "required_complete_geometry": 45,
+  "samples": 128,
+  "proteins": 32,
+  "slots": 4,
+  "partitions": 4,
+  "sequences_per_backbone": 8,
+  "temperature": 0.1,
+  "mpnn_mode": "ca",
+  "teacher": "Same deterministic FP32 ESMFold2-Fast execution, three loops,50steps, one diffusion sample, fixed sequence and seed recipe as historical parent controls",
+  "denominator": "Export all128free_pose/generated_cond outputs, including every physical failure and every original parent/motif pair. No native-oracle candidates or replacements. Preserve all eight attempts per backbone.",
+  "constraints": "ProteinMPNN fixes the supplied20residue motif sequence. Score the ORIGINAL isolated motif structure, not the constructed or refolded motif as a substitute target.",
+  "same_refold": "The SAME refold must pass coarse whole-backbone validity, globalTM>0.5, scaffold-onlyTM>0.5, motifCA-RMSD<=1A, motifdRMS<=1A and peptideC-N1.1to1.6A/CA<=4.5A throughout both eight-residue flanks and boundaries. Strict success also requires complete physical and graph-nonbonded-overlap-free raw construction. Original motif reference/sequence never changes when its rigid pose moves.",
+  "comparison": "Reuse the four distinct original parent partitions and all experimental positive-control budgets unchanged. Apply the same movable36-residue-block atom-contact gate to parent raw structures; verified parent counts remain8strict in7families and43complete-connected-designable (45ordinarydesignable). Report ordinary and connected designability, same-refold strict success, paired family-clustered intervals and every failure. This tests the whole constructive procedure against the parent; it does not isolate pose movement as the cause of any designability difference.",
+  "advancement": "More than8strict successes across at least7families, with at least45complete_connected_designable samples. That count requires complete physical eligibility of the constructed backbone plus a single valid connected refold with global/scaffoldTM>0.5, without requiring motif retention in that secondary designability count. Report connected designability without the raw complete gate separately. Otherwise close this fixed construction as a designability route; do not train on geometry alone. Passing permits a separately specified isolated-fragment training experiment, not a generalization claim.",
+  "resources": "Four one-RTX partitions, each32backbones x8sequences with35minute caps, inheriting the already qualified matched teacher profile. Verify teacher content and inputs on CPU before submission; verify immutable file metadata at GPU startup/end and rehash in independent CPU completion audits. Overlap CPU scoring with GPU refolding. No concurrent teacher workers on the same GPU; previous profile was slower. At most8own running+pending GPUs total.",
+  "scope": "Training-diagnostic corpus only; locked tests untouched. Constructive teacher candidate, not a trained generator or deployable speed result. Include CPU closure cost. More than8strict inatleast7families AND at least45complete-connected-designable required before separately specifying isolated-fragment training. No extension or new sequence draws for a failed recipe.",
+  "prerequisite": "Full512-output paired CPU assay and independent audit must qualify. free_pose77/128 versus fixed_pose60/128 complete physical and overlap-free; native124/128both. All64profile outputs and512saved-parameter replays exact. No geometry-only designability claim."
+}

@@ -1,0 +1,18 @@
+{
+  "hypothesis": "Guiding decoded clean estimates during the trained conditional flow allows later prior dynamics to accommodate motif geometry, unlike terminal latent edits or initial-noise optimization.",
+  "parent_generation": "extra_fragment_validation_50188437",
+  "selection": "First query in each128/256/384/512 bucket from the unchanged retrieval panel; four original noise slots each. Training diagnostic, no independent-test claim.",
+  "seed": 2026100405,
+  "steps": 50,
+  "decoder_steps": 3,
+  "strength": 0.5,
+  "first": 25,
+  "stop": 45,
+  "schedule": "At steps25 through44, clean=layer_norm(x+(1-t)*v). Differentiate half squared proper CA motif RMSD through frozen current velocity and AE3 decoder with fixed original noise; detach prior history. Subtract .5*(1-t)/t times per-example unit-RMS gradient from velocity. Preserve original prior self-conditioning convention; no history gradient. Last five steps unguided. Heuristic, not exact posterior sampling.",
+  "controls": "All four families: zero guidance matches canonical sampler exactly and historical latent within1e-5; historical CA RMSD<=.2A,lDDT>=.99 and identical decisions. First guided step: autograd/no-grad loss max difference<=.001; nonzero finite gradient; central directional derivative at one of .01,.001 within max(.01,.05abs(analytic)). Check original motif rigid-pose loss/gradient invariance at1e-4 relative gradient error. Frozen parameter hash unchanged. Save all50states perarm and audit Euler updates on CPU. No filtering, resampling or line search.",
+  "gate": {"minimum_valid": 15, "minimum_raw": 5, "minimum_raw_families": 2},
+  "followup": "Only after every control and gate passes, preregister matched fixed-budget refolding of all16guided and16parent plus4native backbones, eight fixed-motif ProteinMPNN sequences each. Same valid refold must satisfy original motif and global/scaffold agreement. No geometry-only positive training labels. A later training proposal must use qualified fragment-only conditional targets, with held-out families and controls.",
+  "failure": "Close this single schedule without strength or time-window sweep if quality gate fails.",
+  "resources": "OneRTX,15minute ceiling,780second work cap,<=75GiB. No expansion before profile audit. At most8own running-plus-pending GPUs.",
+  "work_cap_seconds": 780
+}

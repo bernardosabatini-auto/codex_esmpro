@@ -1,0 +1,10 @@
+{
+  "generation": "trajectory_guidance_51501401",
+  "inventory": "All16baseline and16guided backbones plus original native backbone for each of the four queries. No output filtering. Eight newly designed fixed-original-motif sequences perbackbone, T.1,ProteinMPNNseed1.288refolds plus four native numerical repeats. Never pool historical attempts.",
+  "recipe": "Reuse qualified deterministicFP32 CA-onlyProteinMPNN/ESMFold2Fast recipe,3loops50steps, single teacher worker and overlapped CPU scoring. Fixed motif is the original query, never replaced by the generated motif.",
+  "primary": "Strict raw validity and both1A motif limits, followed by ONE SAME valid refold with globalTM>.5, scaffold-onlyTM>.5, proper original-motifCA RMSD<=1A and dRMS<=1A. Report ordinary designability separately and all failures. Connectivity supplementary, unchanged primary.",
+  "advance": {"minimum_strict_gain": 3, "minimum_guided_strict_families": 2, "minimum_native_global_scaffold": 3, "maximum_designability_loss": 0},
+  "interpretation": "Four repeatedly used training families, not a generalization benchmark or proof of learned improvement. Passing licenses a broader preregistered paired assay, not training from raw geometric positives. Report paired sample outcomes and family counts; four families cannot support a precise population interval.",
+  "failure": "Close fixed guidance recipe if any numerical control or advance gate fails; no extra designs or strength sweep.",
+  "resources": "OneRTX35minute maximum,<=75GiB, no more than8own running-plus-pending GPUs. Runtime/memory inherited from matched32backbone256refold RTX profiles, with headroom for36backbones."
+}

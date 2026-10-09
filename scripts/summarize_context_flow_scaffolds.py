@@ -14,6 +14,9 @@ from prepare_overfit import sha
 
 def analyze(run):
     mp=run/'manifest.json';m=json.loads(mp.read_text())
+    if m['config'].get('retrieved_context_profile'):
+        from summarize_retrieved_context_profile import analyze as retrieval_audit
+        return retrieval_audit(run)
     if m['config'].get('context_normalization_profile'):
         from context_normalization_profile import analyze as normalization_audit
         return normalization_audit(run)
